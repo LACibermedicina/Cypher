@@ -7,7 +7,7 @@ import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -2228,6 +2228,482 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Validate API key error:', error);
       res.status(500).json({ message: 'Failed to validate API key' });
+    }
+  });
+
+  // ===== LABORATORY INTEGRATION ENDPOINTS =====
+
+  // Create new laboratory test order (Internal - for doctors)
+  app.post('/api/lab-orders', async (req, res) => {
+    try {
+      // Validate request body with Zod schema
+      const orderValidation = insertLabOrderSchema.extend({
+        expectedResultDate: z.string().optional().transform(val => val ? new Date(val) : undefined)
+      }).safeParse(req.body);
+
+      if (!orderValidation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid request data',
+          errors: orderValidation.error.errors.map(err => ({
+            field: err.path.join('.'),
+            message: err.message
+          }))
+        });
+      }
+
+      const { patientId, laboratoryId, orderDetails, urgency, expectedResultDate } = orderValidation.data;
+
+      // Validate laboratory exists and is active
+      const laboratory = await storage.getCollaborator(laboratoryId);
+      if (!laboratory || laboratory.type !== 'laboratory' || !laboratory.isActive) {
+        return res.status(404).json({ message: 'Laboratory not found or inactive' });
+      }
+
+      // Validate patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+
+      // Require authentication for internal endpoints
+      const user = (req as any).user;
+      if (!user || user.role !== 'doctor') {
+        return res.status(401).json({ message: 'Authentication required - doctors only' });
+      }
+
+      const doctorId = user.id;
+      
+      // Create lab order
+      const newOrder = await storage.createLabOrder({
+        patientId,
+        doctorId,
+        laboratoryId,
+        orderDetails,
+        urgency: urgency || 'routine',
+        expectedResultDate,
+      });
+
+      // Log order creation
+      await storage.createCollaboratorIntegration({
+        collaboratorId: laboratoryId,
+        integrationType: 'lab_order',
+        entityId: newOrder.id,
+        action: 'order_created',
+        status: 'success',
+        requestData: {
+          patientId,
+          doctorId,
+          orderDetails,
+          urgency: urgency || 'routine',
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Real-time broadcast
+      broadcast({
+        type: 'lab_order_created',
+        data: { orderId: newOrder.id, laboratoryId, patientId }
+      });
+
+      res.status(201).json(newOrder);
+    } catch (error) {
+      console.error('Create lab order error:', error);
+      res.status(500).json({ message: 'Failed to create lab order' });
+    }
+  });
+
+  // Get laboratory orders (External API - for laboratories)
+  app.get('/api/laboratories/:laboratoryId/orders', authenticateApiKey, async (req, res) => {
+    try {
+      const { laboratoryId } = req.params;
+      const { status, limit = 50, offset = 0, startDate, endDate } = req.query;
+
+      // Tenant binding check
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== laboratoryId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_lab_orders_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another laboratory\'s orders',
+          requestData: {
+            requestedLaboratoryId: laboratoryId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized laboratory access' });
+      }
+
+      // Validate laboratory type
+      if (authenticatedCollaborator.type !== 'laboratory') {
+        return res.status(403).json({ message: 'Access denied: not a laboratory collaborator' });
+      }
+
+      // Get laboratory orders
+      const allOrders = await storage.getLabOrdersByLaboratory(laboratoryId);
+      
+      // Apply filters
+      let filteredOrders = allOrders;
+      
+      if (status) {
+        filteredOrders = filteredOrders.filter(order => order.status === status);
+      }
+      
+      if (startDate || endDate) {
+        const start = startDate ? new Date(startDate as string) : new Date(0);
+        const end = endDate ? new Date(endDate as string) : new Date();
+        filteredOrders = filteredOrders.filter(order => 
+          new Date(order.createdAt) >= start && new Date(order.createdAt) <= end
+        );
+      }
+
+      // Apply pagination
+      const total = filteredOrders.length;
+      const paginatedOrders = filteredOrders.slice(Number(offset), Number(offset) + Number(limit));
+
+      // Log access
+      await storage.createCollaboratorIntegration({
+        collaboratorId: laboratoryId,
+        integrationType: 'lab_order_access',
+        entityId: 'orders_list',
+        action: 'orders_retrieved',
+        status: 'success',
+        requestData: {
+          ordersCount: paginatedOrders.length,
+          filters: { status, startDate, endDate },
+          pagination: { limit, offset },
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json({
+        orders: paginatedOrders,
+        total,
+        limit: Number(limit),
+        offset: Number(offset),
+        hasMore: Number(offset) + Number(limit) < total
+      });
+    } catch (error) {
+      console.error('Get laboratory orders error:', error);
+      res.status(500).json({ message: 'Failed to get laboratory orders' });
+    }
+  });
+
+  // Update laboratory order status (External API - for laboratories)
+  app.patch('/api/lab-orders/:orderId/status', authenticateApiKey, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { status, collectionDate, completedAt, externalOrderId, notes } = req.body;
+
+      // Get existing order with tenant binding
+      const existingOrder = await storage.getLabOrder(orderId);
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Lab order not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== existingOrder.laboratoryId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: orderId,
+          action: 'unauthorized_lab_order_update',
+          status: 'failed',
+          errorMessage: 'Attempted to update another laboratory\'s order',
+          requestData: {
+            orderId,
+            orderLaboratoryId: existingOrder.laboratoryId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            requestedStatus: status,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized lab order update' });
+      }
+
+      // Validate status transitions
+      const ALLOWED_LAB_TRANSITIONS: Record<string, string[]> = {
+        'ordered': ['collected', 'cancelled'],
+        'collected': ['processing', 'cancelled'],
+        'processing': ['completed', 'cancelled'],
+        'completed': [], // Final state
+        'cancelled': [] // Final state
+      };
+
+      const currentStatus = existingOrder.status;
+      if (status && !ALLOWED_LAB_TRANSITIONS[currentStatus]?.includes(status)) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'lab_workflow_violation',
+          entityId: orderId,
+          action: 'invalid_status_transition',
+          status: 'failed',
+          errorMessage: `Invalid lab order transition from ${currentStatus} to ${status}`,
+          requestData: {
+            orderId,
+            patientId: existingOrder.patientId,
+            currentStatus,
+            requestedStatus: status,
+            validTransitions: ALLOWED_LAB_TRANSITIONS[currentStatus] || [],
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(400).json({ 
+          message: `Invalid transition from ${currentStatus} to ${status}`,
+          currentStatus,
+          validTransitions: ALLOWED_LAB_TRANSITIONS[currentStatus] || []
+        });
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (collectionDate) updateData.collectionDate = new Date(collectionDate);
+      if (completedAt) updateData.completedAt = new Date(completedAt);
+      if (externalOrderId) updateData.externalOrderId = externalOrderId;
+
+      // Auto-set completion timestamp for completed status
+      if (status === 'completed' && !completedAt) {
+        updateData.completedAt = new Date();
+      }
+
+      // Update the order
+      const updatedOrder = await storage.updateLabOrder(orderId, updateData);
+      if (!updatedOrder) {
+        return res.status(500).json({ message: 'Failed to update lab order' });
+      }
+
+      // Comprehensive audit logging
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'lab_order_update',
+        entityId: orderId,
+        action: 'status_updated',
+        status: 'success',
+        requestData: {
+          orderId,
+          patientId: existingOrder.patientId,
+          doctorId: existingOrder.doctorId,
+          previousStatus: currentStatus,
+          newStatus: status,
+          updateData,
+          notes: notes || '',
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Real-time broadcast
+      broadcast({
+        type: 'lab_order_status_updated',
+        data: { orderId, newStatus: status, laboratoryId: authenticatedCollaborator.id }
+      });
+
+      res.json({
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        previousStatus: currentStatus,
+        updatedAt: new Date().toISOString(),
+        collectionDate: updatedOrder.collectionDate,
+        completedAt: updatedOrder.completedAt,
+        externalOrderId: updatedOrder.externalOrderId
+      });
+    } catch (error) {
+      console.error('Update lab order status error:', error);
+      res.status(500).json({ message: 'Failed to update lab order status' });
+    }
+  });
+
+  // Submit laboratory test results (External API - for laboratories)
+  app.post('/api/lab-orders/:orderId/results', authenticateApiKey, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { results, resultsFileUrl, criticalValues, technician } = req.body;
+
+      // Get existing order with tenant binding
+      const existingOrder = await storage.getLabOrder(orderId);
+      if (!existingOrder) {
+        return res.status(404).json({ message: 'Lab order not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== existingOrder.laboratoryId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: orderId,
+          action: 'unauthorized_results_submission',
+          status: 'failed',
+          errorMessage: 'Attempted to submit results for another laboratory\'s order',
+          requestData: {
+            orderId,
+            orderLaboratoryId: existingOrder.laboratoryId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized results submission' });
+      }
+
+      // Validate order can receive results
+      if (!['processing', 'completed'].includes(existingOrder.status)) {
+        return res.status(400).json({ 
+          message: 'Results can only be submitted for orders in processing or completed status',
+          currentStatus: existingOrder.status 
+        });
+      }
+
+      // Update order with results
+      const updateData: any = {
+        status: 'completed',
+        completedAt: new Date(),
+        results,
+        criticalValues: criticalValues || false,
+      };
+
+      if (resultsFileUrl) {
+        updateData.resultsFileUrl = resultsFileUrl;
+      }
+
+      const updatedOrder = await storage.updateLabOrder(orderId, updateData);
+      if (!updatedOrder) {
+        return res.status(500).json({ message: 'Failed to update lab order with results' });
+      }
+
+      // Comprehensive audit logging
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'lab_results_submission',
+        entityId: orderId,
+        action: 'results_submitted',
+        status: 'success',
+        requestData: {
+          orderId,
+          patientId: existingOrder.patientId,
+          doctorId: existingOrder.doctorId,
+          resultsSubmitted: true,
+          criticalValues: criticalValues || false,
+          technician: technician || 'unknown',
+          resultsFileProvided: !!resultsFileUrl,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Real-time broadcast
+      broadcast({
+        type: 'lab_results_available',
+        data: { 
+          orderId, 
+          laboratoryId: authenticatedCollaborator.id,
+          patientId: existingOrder.patientId,
+          criticalValues: criticalValues || false
+        }
+      });
+
+      res.json({
+        id: updatedOrder.id,
+        status: updatedOrder.status,
+        results: updatedOrder.results,
+        resultsFileUrl: updatedOrder.resultsFileUrl,
+        criticalValues: updatedOrder.criticalValues,
+        completedAt: updatedOrder.completedAt,
+        submittedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Submit lab results error:', error);
+      res.status(500).json({ message: 'Failed to submit lab results' });
+    }
+  });
+
+  // Get laboratory analytics and statistics (External API - for laboratories)
+  app.get('/api/laboratories/:laboratoryId/analytics', authenticateApiKey, async (req, res) => {
+    try {
+      const { laboratoryId } = req.params;
+
+      // Tenant binding check
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== laboratoryId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_lab_analytics_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another laboratory\'s analytics',
+          requestData: {
+            requestedLaboratoryId: laboratoryId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized laboratory analytics access' });
+      }
+
+      // Validate laboratory exists and is active
+      const laboratory = await storage.getCollaborator(laboratoryId);
+      if (!laboratory || laboratory.type !== 'laboratory') {
+        return res.status(404).json({ message: 'Laboratory not found' });
+      }
+
+      const labOrders = await storage.getLabOrdersByLaboratory(laboratoryId);
+      const integrationLogs = await storage.getCollaboratorIntegrationsByCollaborator(laboratoryId);
+
+      // Calculate statistics
+      const totalOrders = labOrders.length;
+      const completedOrders = labOrders.filter(order => order.status === 'completed').length;
+      const pendingOrders = labOrders.filter(order => 
+        ['ordered', 'collected', 'processing'].includes(order.status)
+      ).length;
+      const criticalResults = labOrders.filter(order => order.criticalValues).length;
+
+      // Average processing time (in hours)
+      const completedOrdersWithTime = labOrders.filter(order => 
+        order.completedAt && order.createdAt
+      );
+      const avgProcessingTime = completedOrdersWithTime.length > 0
+        ? completedOrdersWithTime.reduce((sum, order) => {
+            const timeDiff = new Date(order.completedAt!).getTime() - new Date(order.createdAt).getTime();
+            return sum + (timeDiff / (1000 * 60 * 60)); // Convert to hours
+          }, 0) / completedOrdersWithTime.length
+        : 0;
+
+      // Recent activity (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentOrders = labOrders.filter(order => 
+        new Date(order.createdAt) >= thirtyDaysAgo
+      );
+
+      // Status distribution
+      const statusDistribution = labOrders.reduce((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      res.json({
+        laboratory: {
+          id: laboratory.id,
+          name: laboratory.name,
+          type: laboratory.type
+        },
+        statistics: {
+          totalOrders,
+          completedOrders,
+          pendingOrders,
+          criticalResults,
+          completionRate: totalOrders > 0 ? (completedOrders / totalOrders * 100) : 0,
+          avgProcessingTimeHours: Math.round(avgProcessingTime * 100) / 100,
+          recentActivity: recentOrders.length,
+          integrationEvents: integrationLogs.length,
+          statusDistribution
+        },
+        recentOrders: recentOrders.slice(0, 10) // Last 10 recent orders
+      });
+    } catch (error) {
+      console.error('Get laboratory analytics error:', error);
+      res.status(500).json({ message: 'Failed to get laboratory analytics' });
     }
   });
 
