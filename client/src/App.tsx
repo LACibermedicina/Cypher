@@ -1,5 +1,6 @@
 import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 
 function Router() {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -36,19 +38,19 @@ function Router() {
             <div className="flex items-center space-x-6 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <i className="fas fa-shield-alt text-accent"></i>
-                <span>FIPS 140-2 Level 3 Compliant</span>
+                <span>{t("security.compliance")}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <i className="fas fa-lock text-accent"></i>
-                <span>Criptografia AES-256</span>
+                <span>{t("security.encryption")}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <i className="fas fa-certificate text-accent"></i>
-                <span>ISO 27001:2013</span>
+                <span>{t("security.iso_cert")}</span>
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2024 Telemed - Sistema de Telemedicina
+              {t("footer.copyright")}
             </div>
           </div>
         </div>

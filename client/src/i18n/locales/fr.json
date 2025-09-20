@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Système de Télémédecine",
+    "description": "Système de télémédecine avec IA intégrée"
+  },
+  "navigation": {
+    "dashboard": "Tableau de Bord",
+    "patients": "Patients",
+    "schedule": "Planning",
+    "whatsapp": "WhatsApp IA",
+    "records": "Dossiers",
+    "admin": "Admin",
+    "logout": "Déconnexion"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "export": "Exporter",
+    "import": "Importer",
+    "close": "Fermer",
+    "open": "Ouvrir",
+    "view": "Voir",
+    "download": "Télécharger",
+    "upload": "Téléverser",
+    "print": "Imprimer"
+  },
+  "medical": {
+    "patient": "Patient",
+    "doctor": "Médecin",
+    "appointment": "Rendez-vous",
+    "prescription": "Prescription",
+    "diagnosis": "Diagnostic",
+    "symptoms": "Symptômes",
+    "treatment": "Traitement",
+    "medication": "Médicament",
+    "exam": "Examen",
+    "result": "Résultat",
+    "emergency": "Urgence",
+    "teleconsultation": "Téléconsultation",
+    "video_call": "Appel Vidéo",
+    "medical_record": "Dossier Médical",
+    "digital_signature": "Signature Numérique",
+    "prescription_digital": "Prescription Numérique"
+  },
+  "dashboard": {
+    "title": "Tableau de Bord",
+    "today_appointments": "Rendez-vous d'Aujourd'hui",
+    "recent_messages": "Messages Récents",
+    "system_status": "État du Système",
+    "quick_actions": "Actions Rapides",
+    "new_appointment": "Nouveau Rendez-vous",
+    "emergency": "Urgence",
+    "digital_prescription": "Prescription Numérique"
+  },
+  "patients": {
+    "title": "Gestion des Patients",
+    "add_patient": "Ajouter un Patient",
+    "patient_info": "Informations du Patient",
+    "medical_history": "Historique Médical",
+    "contact_info": "Informations de Contact",
+    "insurance": "Assurance"
+  },
+  "appointments": {
+    "title": "Rendez-vous",
+    "schedule_appointment": "Planifier un Rendez-vous",
+    "upcoming": "À venir",
+    "today": "Aujourd'hui",
+    "completed": "Terminés",
+    "cancelled": "Annulés"
+  },
+  "telemedicine": {
+    "video_consultation": "Consultation Vidéo",
+    "start_consultation": "Démarrer la Consultation",
+    "end_consultation": "Terminer la Consultation",
+    "consultation_history": "Historique des Consultations",
+    "patient_portal": "Portail Patient",
+    "secure_messaging": "Messagerie Sécurisée",
+    "digital_health": "Santé Numérique",
+    "remote_monitoring": "Surveillance à Distance"
+  },
+  "security": {
+    "encryption": "Chiffrement AES-256",
+    "compliance": "Conforme FIPS 140-2 Niveau 3",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Accès Sécurisé",
+    "data_protection": "Protection des Données"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Système de Télémédecine",
+    "all_rights_reserved": "Tous droits réservés"
+  }
+}

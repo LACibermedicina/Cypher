@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "远程医疗系统",
+    "description": "集成人工智能的远程医疗系统"
+  },
+  "navigation": {
+    "dashboard": "仪表板",
+    "patients": "患者",
+    "schedule": "日程",
+    "whatsapp": "WhatsApp 智能",
+    "records": "病历",
+    "admin": "管理",
+    "logout": "登出"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "search": "搜索",
+    "filter": "筛选",
+    "export": "导出",
+    "import": "导入",
+    "close": "关闭",
+    "open": "打开",
+    "view": "查看",
+    "download": "下载",
+    "upload": "上传",
+    "print": "打印"
+  },
+  "medical": {
+    "patient": "患者",
+    "doctor": "医生",
+    "appointment": "预约",
+    "prescription": "处方",
+    "diagnosis": "诊断",
+    "symptoms": "症状",
+    "treatment": "治疗",
+    "medication": "药物",
+    "exam": "检查",
+    "result": "结果",
+    "emergency": "急诊",
+    "teleconsultation": "远程咨询",
+    "video_call": "视频通话",
+    "medical_record": "病历",
+    "digital_signature": "数字签名",
+    "prescription_digital": "数字处方"
+  },
+  "dashboard": {
+    "title": "控制面板",
+    "today_appointments": "今日预约",
+    "recent_messages": "最新消息",
+    "system_status": "系统状态",
+    "quick_actions": "快速操作",
+    "new_appointment": "新预约",
+    "emergency": "急诊",
+    "digital_prescription": "数字处方"
+  },
+  "patients": {
+    "title": "患者管理",
+    "add_patient": "添加患者",
+    "patient_info": "患者信息",
+    "medical_history": "病史",
+    "contact_info": "联系信息",
+    "insurance": "保险"
+  },
+  "appointments": {
+    "title": "预约",
+    "schedule_appointment": "安排预约",
+    "upcoming": "即将到来",
+    "today": "今天",
+    "completed": "已完成",
+    "cancelled": "已取消"
+  },
+  "telemedicine": {
+    "video_consultation": "视频咨询",
+    "start_consultation": "开始咨询",
+    "end_consultation": "结束咨询",
+    "consultation_history": "咨询历史",
+    "patient_portal": "患者门户",
+    "secure_messaging": "安全消息",
+    "digital_health": "数字健康",
+    "remote_monitoring": "远程监护"
+  },
+  "security": {
+    "encryption": "AES-256 加密",
+    "compliance": "FIPS 140-2 三级认证",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "安全访问",
+    "data_protection": "数据保护"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - 远程医疗系统",
+    "all_rights_reserved": "保留所有权利"
+  }
+}

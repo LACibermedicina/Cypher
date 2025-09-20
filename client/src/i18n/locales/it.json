@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Sistema di Telemedicina",
+    "description": "Sistema di telemedicina con IA integrata"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "patients": "Pazienti",
+    "schedule": "Calendario",
+    "whatsapp": "WhatsApp IA",
+    "records": "Cartelle",
+    "admin": "Admin",
+    "logout": "Esci"
+  },
+  "common": {
+    "loading": "Caricamento...",
+    "error": "Errore",
+    "success": "Successo",
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "save": "Salva",
+    "edit": "Modifica",
+    "delete": "Elimina",
+    "search": "Cerca",
+    "filter": "Filtra",
+    "export": "Esporta",
+    "import": "Importa",
+    "close": "Chiudi",
+    "open": "Apri",
+    "view": "Visualizza",
+    "download": "Scarica",
+    "upload": "Carica",
+    "print": "Stampa"
+  },
+  "medical": {
+    "patient": "Paziente",
+    "doctor": "Dottore",
+    "appointment": "Appuntamento",
+    "prescription": "Prescrizione",
+    "diagnosis": "Diagnosi",
+    "symptoms": "Sintomi",
+    "treatment": "Trattamento",
+    "medication": "Farmaco",
+    "exam": "Esame",
+    "result": "Risultato",
+    "emergency": "Emergenza",
+    "teleconsultation": "Teleconsulto",
+    "video_call": "Videochiamata",
+    "medical_record": "Cartella Clinica",
+    "digital_signature": "Firma Digitale",
+    "prescription_digital": "Prescrizione Digitale"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "today_appointments": "Appuntamenti di Oggi",
+    "recent_messages": "Messaggi Recenti",
+    "system_status": "Stato del Sistema",
+    "quick_actions": "Azioni Rapide",
+    "new_appointment": "Nuovo Appuntamento",
+    "emergency": "Emergenza",
+    "digital_prescription": "Prescrizione Digitale"
+  },
+  "patients": {
+    "title": "Gestione Pazienti",
+    "add_patient": "Aggiungi Paziente",
+    "patient_info": "Informazioni Paziente",
+    "medical_history": "Storia Clinica",
+    "contact_info": "Informazioni di Contatto",
+    "insurance": "Assicurazione"
+  },
+  "appointments": {
+    "title": "Appuntamenti",
+    "schedule_appointment": "Programma Appuntamento",
+    "upcoming": "Prossimi",
+    "today": "Oggi",
+    "completed": "Completati",
+    "cancelled": "Annullati"
+  },
+  "telemedicine": {
+    "video_consultation": "Consultazione Video",
+    "start_consultation": "Inizia Consultazione",
+    "end_consultation": "Termina Consultazione",
+    "consultation_history": "Cronologia Consultazioni",
+    "patient_portal": "Portale Paziente",
+    "secure_messaging": "Messaggistica Sicura",
+    "digital_health": "Salute Digitale",
+    "remote_monitoring": "Monitoraggio Remoto"
+  },
+  "security": {
+    "encryption": "Crittografia AES-256",
+    "compliance": "Conforme FIPS 140-2 Livello 3",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Accesso Sicuro",
+    "data_protection": "Protezione Dati"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Sistema di Telemedicina",
+    "all_rights_reserved": "Tutti i diritti riservati"
+  }
+}

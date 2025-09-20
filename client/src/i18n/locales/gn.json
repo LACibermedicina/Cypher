@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Pohã Ñana Sistema",
+    "description": "Pohã ñana sistema inteligencia artificial reheve"
+  },
+  "navigation": {
+    "dashboard": "Ñepyrũ",
+    "patients": "Hasýva",
+    "schedule": "Tembiaporã",
+    "whatsapp": "WhatsApp Akãnguera",
+    "records": "Kuatiahai",
+    "admin": "Ñangarekoha",
+    "logout": "Ñesẽ"
+  },
+  "common": {
+    "loading": "Oñemyenyhẽ...",
+    "error": "Jejavy",
+    "success": "Iporãva",
+    "cancel": "Eheja",
+    "confirm": "Emoneĩ",
+    "save": "Eñongatu",
+    "edit": "Eñembosako'i",
+    "delete": "Embogue",
+    "search": "Eheka",
+    "filter": "Eporavo",
+    "export": "Egueraha",
+    "import": "Egueru",
+    "close": "Emboty",
+    "open": "Eipe",
+    "view": "Ehecha",
+    "download": "Emboguejy",
+    "upload": "Emondo",
+    "print": "Emonguatia"
+  },
+  "medical": {
+    "patient": "Hasýva",
+    "doctor": "Pohãra",
+    "appointment": "Jehu",
+    "prescription": "Pohã jeporai",
+    "diagnosis": "Mba'asy jeikuaa",
+    "symptoms": "Ta'ãnga",
+    "treatment": "Ñaña",
+    "medication": "Pohã",
+    "exam": "Jehechauka",
+    "result": "Tembiapokue",
+    "emergency": "Pya'e jeipota",
+    "teleconsultation": "Mombyry jeporandu",
+    "video_call": "Ta'anga ñe'ẽ",
+    "medical_record": "Pohã kuatiahai",
+    "digital_signature": "Teramoĩ digital",
+    "prescription_digital": "Pohã jeporai digital"
+  },
+  "dashboard": {
+    "title": "Ñangarekoha Rupa",
+    "today_appointments": "Ko Árape Jehu",
+    "recent_messages": "Ñe'ẽmondo Pyahu",
+    "system_status": "Sistema Teko",
+    "quick_actions": "Ñemba'apo Pya'e",
+    "new_appointment": "Jehu Pyahu",
+    "emergency": "Pya'e jeipota",
+    "digital_prescription": "Pohã Jeporai Digital"
+  },
+  "patients": {
+    "title": "Hasýva Ñangarekoha",
+    "add_patient": "Embojuaju Hasýva",
+    "patient_info": "Hasýva Marandu",
+    "medical_history": "Mba'asy Rembiasakue",
+    "contact_info": "Joaju Marandu",
+    "insurance": "Ñangarekoha"
+  },
+  "appointments": {
+    "title": "Jehu",
+    "schedule_appointment": "Embokatupyry Jehu",
+    "upcoming": "Ou Potáva",
+    "today": "Ko Árape",
+    "completed": "Oĩmbáva",
+    "cancelled": "Ojejokoháva"
+  },
+  "telemedicine": {
+    "video_consultation": "Ta'ãnga Jeporandu",
+    "start_consultation": "Eñepyrũ Jeporandu",
+    "end_consultation": "Emohu Jeporandu",
+    "consultation_history": "Jeporandu Rembiasakue",
+    "patient_portal": "Hasýva Okẽ",
+    "secure_messaging": "Ñe'ẽmondo Hekorosã",
+    "digital_health": "Tesãi Digital",
+    "remote_monitoring": "Moma'ẽ Ñangareko"
+  },
+  "security": {
+    "encryption": "AES-256 Ñemikoviripa",
+    "compliance": "FIPS 140-2 Mbovy 3 Ojokupytyva",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Jeike Hekorosã",
+    "data_protection": "Mba'ekuaarã Ñangarekoha"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Pohã Ñana Sistema",
+    "all_rights_reserved": "Opaichagua derecho oñongatu"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Telemedicine System",
+    "description": "Telemedicine system with integrated AI"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "patients": "Patients",
+    "schedule": "Schedule",
+    "whatsapp": "WhatsApp AI",
+    "records": "Records",
+    "admin": "Admin",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "close": "Close",
+    "open": "Open",
+    "view": "View",
+    "download": "Download",
+    "upload": "Upload",
+    "print": "Print"
+  },
+  "medical": {
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "appointment": "Appointment",
+    "prescription": "Prescription",
+    "diagnosis": "Diagnosis",
+    "symptoms": "Symptoms",
+    "treatment": "Treatment",
+    "medication": "Medication",
+    "exam": "Exam",
+    "result": "Result",
+    "emergency": "Emergency",
+    "teleconsultation": "Teleconsultation",
+    "video_call": "Video Call",
+    "medical_record": "Medical Record",
+    "digital_signature": "Digital Signature",
+    "prescription_digital": "Digital Prescription"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "today_appointments": "Today's Appointments",
+    "recent_messages": "Recent Messages",
+    "system_status": "System Status",
+    "quick_actions": "Quick Actions",
+    "new_appointment": "New Appointment",
+    "emergency": "Emergency",
+    "digital_prescription": "Digital Prescription",
+    "ai_medical": "Medical AI",
+    "status_active": "Active",
+    "status_online": "Online",
+    "database": "Database",
+    "status_connected": "Connected"
+  },
+  "patients": {
+    "title": "Patient Management",
+    "add_patient": "Add Patient",
+    "patient_info": "Patient Information",
+    "medical_history": "Medical History",
+    "contact_info": "Contact Information",
+    "insurance": "Insurance"
+  },
+  "appointments": {
+    "title": "Appointments",
+    "schedule_appointment": "Schedule Appointment",
+    "upcoming": "Upcoming",
+    "today": "Today",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "telemedicine": {
+    "video_consultation": "Video Consultation",
+    "start_consultation": "Start Consultation",
+    "end_consultation": "End Consultation",
+    "consultation_history": "Consultation History",
+    "patient_portal": "Patient Portal",
+    "secure_messaging": "Secure Messaging",
+    "digital_health": "Digital Health",
+    "remote_monitoring": "Remote Monitoring"
+  },
+  "security": {
+    "encryption": "AES-256 Encryption",
+    "compliance": "FIPS 140-2 Level 3 Compliant",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Secure Access",
+    "data_protection": "Data Protection"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Telemedicine System",
+    "all_rights_reserved": "All rights reserved"
+  }
+}

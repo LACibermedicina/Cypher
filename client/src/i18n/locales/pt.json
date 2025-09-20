@@ -1,0 +1,106 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Sistema de Telemedicina",
+    "description": "Sistema de telemedicina com IA integrada"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "patients": "Pacientes",
+    "schedule": "Agenda",
+    "whatsapp": "WhatsApp IA",
+    "records": "Prontuários",
+    "admin": "Admin",
+    "logout": "Sair"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Salvar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "close": "Fechar",
+    "open": "Abrir",
+    "view": "Visualizar",
+    "download": "Baixar",
+    "upload": "Enviar",
+    "print": "Imprimir"
+  },
+  "medical": {
+    "patient": "Paciente",
+    "doctor": "Médico",
+    "appointment": "Consulta",
+    "prescription": "Receita",
+    "diagnosis": "Diagnóstico",
+    "symptoms": "Sintomas",
+    "treatment": "Tratamento",
+    "medication": "Medicamento",
+    "exam": "Exame",
+    "result": "Resultado",
+    "emergency": "Emergência",
+    "teleconsultation": "Teleconsulta",
+    "video_call": "Videochamada",
+    "medical_record": "Prontuário Médico",
+    "digital_signature": "Assinatura Digital",
+    "prescription_digital": "Receita Digital"
+  },
+  "dashboard": {
+    "title": "Painel de Controle",
+    "today_appointments": "Consultas de Hoje",
+    "recent_messages": "Mensagens Recentes",
+    "system_status": "Status do Sistema",
+    "quick_actions": "Ações Rápidas",
+    "new_appointment": "Nova Consulta",
+    "emergency": "Emergência",
+    "digital_prescription": "Receita Digital",
+    "ai_medical": "IA Médica",
+    "status_active": "Ativa",
+    "status_online": "Online",
+    "database": "Banco de Dados",
+    "status_connected": "Conectado"
+  },
+  "patients": {
+    "title": "Gestão de Pacientes",
+    "add_patient": "Adicionar Paciente",
+    "patient_info": "Informações do Paciente",
+    "medical_history": "Histórico Médico",
+    "contact_info": "Informações de Contato",
+    "insurance": "Convênio"
+  },
+  "appointments": {
+    "title": "Agendamentos",
+    "schedule_appointment": "Agendar Consulta",
+    "upcoming": "Próximas",
+    "today": "Hoje",
+    "completed": "Concluídas",
+    "cancelled": "Canceladas"
+  },
+  "telemedicine": {
+    "video_consultation": "Videoconsulta",
+    "start_consultation": "Iniciar Consulta",
+    "end_consultation": "Finalizar Consulta",
+    "consultation_history": "Histórico de Consultas",
+    "patient_portal": "Portal do Paciente",
+    "secure_messaging": "Mensagens Seguras",
+    "digital_health": "Saúde Digital",
+    "remote_monitoring": "Monitoramento Remoto"
+  },
+  "security": {
+    "encryption": "Criptografia AES-256",
+    "compliance": "FIPS 140-2 Level 3 Compliant",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Acesso Seguro",
+    "data_protection": "Proteção de Dados"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Sistema de Telemedicina",
+    "all_rights_reserved": "Todos os direitos reservados"
+  }
+}

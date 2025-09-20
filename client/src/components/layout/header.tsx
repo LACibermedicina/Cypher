@@ -1,15 +1,18 @@
 import { Link, useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
+import LanguageSelector from "@/components/ui/language-selector";
 
 export default function Header() {
   const [location] = useLocation();
+  const { t } = useTranslation();
 
   const navItems = [
-    { path: "/dashboard", label: "Dashboard", icon: "fas fa-chart-line" },
-    { path: "/patients", label: "Pacientes", icon: "fas fa-users" },
-    { path: "/schedule", label: "Agenda", icon: "fas fa-calendar-alt" },
-    { path: "/whatsapp", label: "WhatsApp IA", icon: "fab fa-whatsapp" },
-    { path: "/records", label: "Prontuários", icon: "fas fa-file-medical" },
-    { path: "/admin", label: "Admin", icon: "fas fa-shield-alt" },
+    { path: "/dashboard", label: t("navigation.dashboard"), icon: "fas fa-chart-line" },
+    { path: "/patients", label: t("navigation.patients"), icon: "fas fa-users" },
+    { path: "/schedule", label: t("navigation.schedule"), icon: "fas fa-calendar-alt" },
+    { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp" },
+    { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical" },
+    { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt" },
   ];
 
   return (
@@ -22,12 +25,12 @@ export default function Header() {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <i className="fas fa-user-md text-primary-foreground text-sm"></i>
                 </div>
-                <h1 className="text-xl font-bold text-primary">Telemed</h1>
+                <h1 className="text-xl font-bold text-primary">{t("app.name")}</h1>
               </div>
             </Link>
             <div className="security-badge px-3 py-1 rounded-full text-white text-xs font-medium">
               <i className="fas fa-shield-alt mr-1"></i>
-              FIPS 140-2 Compliant
+              {t("security.compliance")}
             </div>
           </div>
 
@@ -36,7 +39,7 @@ export default function Header() {
               <Link
                 key={item.path}
                 href={item.path}
-                data-testid={`link-nav-${item.label.toLowerCase()}`}
+                data-testid={`link-nav-${item.path.slice(1) || 'dashboard'}`}
               >
                 <span
                   className={`${
@@ -53,9 +56,10 @@ export default function Header() {
           </nav>
 
           <div className="flex items-center space-x-4">
+            <LanguageSelector />
             <div className="ai-indicator px-3 py-1 rounded-full text-white text-xs font-medium">
               <i className="fas fa-robot mr-1"></i>
-              IA Ativa
+              {t("dashboard.ai_medical")} - {t("dashboard.status_active")}
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">

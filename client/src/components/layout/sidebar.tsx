@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -10,62 +11,67 @@ interface SidebarProps {
   className?: string;
 }
 
-const navItems = [
-  {
-    path: "/dashboard",
-    label: "Dashboard",
-    icon: "fas fa-chart-line",
-    description: "Visão geral do sistema"
-  },
-  {
-    path: "/patients",
-    label: "Pacientes",
-    icon: "fas fa-users",
-    description: "Gestão de pacientes"
-  },
-  {
-    path: "/schedule",
-    label: "Agenda",
-    icon: "fas fa-calendar-alt",
-    description: "Agendamentos e consultas"
-  },
-  {
-    path: "/whatsapp",
-    label: "WhatsApp IA",
-    icon: "fab fa-whatsapp",
-    description: "Mensagens inteligentes"
-  },
-  {
-    path: "/records",
-    label: "Prontuários",
-    icon: "fas fa-file-medical",
-    description: "Registros médicos seguros"
-  },
-];
+// Navigation items will be generated inside the component using translations
 
-const quickActions = [
-  {
-    label: "Nova Consulta",
-    icon: "fas fa-plus",
-    action: "new-appointment",
-    color: "bg-primary text-primary-foreground"
-  },
-  {
-    label: "Emergência",
-    icon: "fas fa-exclamation-triangle",
-    action: "emergency",
-    color: "bg-destructive text-destructive-foreground"
-  },
-  {
-    label: "Receita Digital",
-    icon: "fas fa-prescription-bottle",
-    action: "prescription",
-    color: "bg-secondary text-secondary-foreground"
-  },
-];
+// Quick actions will be generated inside the component using translations
 
 function SidebarContent() {
   const [location] = useLocation();
+  const { t } = useTranslation();
+
+  const navItems = [
+    {
+      path: "/dashboard",
+      label: t("navigation.dashboard"),
+      icon: "fas fa-chart-line",
+      description: t("dashboard.title")
+    },
+    {
+      path: "/patients",
+      label: t("navigation.patients"),
+      icon: "fas fa-users",
+      description: t("patients.title")
+    },
+    {
+      path: "/schedule",
+      label: t("navigation.schedule"),
+      icon: "fas fa-calendar-alt",
+      description: t("appointments.title")
+    },
+    {
+      path: "/whatsapp",
+      label: t("navigation.whatsapp"),
+      icon: "fab fa-whatsapp",
+      description: t("telemedicine.secure_messaging")
+    },
+    {
+      path: "/records",
+      label: t("navigation.records"),
+      icon: "fas fa-file-medical",
+      description: t("medical.medical_record")
+    },
+  ];
+
+  const quickActions = [
+    {
+      label: t("dashboard.new_appointment"),
+      icon: "fas fa-plus",
+      action: "new-appointment",
+      color: "bg-primary text-primary-foreground"
+    },
+    {
+      label: t("medical.emergency"),
+      icon: "fas fa-exclamation-triangle",
+      action: "emergency",
+      color: "bg-destructive text-destructive-foreground"
+    },
+    {
+      label: t("medical.prescription_digital"),
+      icon: "fas fa-prescription-bottle",
+      action: "prescription",
+      color: "bg-secondary text-secondary-foreground"
+    },
+  ];
 
   return (
     <div className="flex h-full flex-col">
@@ -75,8 +81,8 @@ function SidebarContent() {
           <i className="fas fa-user-md text-primary-foreground"></i>
         </div>
         <div>
-          <h2 className="text-lg font-bold text-primary">Telemed</h2>
-          <p className="text-xs text-muted-foreground">Sistema de Telemedicina</p>
+          <h2 className="text-lg font-bold text-primary">{t("app.name")}</h2>
+          <p className="text-xs text-muted-foreground">{t("app.subtitle")}</p>
         </div>
       </div>
 
@@ -84,7 +90,7 @@ function SidebarContent() {
       <div className="px-6 py-3">
         <div className="security-badge px-3 py-2 rounded-lg text-white text-xs font-medium text-center">
           <i className="fas fa-shield-alt mr-2"></i>
-          FIPS 140-2 Compliant
+          {t("security.compliance")}
         </div>
       </div>
 
@@ -92,7 +98,7 @@ function SidebarContent() {
       <ScrollArea className="flex-1 px-3">
         <div className="space-y-2 py-4">
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Navegação
+            {t("navigation.dashboard")}
           </h3>
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
@@ -102,7 +108,7 @@ function SidebarContent() {
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground"
                 }`}
-                data-testid={`sidebar-nav-${item.label.toLowerCase()}`}
+                data-testid={`sidebar-nav-${item.path.slice(1) || 'dashboard'}`}
               >
                 <i className={`${item.icon} w-5 text-center`}></i>
                 <div className="flex-1">
@@ -117,7 +123,7 @@ function SidebarContent() {
         {/* Quick Actions */}
         <div className="space-y-2 py-4">
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Ações Rápidas
+            {t("dashboard.quick_actions")}
           </h3>
           {quickActions.map((action) => (
             <Button
@@ -136,31 +142,31 @@ function SidebarContent() {
         {/* AI Status */}
         <div className="space-y-2 py-4">
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Status do Sistema
+            {t("dashboard.system_status")}
           </h3>
           <div className="px-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="ai-indicator w-3 h-3 rounded-full"></div>
-                <span className="text-sm">IA Médica</span>
+                <span className="text-sm">{t("dashboard.ai_medical")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">Ativa</Badge>
+              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_active")}</Badge>
             </div>
             
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm">WhatsApp</span>
+                <span className="text-sm">{t("navigation.whatsapp")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">Online</Badge>
+              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_online")}</Badge>
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">Banco de Dados</span>
+                <span className="text-sm">{t("dashboard.database")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">Conectado</Badge>
+              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_connected")}</Badge>
             </div>
           </div>
         </div>
@@ -187,11 +193,11 @@ function SidebarContent() {
         <div className="space-y-2 text-xs text-muted-foreground">
           <div className="flex items-center space-x-2">
             <i className="fas fa-lock text-accent"></i>
-            <span>Criptografia AES-256</span>
+            <span>{t("security.encryption")}</span>
           </div>
           <div className="flex items-center space-x-2">
             <i className="fas fa-certificate text-accent"></i>
-            <span>ISO 27001:2013</span>
+            <span>{t("security.iso_cert")}</span>
           </div>
         </div>
       </div>

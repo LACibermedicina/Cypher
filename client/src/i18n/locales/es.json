@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Telemed",
+    "subtitle": "Sistema de Telemedicina",
+    "description": "Sistema de telemedicina con IA integrada"
+  },
+  "navigation": {
+    "dashboard": "Panel",
+    "patients": "Pacientes",
+    "schedule": "Agenda",
+    "whatsapp": "WhatsApp IA",
+    "records": "Historiales",
+    "admin": "Admin",
+    "logout": "Salir"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Guardar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "export": "Exportar",
+    "import": "Importar",
+    "close": "Cerrar",
+    "open": "Abrir",
+    "view": "Ver",
+    "download": "Descargar",
+    "upload": "Subir",
+    "print": "Imprimir"
+  },
+  "medical": {
+    "patient": "Paciente",
+    "doctor": "Doctor",
+    "appointment": "Cita",
+    "prescription": "Receta",
+    "diagnosis": "Diagnóstico",
+    "symptoms": "Síntomas",
+    "treatment": "Tratamiento",
+    "medication": "Medicamento",
+    "exam": "Examen",
+    "result": "Resultado",
+    "emergency": "Emergencia",
+    "teleconsultation": "Teleconsulta",
+    "video_call": "Videollamada",
+    "medical_record": "Historial Médico",
+    "digital_signature": "Firma Digital",
+    "prescription_digital": "Receta Digital"
+  },
+  "dashboard": {
+    "title": "Panel de Control",
+    "today_appointments": "Citas de Hoy",
+    "recent_messages": "Mensajes Recientes",
+    "system_status": "Estado del Sistema",
+    "quick_actions": "Acciones Rápidas",
+    "new_appointment": "Nueva Cita",
+    "emergency": "Emergencia",
+    "digital_prescription": "Receta Digital"
+  },
+  "patients": {
+    "title": "Gestión de Pacientes",
+    "add_patient": "Agregar Paciente",
+    "patient_info": "Información del Paciente",
+    "medical_history": "Historial Médico",
+    "contact_info": "Información de Contacto",
+    "insurance": "Seguro"
+  },
+  "appointments": {
+    "title": "Citas",
+    "schedule_appointment": "Agendar Cita",
+    "upcoming": "Próximas",
+    "today": "Hoy",
+    "completed": "Completadas",
+    "cancelled": "Canceladas"
+  },
+  "telemedicine": {
+    "video_consultation": "Videoconsulta",
+    "start_consultation": "Iniciar Consulta",
+    "end_consultation": "Finalizar Consulta",
+    "consultation_history": "Historial de Consultas",
+    "patient_portal": "Portal del Paciente",
+    "secure_messaging": "Mensajería Segura",
+    "digital_health": "Salud Digital",
+    "remote_monitoring": "Monitoreo Remoto"
+  },
+  "security": {
+    "encryption": "Cifrado AES-256",
+    "compliance": "Certificación FIPS 140-2 Nivel 3",
+    "iso_cert": "ISO 27001:2013",
+    "secure_access": "Acceso Seguro",
+    "data_protection": "Protección de Datos"
+  },
+  "footer": {
+    "copyright": "© 2024 Telemed - Sistema de Telemedicina",
+    "all_rights_reserved": "Todos los derechos reservados"
+  }
+}
