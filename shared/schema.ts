@@ -101,10 +101,113 @@ export const collaborators = pgTable("collaborators", {
   address: text("address"),
   phone: text("phone"),
   email: text("email"),
+  cnpj: text("cnpj"), // Brazilian tax ID for healthcare institutions
+  cnes: text("cnes"), // Brazilian National Registry of Healthcare Establishments
+  licenseNumber: text("license_number"), // Professional/institutional license
+  specialization: text("specialization"), // e.g., cardiology, orthopedics for hospitals
   isOnline: boolean("is_online").default(false),
+  isActive: boolean("is_active").default(true),
   apiEndpoint: text("api_endpoint"),
-  credentials: text("credentials"), // Encrypted
+  credentials: text("credentials"), // Encrypted API credentials
+  integrationConfig: jsonb("integration_config"), // Configuration for specific integration type
+  complianceStatus: text("compliance_status").default("pending"), // pending, approved, suspended
+  lastHealthCheck: timestamp("last_health_check"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Prescription sharing with pharmacies
+export const prescriptionShares = pgTable("prescription_shares", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  medicalRecordId: uuid("medical_record_id").references(() => medicalRecords.id).notNull(),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  doctorId: uuid("doctor_id").references(() => users.id).notNull(),
+  pharmacyId: uuid("pharmacy_id").references(() => collaborators.id).notNull(),
+  prescriptionText: text("prescription_text").notNull(),
+  digitalSignatureId: uuid("digital_signature_id").references(() => digitalSignatures.id),
+  status: text("status").notNull().default("shared"), // shared, dispensed, partially_dispensed, cancelled
+  shareMethod: text("share_method").notNull().default("api"), // api, manual, qr_code
+  accessCode: text("access_code"), // Secure code for patient verification
+  expiresAt: timestamp("expires_at"), // Prescription expiry
+  dispensedAt: timestamp("dispensed_at"),
+  dispensingNotes: text("dispensing_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Laboratory orders and results
+export const labOrders = pgTable("lab_orders", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  doctorId: uuid("doctor_id").references(() => users.id).notNull(),
+  laboratoryId: uuid("laboratory_id").references(() => collaborators.id).notNull(),
+  orderDetails: text("order_details").notNull(), // Tests requested
+  urgency: text("urgency").default("routine"), // routine, urgent, stat
+  status: text("status").notNull().default("ordered"), // ordered, collected, processing, completed, cancelled
+  externalOrderId: text("external_order_id"), // ID from laboratory system
+  collectionDate: timestamp("collection_date"),
+  expectedResultDate: timestamp("expected_result_date"),
+  completedAt: timestamp("completed_at"),
+  results: jsonb("results"), // Structured test results
+  resultsFileUrl: text("results_file_url"), // PDF or file link
+  criticalValues: boolean("critical_values").default(false),
+  notificationSent: boolean("notification_sent").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Hospital referrals and transfers
+export const hospitalReferrals = pgTable("hospital_referrals", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  referringDoctorId: uuid("referring_doctor_id").references(() => users.id).notNull(),
+  hospitalId: uuid("hospital_id").references(() => collaborators.id).notNull(),
+  specialty: text("specialty").notNull(), // Target specialty/department
+  urgency: text("urgency").notNull().default("routine"), // routine, urgent, emergency
+  reason: text("reason").notNull(), // Reason for referral
+  clinicalSummary: text("clinical_summary"), // Patient condition summary
+  requestedServices: text("requested_services"), // Specific services needed
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, completed
+  externalReferralId: text("external_referral_id"), // ID from hospital system
+  scheduledDate: timestamp("scheduled_date"),
+  completedAt: timestamp("completed_date"),
+  dischargeNotes: text("discharge_notes"), // Summary after treatment
+  followUpRequired: boolean("follow_up_required").default(false),
+  followUpDate: timestamp("follow_up_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Integration monitoring and audit trail
+export const collaboratorIntegrations = pgTable("collaborator_integrations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  collaboratorId: uuid("collaborator_id").references(() => collaborators.id).notNull(),
+  integrationType: text("integration_type").notNull(), // prescription_share, lab_order, hospital_referral
+  entityId: uuid("entity_id").notNull(), // ID of the related prescription/order/referral
+  action: text("action").notNull(), // create, update, query, cancel
+  status: text("status").notNull(), // success, failed, pending, timeout
+  requestData: jsonb("request_data"), // Data sent to external system
+  responseData: jsonb("response_data"), // Response from external system
+  errorMessage: text("error_message"),
+  responseTime: integer("response_time"), // milliseconds
+  retryCount: integer("retry_count").default(0),
+  processedBy: text("processed_by"), // system, user_id
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// API authentication for external collaborators
+export const collaboratorApiKeys = pgTable("collaborator_api_keys", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  collaboratorId: uuid("collaborator_id").references(() => collaborators.id).notNull(),
+  keyName: text("key_name").notNull(), // Friendly name for the key
+  hashedKey: text("hashed_key").notNull(), // Hashed version of the API key
+  permissions: jsonb("permissions").notNull(), // Array of allowed actions/endpoints
+  isActive: boolean("is_active").default(true),
+  lastUsed: timestamp("last_used"),
+  expiresAt: timestamp("expires_at"),
+  ipWhitelist: text("ip_whitelist").array(), // Allowed IP addresses
+  rateLimit: integer("rate_limit").default(1000), // Requests per hour
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const doctorSchedule = pgTable("doctor_schedule", {
@@ -244,6 +347,81 @@ export const videoConsultationsRelations = relations(videoConsultations, ({ one 
   }),
 }));
 
+export const collaboratorsRelations = relations(collaborators, ({ many }) => ({
+  prescriptionShares: many(prescriptionShares),
+  labOrders: many(labOrders),
+  hospitalReferrals: many(hospitalReferrals),
+  integrations: many(collaboratorIntegrations),
+  apiKeys: many(collaboratorApiKeys),
+}));
+
+export const prescriptionSharesRelations = relations(prescriptionShares, ({ one }) => ({
+  medicalRecord: one(medicalRecords, {
+    fields: [prescriptionShares.medicalRecordId],
+    references: [medicalRecords.id],
+  }),
+  patient: one(patients, {
+    fields: [prescriptionShares.patientId],
+    references: [patients.id],
+  }),
+  doctor: one(users, {
+    fields: [prescriptionShares.doctorId],
+    references: [users.id],
+  }),
+  pharmacy: one(collaborators, {
+    fields: [prescriptionShares.pharmacyId],
+    references: [collaborators.id],
+  }),
+  digitalSignature: one(digitalSignatures, {
+    fields: [prescriptionShares.digitalSignatureId],
+    references: [digitalSignatures.id],
+  }),
+}));
+
+export const labOrdersRelations = relations(labOrders, ({ one }) => ({
+  patient: one(patients, {
+    fields: [labOrders.patientId],
+    references: [patients.id],
+  }),
+  doctor: one(users, {
+    fields: [labOrders.doctorId],
+    references: [users.id],
+  }),
+  laboratory: one(collaborators, {
+    fields: [labOrders.laboratoryId],
+    references: [collaborators.id],
+  }),
+}));
+
+export const hospitalReferralsRelations = relations(hospitalReferrals, ({ one }) => ({
+  patient: one(patients, {
+    fields: [hospitalReferrals.patientId],
+    references: [patients.id],
+  }),
+  referringDoctor: one(users, {
+    fields: [hospitalReferrals.referringDoctorId],
+    references: [users.id],
+  }),
+  hospital: one(collaborators, {
+    fields: [hospitalReferrals.hospitalId],
+    references: [collaborators.id],
+  }),
+}));
+
+export const collaboratorIntegrationsRelations = relations(collaboratorIntegrations, ({ one }) => ({
+  collaborator: one(collaborators, {
+    fields: [collaboratorIntegrations.collaboratorId],
+    references: [collaborators.id],
+  }),
+}));
+
+export const collaboratorApiKeysRelations = relations(collaboratorApiKeys, ({ one }) => ({
+  collaborator: one(collaborators, {
+    fields: [collaboratorApiKeys.collaboratorId],
+    references: [collaborators.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -281,6 +459,35 @@ export const insertExamResultSchema = createInsertSchema(examResults).omit({
 export const insertCollaboratorSchema = createInsertSchema(collaborators).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPrescriptionShareSchema = createInsertSchema(prescriptionShares).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLabOrderSchema = createInsertSchema(labOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertHospitalReferralSchema = createInsertSchema(hospitalReferrals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCollaboratorIntegrationSchema = createInsertSchema(collaboratorIntegrations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCollaboratorApiKeySchema = createInsertSchema(collaboratorApiKeys).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertDoctorScheduleSchema = createInsertSchema(doctorSchedule).omit({
@@ -320,6 +527,21 @@ export type InsertExamResult = z.infer<typeof insertExamResultSchema>;
 
 export type Collaborator = typeof collaborators.$inferSelect;
 export type InsertCollaborator = z.infer<typeof insertCollaboratorSchema>;
+
+export type PrescriptionShare = typeof prescriptionShares.$inferSelect;
+export type InsertPrescriptionShare = z.infer<typeof insertPrescriptionShareSchema>;
+
+export type LabOrder = typeof labOrders.$inferSelect;
+export type InsertLabOrder = z.infer<typeof insertLabOrderSchema>;
+
+export type HospitalReferral = typeof hospitalReferrals.$inferSelect;
+export type InsertHospitalReferral = z.infer<typeof insertHospitalReferralSchema>;
+
+export type CollaboratorIntegration = typeof collaboratorIntegrations.$inferSelect;
+export type InsertCollaboratorIntegration = z.infer<typeof insertCollaboratorIntegrationSchema>;
+
+export type CollaboratorApiKey = typeof collaboratorApiKeys.$inferSelect;
+export type InsertCollaboratorApiKey = z.infer<typeof insertCollaboratorApiKeySchema>;
 
 export type DoctorSchedule = typeof doctorSchedule.$inferSelect;
 export type InsertDoctorSchedule = z.infer<typeof insertDoctorScheduleSchema>;

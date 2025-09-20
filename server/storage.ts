@@ -1,11 +1,15 @@
 import { 
   users, patients, appointments, medicalRecords, whatsappMessages, 
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
+  prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
   type Collaborator, type InsertCollaborator, type DoctorSchedule, type InsertDoctorSchedule,
-  type DigitalSignature, type InsertDigitalSignature, type VideoConsultation, type InsertVideoConsultation
+  type DigitalSignature, type InsertDigitalSignature, type VideoConsultation, type InsertVideoConsultation,
+  type PrescriptionShare, type InsertPrescriptionShare, type LabOrder, type InsertLabOrder,
+  type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
+  type CollaboratorApiKey, type InsertCollaboratorApiKey
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
@@ -52,7 +56,44 @@ export interface IStorage {
 
   // Collaborators
   getAllCollaborators(): Promise<Collaborator[]>;
+  getCollaborator(id: string): Promise<Collaborator | undefined>;
+  getCollaboratorsByType(type: string): Promise<Collaborator[]>;
+  createCollaborator(collaborator: InsertCollaborator): Promise<Collaborator>;
+  updateCollaborator(id: string, collaborator: Partial<InsertCollaborator>): Promise<Collaborator | undefined>;
   updateCollaboratorStatus(id: string, isOnline: boolean): Promise<void>;
+
+  // Prescription Sharing
+  createPrescriptionShare(share: InsertPrescriptionShare): Promise<PrescriptionShare>;
+  getPrescriptionShare(id: string): Promise<PrescriptionShare | undefined>;
+  getPrescriptionSharesByPatient(patientId: string): Promise<PrescriptionShare[]>;
+  getPrescriptionSharesByPharmacy(pharmacyId: string): Promise<PrescriptionShare[]>;
+  updatePrescriptionShare(id: string, share: Partial<InsertPrescriptionShare>): Promise<PrescriptionShare | undefined>;
+
+  // Laboratory Orders
+  createLabOrder(order: InsertLabOrder): Promise<LabOrder>;
+  getLabOrder(id: string): Promise<LabOrder | undefined>;
+  getLabOrdersByPatient(patientId: string): Promise<LabOrder[]>;
+  getLabOrdersByLaboratory(laboratoryId: string): Promise<LabOrder[]>;
+  updateLabOrder(id: string, order: Partial<InsertLabOrder>): Promise<LabOrder | undefined>;
+
+  // Hospital Referrals
+  createHospitalReferral(referral: InsertHospitalReferral): Promise<HospitalReferral>;
+  getHospitalReferral(id: string): Promise<HospitalReferral | undefined>;
+  getHospitalReferralsByPatient(patientId: string): Promise<HospitalReferral[]>;
+  getHospitalReferralsByHospital(hospitalId: string): Promise<HospitalReferral[]>;
+  updateHospitalReferral(id: string, referral: Partial<InsertHospitalReferral>): Promise<HospitalReferral | undefined>;
+
+  // Integration Monitoring
+  createCollaboratorIntegration(integration: InsertCollaboratorIntegration): Promise<CollaboratorIntegration>;
+  getCollaboratorIntegrationsByEntity(entityId: string, integrationType: string): Promise<CollaboratorIntegration[]>;
+  getCollaboratorIntegrationsByCollaborator(collaboratorId: string): Promise<CollaboratorIntegration[]>;
+
+  // API Key Management
+  createCollaboratorApiKey(apiKey: InsertCollaboratorApiKey): Promise<CollaboratorApiKey>;
+  getCollaboratorApiKey(id: string): Promise<CollaboratorApiKey | undefined>;
+  getCollaboratorApiKeysByCollaborator(collaboratorId: string): Promise<CollaboratorApiKey[]>;
+  updateCollaboratorApiKey(id: string, apiKey: Partial<InsertCollaboratorApiKey>): Promise<CollaboratorApiKey | undefined>;
+  validateApiKey(hashedKey: string): Promise<CollaboratorApiKey | undefined>;
 
   // Doctor Schedule
   getDoctorSchedule(doctorId: string): Promise<DoctorSchedule[]>;
@@ -326,6 +367,179 @@ export class DatabaseStorage implements IStorage {
       .where(eq(videoConsultations.id, id))
       .returning();
     return consultation || undefined;
+  }
+
+  // Enhanced Collaborator Methods
+  async getCollaborator(id: string): Promise<Collaborator | undefined> {
+    const [collaborator] = await db.select().from(collaborators).where(eq(collaborators.id, id));
+    return collaborator || undefined;
+  }
+
+  async getCollaboratorsByType(type: string): Promise<Collaborator[]> {
+    return await db.select().from(collaborators)
+      .where(eq(collaborators.type, type))
+      .orderBy(collaborators.name);
+  }
+
+  async createCollaborator(insertCollaborator: InsertCollaborator): Promise<Collaborator> {
+    const [collaborator] = await db.insert(collaborators).values(insertCollaborator).returning();
+    return collaborator;
+  }
+
+  async updateCollaborator(id: string, updateCollaborator: Partial<InsertCollaborator>): Promise<Collaborator | undefined> {
+    const [collaborator] = await db.update(collaborators)
+      .set(updateCollaborator)
+      .where(eq(collaborators.id, id))
+      .returning();
+    return collaborator || undefined;
+  }
+
+  // Prescription Sharing Methods
+  async createPrescriptionShare(insertShare: InsertPrescriptionShare): Promise<PrescriptionShare> {
+    const [share] = await db.insert(prescriptionShares).values(insertShare).returning();
+    return share;
+  }
+
+  async getPrescriptionShare(id: string): Promise<PrescriptionShare | undefined> {
+    const [share] = await db.select().from(prescriptionShares).where(eq(prescriptionShares.id, id));
+    return share || undefined;
+  }
+
+  async getPrescriptionSharesByPatient(patientId: string): Promise<PrescriptionShare[]> {
+    return await db.select().from(prescriptionShares)
+      .where(eq(prescriptionShares.patientId, patientId))
+      .orderBy(desc(prescriptionShares.createdAt));
+  }
+
+  async getPrescriptionSharesByPharmacy(pharmacyId: string): Promise<PrescriptionShare[]> {
+    return await db.select().from(prescriptionShares)
+      .where(eq(prescriptionShares.pharmacyId, pharmacyId))
+      .orderBy(desc(prescriptionShares.createdAt));
+  }
+
+  async updatePrescriptionShare(id: string, updateShare: Partial<InsertPrescriptionShare>): Promise<PrescriptionShare | undefined> {
+    const [share] = await db.update(prescriptionShares)
+      .set(updateShare)
+      .where(eq(prescriptionShares.id, id))
+      .returning();
+    return share || undefined;
+  }
+
+  // Laboratory Order Methods
+  async createLabOrder(insertOrder: InsertLabOrder): Promise<LabOrder> {
+    const [order] = await db.insert(labOrders).values(insertOrder).returning();
+    return order;
+  }
+
+  async getLabOrder(id: string): Promise<LabOrder | undefined> {
+    const [order] = await db.select().from(labOrders).where(eq(labOrders.id, id));
+    return order || undefined;
+  }
+
+  async getLabOrdersByPatient(patientId: string): Promise<LabOrder[]> {
+    return await db.select().from(labOrders)
+      .where(eq(labOrders.patientId, patientId))
+      .orderBy(desc(labOrders.createdAt));
+  }
+
+  async getLabOrdersByLaboratory(laboratoryId: string): Promise<LabOrder[]> {
+    return await db.select().from(labOrders)
+      .where(eq(labOrders.laboratoryId, laboratoryId))
+      .orderBy(desc(labOrders.createdAt));
+  }
+
+  async updateLabOrder(id: string, updateOrder: Partial<InsertLabOrder>): Promise<LabOrder | undefined> {
+    const [order] = await db.update(labOrders)
+      .set(updateOrder)
+      .where(eq(labOrders.id, id))
+      .returning();
+    return order || undefined;
+  }
+
+  // Hospital Referral Methods
+  async createHospitalReferral(insertReferral: InsertHospitalReferral): Promise<HospitalReferral> {
+    const [referral] = await db.insert(hospitalReferrals).values(insertReferral).returning();
+    return referral;
+  }
+
+  async getHospitalReferral(id: string): Promise<HospitalReferral | undefined> {
+    const [referral] = await db.select().from(hospitalReferrals).where(eq(hospitalReferrals.id, id));
+    return referral || undefined;
+  }
+
+  async getHospitalReferralsByPatient(patientId: string): Promise<HospitalReferral[]> {
+    return await db.select().from(hospitalReferrals)
+      .where(eq(hospitalReferrals.patientId, patientId))
+      .orderBy(desc(hospitalReferrals.createdAt));
+  }
+
+  async getHospitalReferralsByHospital(hospitalId: string): Promise<HospitalReferral[]> {
+    return await db.select().from(hospitalReferrals)
+      .where(eq(hospitalReferrals.hospitalId, hospitalId))
+      .orderBy(desc(hospitalReferrals.createdAt));
+  }
+
+  async updateHospitalReferral(id: string, updateReferral: Partial<InsertHospitalReferral>): Promise<HospitalReferral | undefined> {
+    const [referral] = await db.update(hospitalReferrals)
+      .set(updateReferral)
+      .where(eq(hospitalReferrals.id, id))
+      .returning();
+    return referral || undefined;
+  }
+
+  // Integration Monitoring Methods
+  async createCollaboratorIntegration(insertIntegration: InsertCollaboratorIntegration): Promise<CollaboratorIntegration> {
+    const [integration] = await db.insert(collaboratorIntegrations).values(insertIntegration).returning();
+    return integration;
+  }
+
+  async getCollaboratorIntegrationsByEntity(entityId: string, integrationType: string): Promise<CollaboratorIntegration[]> {
+    return await db.select().from(collaboratorIntegrations)
+      .where(and(
+        eq(collaboratorIntegrations.entityId, entityId),
+        eq(collaboratorIntegrations.integrationType, integrationType)
+      ))
+      .orderBy(desc(collaboratorIntegrations.createdAt));
+  }
+
+  async getCollaboratorIntegrationsByCollaborator(collaboratorId: string): Promise<CollaboratorIntegration[]> {
+    return await db.select().from(collaboratorIntegrations)
+      .where(eq(collaboratorIntegrations.collaboratorId, collaboratorId))
+      .orderBy(desc(collaboratorIntegrations.createdAt));
+  }
+
+  // API Key Management Methods
+  async createCollaboratorApiKey(insertApiKey: InsertCollaboratorApiKey): Promise<CollaboratorApiKey> {
+    const [apiKey] = await db.insert(collaboratorApiKeys).values(insertApiKey).returning();
+    return apiKey;
+  }
+
+  async getCollaboratorApiKey(id: string): Promise<CollaboratorApiKey | undefined> {
+    const [apiKey] = await db.select().from(collaboratorApiKeys).where(eq(collaboratorApiKeys.id, id));
+    return apiKey || undefined;
+  }
+
+  async getCollaboratorApiKeysByCollaborator(collaboratorId: string): Promise<CollaboratorApiKey[]> {
+    return await db.select().from(collaboratorApiKeys)
+      .where(eq(collaboratorApiKeys.collaboratorId, collaboratorId))
+      .orderBy(desc(collaboratorApiKeys.createdAt));
+  }
+
+  async updateCollaboratorApiKey(id: string, updateApiKey: Partial<InsertCollaboratorApiKey>): Promise<CollaboratorApiKey | undefined> {
+    const [apiKey] = await db.update(collaboratorApiKeys)
+      .set(updateApiKey)
+      .where(eq(collaboratorApiKeys.id, id))
+      .returning();
+    return apiKey || undefined;
+  }
+
+  async validateApiKey(hashedKey: string): Promise<CollaboratorApiKey | undefined> {
+    const [apiKey] = await db.select().from(collaboratorApiKeys)
+      .where(and(
+        eq(collaboratorApiKeys.hashedKey, hashedKey),
+        eq(collaboratorApiKeys.isActive, true)
+      ));
+    return apiKey || undefined;
   }
 }
 
