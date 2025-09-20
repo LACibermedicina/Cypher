@@ -1,19 +1,100 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [appointmentType, setAppointmentType] = useState<string>("consultation");
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: appointments, isLoading } = useQuery({
     queryKey: ['/api/appointments/doctor', DEFAULT_DOCTOR_ID, selectedDate.toISOString()],
   });
+
+  // Fetch available slots for appointment creation
+  const { data: availableSlots, isLoading: slotsLoading } = useQuery({
+    queryKey: ['/api/scheduling/available-slots', DEFAULT_DOCTOR_ID],
+    enabled: isCreateModalOpen, // Only fetch when modal is open
+  });
+
+  // Fetch patients for selection
+  const { data: patients } = useQuery({
+    queryKey: ['/api/patients'],
+    enabled: isCreateModalOpen, // Only fetch when modal is open  
+  });
+
+  // Create appointment mutation
+  const createAppointmentMutation = useMutation({
+    mutationFn: (appointmentData: any) => apiRequest('POST', '/api/appointments', appointmentData),
+    onSuccess: () => {
+      toast({
+        title: "Consulta agendada",
+        description: "A consulta foi agendada com sucesso.",
+      });
+      setIsCreateModalOpen(false);
+      setSelectedPatientId("");
+      setSelectedSlot("");
+      setAppointmentType("consultation");
+      // Invalidate and refetch appointments
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/doctor'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao agendar",
+        description: error.message || "Não foi possível agendar a consulta.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle appointment creation
+  const handleCreateAppointment = () => {
+    if (!selectedPatientId || !selectedSlot) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Selecione um paciente e um horário.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the selected slot to get proper date/time
+    const slot = availableSlots?.find((s: any) => s.formatted === selectedSlot);
+    if (!slot) {
+      toast({
+        title: "Horário inválido",
+        description: "O horário selecionado não é válido.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const appointmentData = {
+      patientId: selectedPatientId,
+      doctorId: DEFAULT_DOCTOR_ID,
+      scheduledAt: new Date(`${slot.date} ${slot.time}`),
+      type: appointmentType,
+      status: 'scheduled',
+      aiScheduled: false,
+    };
+
+    createAppointmentMutation.mutate(appointmentData);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -59,7 +140,10 @@ export default function Schedule() {
             Gerencie seus horários e consultas - {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <Button data-testid="button-new-appointment">
+        <Button 
+          onClick={() => setIsCreateModalOpen(true)}
+          data-testid="button-new-appointment"
+        >
           <i className="fas fa-plus mr-2"></i>
           Nova Consulta
         </Button>
@@ -124,7 +208,11 @@ export default function Schedule() {
                   <p className="text-muted-foreground mb-4">
                     Não há consultas marcadas para este dia.
                   </p>
-                  <Button variant="outline" data-testid="button-add-first-appointment">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsCreateModalOpen(true)}
+                    data-testid="button-add-first-appointment"
+                  >
                     <i className="fas fa-plus mr-2"></i>
                     Agendar primeira consulta
                   </Button>
@@ -238,6 +326,120 @@ export default function Schedule() {
           </div>
         </div>
       </div>
+
+      {/* Appointment Creation Modal */}
+      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+        <DialogContent className="max-w-md" data-testid="modal-create-appointment">
+          <DialogHeader>
+            <DialogTitle>Nova Consulta</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Patient Selection */}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Paciente
+              </label>
+              <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+                <SelectTrigger data-testid="select-patient">
+                  <SelectValue placeholder="Selecione um paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(patients || []).map((patient: any) => (
+                    <SelectItem 
+                      key={patient.id} 
+                      value={patient.id}
+                      data-testid={`option-patient-${patient.id}`}
+                    >
+                      {patient.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Available Slots */}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Horário Disponível
+              </label>
+              <Select value={selectedSlot} onValueChange={setSelectedSlot}>
+                <SelectTrigger data-testid="select-available-slot">
+                  <SelectValue placeholder="Selecione um horário" />
+                </SelectTrigger>
+                <SelectContent>
+                  {slotsLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Carregando horários...
+                    </SelectItem>
+                  ) : (
+                    (availableSlots || []).map((slot: any, index: number) => (
+                      <SelectItem 
+                        key={index} 
+                        value={slot.formatted}
+                        data-testid={`option-slot-${index}`}
+                      >
+                        {slot.formatted}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Appointment Type */}
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">
+                Tipo de Consulta
+              </label>
+              <Select value={appointmentType} onValueChange={setAppointmentType}>
+                <SelectTrigger data-testid="select-appointment-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consultation" data-testid="option-type-consultation">
+                    Consulta
+                  </SelectItem>
+                  <SelectItem value="followup" data-testid="option-type-followup">
+                    Retorno
+                  </SelectItem>
+                  <SelectItem value="emergency" data-testid="option-type-emergency">
+                    Emergência
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsCreateModalOpen(false)}
+                data-testid="button-cancel-appointment"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleCreateAppointment}
+                disabled={createAppointmentMutation.isPending || !selectedPatientId || !selectedSlot}
+                data-testid="button-confirm-appointment"
+              >
+                {createAppointmentMutation.isPending ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                    Agendando...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check mr-2"></i>
+                    Agendar Consulta
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

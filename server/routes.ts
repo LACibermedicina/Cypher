@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { openAIService } from "./services/openai";
 import { whatsAppService } from "./services/whatsapp";
+import { SchedulingService } from "./services/scheduling";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -11,6 +12,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Initialize default doctor if not exists and get the actual ID
   const actualDoctorId = await initializeDefaultDoctor();
+  
+  // Initialize scheduling service
+  const schedulingService = new SchedulingService(storage);
+  
+  // Ensure default schedule exists for the doctor
+  await schedulingService.createDefaultSchedule(actualDoctorId);
   
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -86,28 +93,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle scheduling requests
         if (analysis.isSchedulingRequest) {
-          // Get available slots (simplified - should check doctor schedule)
-          const availableSlots = [
-            'Terça-feira, 15/01 às 9:00',
-            'Quinta-feira, 17/01 às 14:00',
-            'Sexta-feira, 18/01 às 10:30',
-          ];
+          // Get real available slots from doctor schedule
+          const availableSlots = await schedulingService.getAvailableSlots(actualDoctorId);
+          const formattedSlots = availableSlots.map(slot => slot.formatted);
 
           const schedulingResponse = await openAIService.processSchedulingRequest(
             message.text,
-            availableSlots
+            formattedSlots
           );
 
           if (schedulingResponse.suggestedAppointment && !schedulingResponse.requiresHumanIntervention) {
-            // Create appointment automatically
-            const appointment = await storage.createAppointment({
-              patientId: patient.id,
-              doctorId: actualDoctorId || DEFAULT_DOCTOR_ID, // Use actual or fallback doctor ID
-              scheduledAt: new Date(`${schedulingResponse.suggestedAppointment.date} ${schedulingResponse.suggestedAppointment.time}`),
-              type: schedulingResponse.suggestedAppointment.type,
-              status: 'scheduled',
-              aiScheduled: true,
-            });
+            // Find the exact slot that was suggested to get proper date/time
+            const selectedSlot = availableSlots.find(slot => 
+              slot.formatted === schedulingResponse.suggestedAppointment?.date + ' às ' + schedulingResponse.suggestedAppointment?.time
+            );
+
+            let scheduledAt: Date;
+            if (selectedSlot) {
+              // Use the properly formatted date and time from the slot
+              scheduledAt = new Date(`${selectedSlot.date} ${selectedSlot.time}`);
+            } else {
+              // Fallback to parsing the response (less reliable)
+              scheduledAt = new Date(`${schedulingResponse.suggestedAppointment.date} ${schedulingResponse.suggestedAppointment.time}`);
+            }
+
+            // Verify the slot is still available before creating
+            const isAvailable = await schedulingService.isSpecificSlotAvailable(
+              actualDoctorId,
+              scheduledAt.toISOString().split('T')[0],
+              scheduledAt.toTimeString().slice(0, 5)
+            );
+
+            if (!isAvailable) {
+              aiResponse = 'Desculpe, esse horário não está mais disponível. Por favor, escolha outro horário.';
+            } else {
+              // Create appointment automatically
+              const appointment = await storage.createAppointment({
+                patientId: patient.id,
+                doctorId: actualDoctorId,
+                scheduledAt,
+                type: schedulingResponse.suggestedAppointment.type || 'consulta',
+                status: 'scheduled',
+                aiScheduled: true,
+              });
 
             // Update WhatsApp message with appointment reference
             await storage.updateWhatsappMessage(whatsappMessage.id, {
@@ -125,6 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               schedulingResponse.suggestedAppointment.date,
               schedulingResponse.suggestedAppointment.time
             );
+            }
           }
         }
 
@@ -223,9 +252,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Available slots API
+  app.get('/api/scheduling/available-slots/:doctorId', async (req, res) => {
+    try {
+      const { doctorId } = req.params;
+      const daysAhead = parseInt(req.query.days as string) || 30;
+      
+      const availableSlots = await schedulingService.getAvailableSlots(doctorId, daysAhead);
+      res.json(availableSlots);
+    } catch (error) {
+      console.error('Error getting available slots:', error);
+      res.status(500).json({ message: 'Failed to get available slots' });
+    }
+  });
+
+  // Check specific slot availability
+  app.post('/api/scheduling/check-availability', async (req, res) => {
+    try {
+      const { doctorId, date, time } = req.body;
+      
+      if (!doctorId || !date || !time) {
+        return res.status(400).json({ message: 'Doctor ID, date, and time are required' });
+      }
+
+      const isAvailable = await schedulingService.isSpecificSlotAvailable(doctorId, date, time);
+      res.json({ available: isAvailable });
+    } catch (error) {
+      console.error('Error checking slot availability:', error);
+      res.status(500).json({ message: 'Failed to check availability' });
+    }
+  });
+
   app.post('/api/appointments', async (req, res) => {
     try {
-      const validatedData = insertAppointmentSchema.parse(req.body);
+      // Transform scheduledAt from string to Date if needed
+      const requestData = {
+        ...req.body,
+        scheduledAt: req.body.scheduledAt ? new Date(req.body.scheduledAt) : undefined,
+      };
+      
+      const validatedData = insertAppointmentSchema.parse(requestData);
       const appointment = await storage.createAppointment(validatedData);
       broadcast({ type: 'appointment_created', data: appointment });
       res.status(201).json(appointment);
