@@ -16,20 +16,25 @@ export default function Header() {
   ];
 
   return (
-    <header className="bg-card border-b border-border shadow-sm" data-testid="header-main">
+    <header className="bg-card/95 backdrop-blur-sm border-b border-border shadow-sm sticky top-0 z-50" data-testid="header-main">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
             <Link href="/" data-testid="link-logo">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <i className="fas fa-user-md text-primary-foreground text-sm"></i>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md">
+                  <i className="fas fa-user-md text-white text-lg"></i>
                 </div>
-                <h1 className="text-xl font-bold text-primary">{t("app.name")}</h1>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-medical-primary bg-clip-text text-transparent">
+                    {t("app.name")}
+                  </h1>
+                  <p className="text-xs text-muted-foreground font-medium">{t("app.subtitle")}</p>
+                </div>
               </div>
             </Link>
-            <div className="security-badge px-3 py-1 rounded-full text-white text-xs font-medium">
-              <i className="fas fa-shield-alt mr-1"></i>
+            <div className="security-badge px-4 py-2 rounded-full text-white text-xs font-semibold">
+              <i className="fas fa-shield-alt mr-2"></i>
               {t("security.compliance")}
             </div>
           </div>
@@ -41,31 +46,44 @@ export default function Header() {
                 href={item.path}
                 data-testid={`link-nav-${item.path.slice(1) || 'dashboard'}`}
               >
-                <span
-                  className={`${
-                    location === item.path || (location === "/" && item.path === "/dashboard")
-                      ? "text-primary font-medium border-b-2 border-primary pb-1"
-                      : "text-muted-foreground hover:text-primary transition-colors"
-                  }`}
-                >
-                  <i className={`${item.icon} mr-2`}></i>
-                  {item.label}
-                </span>
+                {(() => {
+                  const isActive = location === item.path || (location === "/" && item.path === "/dashboard");
+                  return (
+                    <span
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? "text-white shadow-md"
+                          : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      }`}
+                      style={{
+                        background: isActive
+                          ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
+                          : "transparent"
+                      }}
+                    >
+                      <i className={`${item.icon} mr-2`}></i>
+                      {item.label}
+                    </span>
+                  );
+                })()}
               </Link>
             ))}
           </nav>
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />
-            <div className="ai-indicator px-3 py-1 rounded-full text-white text-xs font-medium">
-              <i className="fas fa-robot mr-1"></i>
+            <div className="ai-indicator px-4 py-2 rounded-full text-white text-xs font-semibold">
+              <i className="fas fa-robot mr-2"></i>
               {t("dashboard.ai_medical")} - {t("dashboard.status_active")}
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <i className="fas fa-user text-muted-foreground text-sm"></i>
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-sm">
+                <i className="fas fa-user text-white text-sm"></i>
               </div>
-              <span className="text-sm font-medium" data-testid="text-user-name">Dr. Carlos Silva</span>
+              <div className="hidden sm:block">
+                <p className="text-sm font-semibold" data-testid="text-user-name">Dr. Carlos Silva</p>
+                <p className="text-xs text-muted-foreground">CRM: 123456-SP</p>
+              </div>
             </div>
           </div>
         </div>

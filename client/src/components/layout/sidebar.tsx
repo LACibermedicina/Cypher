@@ -75,20 +75,22 @@ function SidebarContent() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Logo and Brand */}
-      <div className="flex items-center space-x-3 p-6 border-b border-border">
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-          <i className="fas fa-user-md text-primary-foreground"></i>
+      {/* Modern Logo and Brand */}
+      <div className="flex items-center space-x-4 p-6 border-b border-border">
+        <div className="w-12 h-12 bg-gradient-to-br from-primary to-medical-primary rounded-xl flex items-center justify-center shadow-lg">
+          <i className="fas fa-user-md text-white text-lg"></i>
         </div>
         <div>
-          <h2 className="text-lg font-bold text-primary">{t("app.name")}</h2>
-          <p className="text-xs text-muted-foreground">{t("app.subtitle")}</p>
+          <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-medical-primary bg-clip-text text-transparent">
+            {t("app.name")}
+          </h2>
+          <p className="text-xs text-muted-foreground font-medium">{t("app.subtitle")}</p>
         </div>
       </div>
 
-      {/* Security Badge */}
+      {/* Modern Security Badge */}
       <div className="px-6 py-3">
-        <div className="security-badge px-3 py-2 rounded-lg text-white text-xs font-medium text-center">
+        <div className="security-badge px-4 py-3 rounded-xl text-white text-xs font-semibold text-center">
           <i className="fas fa-shield-alt mr-2"></i>
           {t("security.compliance")}
         </div>
@@ -103,10 +105,10 @@ function SidebarContent() {
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
               <div
-                className={`flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer ${
+                className={`nav-item flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
                   location === item.path || (location === "/" && item.path === "/dashboard")
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground"
+                    ? "active bg-gradient-to-r from-primary to-medical-primary text-white shadow-md"
+                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
                 }`}
                 data-testid={`sidebar-nav-${item.path.slice(1) || 'dashboard'}`}
               >
@@ -130,11 +132,11 @@ function SidebarContent() {
               key={action.action}
               variant="outline"
               size="sm"
-              className="w-full justify-start h-12"
+              className="w-full justify-start h-12 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200"
               data-testid={`sidebar-action-${action.action}`}
             >
-              <i className={`${action.icon} mr-3`}></i>
-              <span className="text-left">{action.label}</span>
+              <i className={`${action.icon} mr-3 text-primary`}></i>
+              <span className="text-left font-medium">{action.label}</span>
             </Button>
           ))}
         </div>
@@ -145,59 +147,59 @@ function SidebarContent() {
             {t("dashboard.system_status")}
           </h3>
           <div className="px-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="ai-indicator w-3 h-3 rounded-full"></div>
-                <span className="text-sm">{t("dashboard.ai_medical")}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-ai-gradient/10 to-primary/10 border border-primary/20">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full shadow-sm"></div>
+                <span className="text-sm font-medium">{t("dashboard.ai_medical")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_active")}</Badge>
+              <Badge className="success-badge text-xs px-3 py-1">{t("dashboard.status_active")}</Badge>
             </div>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm">{t("navigation.whatsapp")}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-sm"></div>
+                <span className="text-sm font-medium">{t("navigation.whatsapp")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_online")}</Badge>
+              <Badge className="success-badge text-xs px-3 py-1">{t("dashboard.status_online")}</Badge>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-sm">{t("dashboard.database")}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full shadow-sm"></div>
+                <span className="text-sm font-medium">{t("dashboard.database")}</span>
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">{t("dashboard.status_connected")}</Badge>
+              <Badge className="success-badge text-xs px-3 py-1">{t("dashboard.status_connected")}</Badge>
             </div>
           </div>
         </div>
       </ScrollArea>
 
-      {/* User Info */}
+      {/* Modern User Info */}
       <div className="border-t border-border p-6">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
-            <i className="fas fa-user text-muted-foreground"></i>
+        <div className="flex items-center space-x-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-md">
+            <i className="fas fa-user text-white text-lg"></i>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium" data-testid="sidebar-user-name">Dr. Carlos Silva</p>
-            <p className="text-xs text-muted-foreground">CRM: 123456-SP</p>
+            <p className="text-sm font-semibold" data-testid="sidebar-user-name">Dr. Carlos Silva</p>
+            <p className="text-xs text-muted-foreground font-medium">CRM: 123456-SP</p>
           </div>
-          <Button variant="ghost" size="sm" data-testid="sidebar-user-menu">
-            <i className="fas fa-cog"></i>
+          <Button variant="ghost" size="sm" className="rounded-xl hover:bg-primary/10" data-testid="sidebar-user-menu">
+            <i className="fas fa-cog text-primary"></i>
           </Button>
         </div>
       </div>
 
-      {/* Security Footer */}
+      {/* Modern Security Footer */}
       <div className="border-t border-border p-4">
-        <div className="space-y-2 text-xs text-muted-foreground">
-          <div className="flex items-center space-x-2">
-            <i className="fas fa-lock text-accent"></i>
-            <span>{t("security.encryption")}</span>
+        <div className="space-y-3 text-xs">
+          <div className="flex items-center space-x-3 p-2 rounded-lg bg-security-gradient/10 border border-accent/20">
+            <i className="fas fa-lock text-accent text-sm"></i>
+            <span className="font-medium text-muted-foreground">{t("security.encryption")}</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <i className="fas fa-certificate text-accent"></i>
-            <span>{t("security.iso_cert")}</span>
+          <div className="flex items-center space-x-3 p-2 rounded-lg bg-security-gradient/10 border border-accent/20">
+            <i className="fas fa-certificate text-accent text-sm"></i>
+            <span className="font-medium text-muted-foreground">{t("security.iso_cert")}</span>
           </div>
         </div>
       </div>
