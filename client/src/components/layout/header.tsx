@@ -3,14 +3,59 @@ import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import LanguageSelector from "@/components/ui/language-selector";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { LogOut, User, Settings } from "lucide-react";
 
 export default function Header() {
   const [location] = useLocation();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logout realizado",
+        description: "Você foi desconectado com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro no logout",
+        description: "Não foi possível fazer logout.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getUserInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  };
+
+  const getRoleDisplay = (role: string) => {
+    switch (role) {
+      case 'doctor':
+        return 'Médico';
+      case 'admin':
+        return 'Administrador';
+      case 'patient':
+        return 'Paciente';
+      default:
+        return role;
+    }
+  };
 
   const navItems = [
     { path: "/dashboard", label: t("navigation.dashboard"), icon: "fas fa-chart-line" },
@@ -143,14 +188,31 @@ export default function Header() {
 
               {/* Mobile User Info */}
               <div className="absolute bottom-6 left-6 right-6 p-4 bg-muted/50 rounded-xl">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-sm">
-                    <i className="fas fa-user text-white"></i>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="w-12 h-12">
+                      <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
+                        {user ? getUserInitials(user.name) : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-sm" data-testid="text-mobile-user-name">
+                        {user?.name || 'Usuário'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-sm" data-testid="text-mobile-user-name">Dr. Carlos Silva</p>
-                    <p className="text-xs text-muted-foreground">CRM: 123456-SP</p>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="text-muted-foreground hover:text-destructive"
+                    data-testid="button-mobile-logout"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </SheetContent>
@@ -162,15 +224,57 @@ export default function Header() {
               <i className="fas fa-robot mr-2"></i>
               {t("dashboard.ai_medical")} - {t("dashboard.status_active")}
             </div>
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-sm">
-                <i className="fas fa-user text-white text-sm"></i>
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-semibold" data-testid="text-user-name">Dr. Carlos Silva</p>
-                <p className="text-xs text-muted-foreground">CRM: 123456-SP</p>
-              </div>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-primary/5 transition-colors"
+                  data-testid="button-user-menu"
+                >
+                  <Avatar className="w-9 h-9">
+                    <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold text-sm">
+                      {user ? getUserInitials(user.name) : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-semibold" data-testid="text-user-name">
+                      {user?.name || 'Usuário'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
+                    </p>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div>
+                    <p className="font-semibold">{user?.name || 'Usuário'}</p>
+                    <p className="text-xs text-muted-foreground font-normal">
+                      {user?.email || user?.username}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <User className="mr-2 h-4 w-4" />
+                  Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleLogout}
+                  className="text-destructive focus:text-destructive"
+                  data-testid="button-desktop-logout"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

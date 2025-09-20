@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientProfile from "@/pages/patient-profile";
@@ -11,6 +13,7 @@ import Schedule from "@/pages/schedule";
 import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
 import AdminPage from "@/pages/admin";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 
@@ -18,16 +21,67 @@ function Router() {
   const { t } = useTranslation();
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/dashboard" component={Dashboard} />
-        <Route path="/patients/:id" component={PatientProfile} />
-        <Route path="/patients" component={Patients} />
-        <Route path="/schedule" component={Schedule} />
-        <Route path="/whatsapp" component={WhatsApp} />
-        <Route path="/records" component={MedicalRecords} />
-        <Route path="/admin" component={AdminPage} />
+        {/* Public routes */}
+        <Route path="/login" component={Login} />
+        
+        {/* Protected routes with different role requirements */}
+        <Route path="/">
+          <ProtectedRoute>
+            <Header />
+            <Dashboard />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/dashboard">
+          <ProtectedRoute>
+            <Header />
+            <Dashboard />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/patients/:id">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <PatientProfile />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/patients">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <Patients />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/schedule">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <Schedule />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/whatsapp">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <WhatsApp />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/records">
+          <ProtectedRoute>
+            <Header />
+            <MedicalRecords />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/admin">
+          <ProtectedRoute requiredRoles={['admin']}>
+            <Header />
+            <AdminPage />
+          </ProtectedRoute>
+        </Route>
+        
         <Route component={NotFound} />
       </Switch>
       
@@ -62,10 +116,12 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
