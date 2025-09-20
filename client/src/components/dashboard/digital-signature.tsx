@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ export default function DigitalSignature() {
   const queryClient = useQueryClient();
 
   const { data: pendingSignatures, isLoading } = useQuery({
-    queryKey: ['/api/digital-signatures/pending/doctor-id'],
+    queryKey: ['/api/digital-signatures/pending', DEFAULT_DOCTOR_ID],
   });
 
   const signDocumentMutation = useMutation({

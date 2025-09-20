@@ -4,10 +4,13 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { openAIService } from "./services/openai";
 import { whatsAppService } from "./services/whatsapp";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  
+  // Initialize default doctor if not exists and get the actual ID
+  const actualDoctorId = await initializeDefaultDoctor();
   
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -99,7 +102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Create appointment automatically
             const appointment = await storage.createAppointment({
               patientId: patient.id,
-              doctorId: 'doctor-id', // Should get from context
+              doctorId: actualDoctorId || DEFAULT_DOCTOR_ID, // Use actual or fallback doctor ID
               scheduledAt: new Date(`${schedulingResponse.suggestedAppointment.date} ${schedulingResponse.suggestedAppointment.time}`),
               type: schedulingResponse.suggestedAppointment.type,
               status: 'scheduled',
@@ -401,4 +404,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   return httpServer;
+}
+
+// Initialize default doctor if not exists
+async function initializeDefaultDoctor() {
+  try {
+    // Check if a doctor user exists by username
+    const existingDoctor = await storage.getUserByUsername('doctor');
+    
+    if (!existingDoctor) {
+      console.log('Creating default doctor user...');
+      const newDoctor = await storage.createUser({
+        username: 'doctor',
+        password: 'doctor123', // In production, this should be properly hashed
+        role: 'doctor',
+        name: 'Dr. Sistema MedIA',
+        email: 'medico@media.med.br',
+        phone: '+55 11 99999-9999',
+        digitalCertificate: 'dev-certificate-001',
+      });
+      
+      // Update the DEFAULT_DOCTOR_ID to use the generated ID
+      console.log('Default doctor created successfully with ID:', newDoctor.id);
+      return newDoctor.id;
+    } else {
+      console.log('Default doctor already exists with ID:', existingDoctor.id);
+      return existingDoctor.id;
+    }
+  } catch (error) {
+    console.error('Failed to initialize default doctor:', error);
+    return null;
+  }
 }

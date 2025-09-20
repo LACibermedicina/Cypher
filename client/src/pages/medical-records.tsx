@@ -76,10 +76,10 @@ export default function MedicalRecords() {
     },
   });
 
-  const selectedPatient = patients?.find((p: any) => p.id === selectedPatientId);
-  const filteredPatients = patients?.filter((patient: any) =>
+  const selectedPatient = (patients || []).find((p: any) => p.id === selectedPatientId);
+  const filteredPatients = (patients || []).filter((patient: any) =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const handleAnalyzeSymptoms = () => {
     const symptoms = form.getValues('symptoms');
@@ -349,7 +349,7 @@ export default function MedicalRecords() {
                     <div className="flex items-center justify-center py-12">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : !medicalRecords || medicalRecords.length === 0 ? (
+                  ) : !(medicalRecords || []).length ? (
                     <Card>
                       <CardContent className="py-12">
                         <div className="text-center">
@@ -369,7 +369,7 @@ export default function MedicalRecords() {
                     </Card>
                   ) : (
                     <div className="space-y-4">
-                      {medicalRecords.map((record: any) => (
+                      {(medicalRecords || []).map((record: any) => (
                         <Card key={record.id} data-testid={`record-card-${record.id}`}>
                           <CardHeader>
                             <div className="flex items-center justify-between">
@@ -460,7 +460,7 @@ export default function MedicalRecords() {
                 </TabsContent>
 
                 <TabsContent value="exams" className="space-y-4">
-                  {!examResults || examResults.length === 0 ? (
+                  {!(examResults || []).length ? (
                     <Card>
                       <CardContent className="py-12">
                         <div className="text-center">
@@ -476,7 +476,7 @@ export default function MedicalRecords() {
                     </Card>
                   ) : (
                     <div className="space-y-4">
-                      {examResults.map((exam: any) => (
+                      {(examResults || []).map((exam: any) => (
                         <Card key={exam.id} data-testid={`exam-card-${exam.id}`}>
                           <CardHeader>
                             <div className="flex items-center justify-between">

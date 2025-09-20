@@ -65,10 +65,10 @@ export default function Patients() {
     createPatientMutation.mutate(data);
   };
 
-  const filteredPatients = patients?.filter((patient: any) =>
+  const filteredPatients = (patients || []).filter((patient: any) =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.phone.includes(searchTerm)
-  ) || [];
+  );
 
   if (isLoading) {
     return (
@@ -105,7 +105,7 @@ export default function Patients() {
                     <FormItem>
                       <FormLabel>Nome Completo</FormLabel>
                       <FormControl>
-                        <Input placeholder="Digite o nome completo" {...field} data-testid="input-patient-name" />
+                        <Input placeholder="Digite o nome completo" {...field} value={field.value || ""} data-testid="input-patient-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -131,7 +131,7 @@ export default function Patients() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="email@exemplo.com" {...field} data-testid="input-patient-email" />
+                        <Input type="email" placeholder="email@exemplo.com" {...field} value={field.value || ""} data-testid="input-patient-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -145,7 +145,7 @@ export default function Patients() {
                       <FormItem>
                         <FormLabel>Gênero</FormLabel>
                         <FormControl>
-                          <Input placeholder="Masculino/Feminino" {...field} data-testid="input-patient-gender" />
+                          <Input placeholder="Masculino/Feminino" {...field} value={field.value || ""} data-testid="input-patient-gender" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -158,7 +158,7 @@ export default function Patients() {
                       <FormItem>
                         <FormLabel>Tipo Sanguíneo</FormLabel>
                         <FormControl>
-                          <Input placeholder="O+, A-, etc." {...field} data-testid="input-patient-blood-type" />
+                          <Input placeholder="O+, A-, etc." {...field} value={field.value || ""} data-testid="input-patient-blood-type" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -172,7 +172,7 @@ export default function Patients() {
                     <FormItem>
                       <FormLabel>Alergias</FormLabel>
                       <FormControl>
-                        <Input placeholder="Liste as alergias conhecidas" {...field} data-testid="input-patient-allergies" />
+                        <Input placeholder="Liste as alergias conhecidas" {...field} value={field.value || ""} data-testid="input-patient-allergies" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

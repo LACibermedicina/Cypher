@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ export default function TodaySchedule() {
   const queryClient = useQueryClient();
 
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ['/api/appointments/today/doctor-id'],
+    queryKey: ['/api/appointments/today', DEFAULT_DOCTOR_ID],
   });
 
   const updateAppointmentMutation = useMutation({
@@ -68,7 +69,7 @@ export default function TodaySchedule() {
         </div>
       </CardHeader>
       <CardContent className="p-6">
-        {!appointments || appointments.length === 0 ? (
+        {!(appointments || []).length ? (
           <div className="text-center py-8">
             <i className="fas fa-calendar-day text-4xl text-muted-foreground mb-3"></i>
             <h3 className="text-lg font-semibold text-muted-foreground mb-2">
@@ -80,7 +81,7 @@ export default function TodaySchedule() {
           </div>
         ) : (
           <div className="space-y-4">
-            {appointments.map((appointment: any) => (
+            {(appointments || []).map((appointment: any) => (
               <div
                 key={appointment.id}
                 className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"

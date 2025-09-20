@@ -4,6 +4,9 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// Default doctor ID for development environment (proper UUID format)
+export const DEFAULT_DOCTOR_ID = '550e8400-e29b-41d4-a716-446655440000';
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
@@ -274,3 +277,11 @@ export type InsertDoctorSchedule = z.infer<typeof insertDoctorScheduleSchema>;
 
 export type DigitalSignature = typeof digitalSignatures.$inferSelect;
 export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema>;
+
+// Dashboard stats type
+export interface DashboardStats {
+  todayConsultations: number;
+  whatsappMessages: number;
+  aiScheduling: number;
+  secureRecords: number;
+}

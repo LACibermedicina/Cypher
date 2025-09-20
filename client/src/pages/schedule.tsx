@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -11,7 +12,7 @@ export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const { data: appointments, isLoading } = useQuery({
-    queryKey: ['/api/appointments/doctor/doctor-id', selectedDate.toISOString()],
+    queryKey: ['/api/appointments/doctor', DEFAULT_DOCTOR_ID, selectedDate.toISOString()],
   });
 
   const getStatusColor = (status: string) => {
@@ -108,13 +109,13 @@ export default function Schedule() {
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <i className="fas fa-calendar text-primary"></i>
                   <span data-testid="text-appointment-count">
-                    {appointments?.length || 0} consultas agendadas
+                    {(appointments || []).length} consultas agendadas
                   </span>
                 </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {!appointments || appointments.length === 0 ? (
+              {!(appointments || []).length ? (
                 <div className="text-center py-12">
                   <i className="fas fa-calendar-day text-6xl text-muted-foreground mb-4"></i>
                   <h3 className="text-lg font-semibold text-muted-foreground mb-2">
@@ -130,7 +131,7 @@ export default function Schedule() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {appointments.map((appointment: any) => (
+                  {(appointments || []).map((appointment: any) => (
                     <div
                       key={appointment.id}
                       className="flex items-center space-x-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"

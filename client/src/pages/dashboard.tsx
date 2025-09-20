@@ -6,10 +6,11 @@ import DigitalSignature from "@/components/dashboard/digital-signature";
 import MedicalCollaborators from "@/components/dashboard/medical-collaborators";
 import ExamResults from "@/components/dashboard/exam-results";
 import { useQuery } from "@tanstack/react-query";
+import { DEFAULT_DOCTOR_ID, type DashboardStats } from "@shared/schema";
 
 export default function Dashboard() {
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['/api/dashboard/stats/doctor-id'],
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ['/api/dashboard/stats', DEFAULT_DOCTOR_ID],
   });
 
   if (statsLoading) {
