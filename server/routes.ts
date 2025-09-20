@@ -767,7 +767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcriptionStatus: 'processing'
       });
 
-      broadcast({ type: 'transcription_started', consultationId });
+      broadcast({ type: 'transcription_started', consultationId, status: 'processing' });
 
       try {
         // Convert base64 audio data to buffer
@@ -793,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transcriptionStatus: 'completed'
         });
 
-        // Create medical record with transcription data
+        // Create medical record with comprehensive transcription data
         const medicalRecord = await storage.createMedicalRecord({
           patientId: consultation.patientId,
           doctorId: consultation.doctorId,
@@ -801,13 +801,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           audioTranscript: transcriptionResult.text,
           diagnosis: transcriptionResult.diagnosis,
           treatment: transcriptionResult.treatment,
+          symptoms: transcriptionResult.symptoms,
+          observations: transcriptionResult.observations,
+          diagnosticHypotheses: transcriptionResult.diagnosticHypotheses,
           isEncrypted: true
         });
 
         broadcast({ 
           type: 'transcription_completed', 
           consultationId,
-          data: transcriptionResult
+          status: 'completed',
+          medicalRecordId: medicalRecord.id
         });
 
         res.json({

@@ -15,6 +15,13 @@ export interface TranscriptionResult {
   diagnosis?: string;
   treatment?: string;
   followUp?: string;
+  symptoms?: string;
+  observations?: string;
+  diagnosticHypotheses?: Array<{
+    condition: string;
+    probability: number;
+    reasoning: string;
+  }>;
   duration: number;
 }
 
@@ -99,7 +106,14 @@ export class WhisperService {
           "treatment": "Tratamento prescrito ou recomendado (se houver)",
           "followUp": "Orientações de acompanhamento (se houver)",
           "symptoms": "Sintomas relatados pelo paciente",
-          "observations": "Observações clínicas do médico"
+          "observations": "Observações clínicas do médico",
+          "diagnosticHypotheses": [
+            {
+              "condition": "Nome da condição médica",
+              "probability": 85,
+              "reasoning": "Justificativa baseada nos sintomas e exame"
+            }
+          ]
         }
         
         Baseie-se apenas no conteúdo da transcrição. Se alguma informação não estiver presente, deixe o campo em branco.
@@ -136,6 +150,9 @@ export class WhisperService {
         diagnosis: analysisResult.diagnosis || undefined,
         treatment: analysisResult.treatment || undefined,
         followUp: analysisResult.followUp || undefined,
+        symptoms: analysisResult.symptoms || undefined,
+        observations: analysisResult.observations || undefined,
+        diagnosticHypotheses: analysisResult.diagnosticHypotheses || undefined,
         duration: Math.round(duration)
       };
 

@@ -11,6 +11,7 @@ import { format, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import VideoConsultation from "@/components/video-consultation/VideoConsultation";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -18,6 +19,9 @@ export default function Schedule() {
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [appointmentType, setAppointmentType] = useState<string>("consultation");
+  const [isVideoConsultationOpen, setIsVideoConsultationOpen] = useState(false);
+  const [activeConsultationId, setActiveConsultationId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -61,6 +65,45 @@ export default function Schedule() {
       });
     },
   });
+
+  // Create video consultation mutation
+  const createVideoConsultationMutation = useMutation({
+    mutationFn: (consultationData: any) => apiRequest('POST', '/api/video-consultations', consultationData),
+    onSuccess: (consultation) => {
+      toast({
+        title: "Videochamada iniciada",
+        description: "A videochamada foi iniciada com sucesso.",
+      });
+      setActiveConsultationId(consultation.id);
+      setIsVideoConsultationOpen(true);
+      queryClient.invalidateQueries({ queryKey: ['/api/video-consultations'] });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível iniciar a videochamada.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStartConsultation = async (appointment: any) => {
+    if (!appointment) return;
+
+    try {
+      // Create a video consultation session linked to the appointment
+      const consultationData = {
+        patientId: appointment.patientId,
+        doctorId: DEFAULT_DOCTOR_ID,
+        appointmentId: appointment.id,
+      };
+
+      setSelectedAppointment(appointment);
+      createVideoConsultationMutation.mutate(consultationData);
+    } catch (error) {
+      console.error('Error starting consultation:', error);
+    }
+  };
 
   // Handle appointment creation
   const handleCreateAppointment = () => {
@@ -276,10 +319,12 @@ export default function Schedule() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleStartConsultation(appointment)}
+                          disabled={createVideoConsultationMutation.isPending}
                           data-testid={`button-start-consultation-${appointment.id}`}
                         >
                           <i className="fas fa-video mr-1"></i>
-                          Iniciar
+                          {createVideoConsultationMutation.isPending ? 'Iniciando...' : 'Iniciar'}
                         </Button>
                         
                         <Button
@@ -438,6 +483,28 @@ export default function Schedule() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Video Consultation Dialog */}
+      <Dialog open={isVideoConsultationOpen} onOpenChange={setIsVideoConsultationOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden" data-testid="dialog-video-consultation">
+          <DialogHeader>
+            <DialogTitle>
+              Videochamada - {selectedAppointment?.patientName || 'Consulta'}
+            </DialogTitle>
+          </DialogHeader>
+          {activeConsultationId && (
+            <VideoConsultation
+              consultationId={activeConsultationId}
+              patientName={selectedAppointment?.patientName || 'Paciente'}
+              onEndConsultation={() => {
+                setIsVideoConsultationOpen(false);
+                setActiveConsultationId(null);
+                setSelectedAppointment(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
