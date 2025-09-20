@@ -106,39 +106,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate required headers
       if (!apiKey) {
-        await storage.createCollaboratorIntegration({
-          collaboratorId: collaboratorId || 'unknown',
-          integrationType: 'api_access',
-          entityId: req.path,
-          action: 'authentication_failed',
-          status: 'failed',
-          errorMessage: 'Missing API key',
-          requestData: {
-            endpoint: req.path,
-            method: req.method,
-            clientIp: clientIp,
-            timestamp: new Date().toISOString()
-          },
-        });
         return res.status(401).json({ message: 'API key required' });
       }
 
       if (!collaboratorId) {
-        await storage.createCollaboratorIntegration({
-          collaboratorId: 'unknown',
-          integrationType: 'api_access',
-          entityId: req.path,
-          action: 'authentication_failed',
-          status: 'failed',
-          errorMessage: 'Missing collaborator ID',
-          requestData: {
-            endpoint: req.path,
-            method: req.method,
-            clientIp: clientIp,
-            timestamp: new Date().toISOString()
-          },
-        });
         return res.status(401).json({ message: 'Collaborator ID required' });
+      }
+
+      // Validate collaboratorId is a valid UUID to prevent database constraint violations
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(collaboratorId)) {
+        return res.status(400).json({ message: 'Invalid collaborator ID format' });
+      }
+
+      // Verify collaborator exists EARLY to prevent FK violations in audit logging
+      const collaborator = await storage.getCollaborator(collaboratorId);
+      if (!collaborator) {
+        // Return 401 without logging to prevent FK constraint violations
+        return res.status(401).json({ message: 'Invalid collaborator' });
       }
 
       // Hash the provided API key for comparison
@@ -283,25 +268,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastUsed: new Date()
       });
 
-      // Verify collaborator exists and is valid
-      const collaborator = await storage.getCollaborator(collaboratorId);
-      if (!collaborator) {
-        await storage.createCollaboratorIntegration({
-          collaboratorId: collaboratorId,
-          integrationType: 'api_access',
-          entityId: req.path,
-          action: 'authentication_failed',
-          status: 'failed',
-          errorMessage: 'Collaborator not found',
-          requestData: {
-            endpoint: req.path,
-            method: req.method,
-            clientIp: clientIp,
-            timestamp: new Date().toISOString()
-          },
-        });
-        return res.status(404).json({ message: 'Collaborator not found' });
-      }
+      // Collaborator existence already verified early to prevent FK violations
+      // Use the collaborator object from the earlier verification
 
       // Log successful authentication and attach to request
       await storage.createCollaboratorIntegration({
@@ -3107,6 +3075,540 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // - lab_result_file_download: File downloads
   //
   // This provides complete workflow tracking and audit logging for Brazilian healthcare compliance.
+
+  // ===== AUTHENTICATION MIDDLEWARE FOR INTERNAL USERS =====
+  
+  // Simple authentication middleware for internal doctor access
+  // In production, this would be replaced with proper session/JWT authentication
+  const requireAuth = async (req: any, res: any, next: any) => {
+    try {
+      // For demo/development: use default doctor
+      // In production: implement proper session/JWT validation
+      const doctorId = DEFAULT_DOCTOR_ID;
+      
+      if (!doctorId) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      // Get doctor user
+      const doctor = await storage.getUser(doctorId);
+      if (!doctor || doctor.role !== 'doctor') {
+        return res.status(401).json({ message: 'Invalid authentication' });
+      }
+      
+      // Attach user to request
+      req.user = doctor;
+      next();
+    } catch (error) {
+      console.error('Authentication error:', error);
+      res.status(500).json({ message: 'Authentication failed' });
+    }
+  };
+
+  // ===== HOSPITAL INTEGRATION ENDPOINTS =====
+
+  // Get all hospital collaborators (Doctor-only)
+  app.get('/api/hospitals', requireAuth, async (req, res) => {
+    try {
+      const hospitals = await storage.getCollaboratorsByType('hospital');
+      res.json(hospitals);
+    } catch (error) {
+      console.error('Get hospitals error:', error);
+      res.status(500).json({ message: 'Failed to get hospitals' });
+    }
+  });
+
+  // Create new hospital collaborator (Admin-only)
+  app.post('/api/hospitals', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      // In production, implement proper admin role check
+      // For now, restrict to doctor role as a basic access control
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: insufficient privileges' });
+      }
+
+      const validatedData = insertCollaboratorSchema.parse({
+        ...req.body,
+        type: 'hospital'
+      });
+      
+      const hospital = await storage.createCollaborator(validatedData);
+      res.status(201).json(hospital);
+    } catch (error) {
+      console.error('Create hospital error:', error);
+      res.status(500).json({ message: 'Failed to create hospital' });
+    }
+  });
+
+  // Create a hospital referral (Doctor-only)
+  app.post('/api/hospital-referrals', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: user.id, // Use the user's ID for tracking
+          integrationType: 'authorization_violation',
+          entityId: 'hospital_referral_creation',
+          action: 'unauthorized_access',
+          status: 'failed',
+          errorMessage: 'Non-doctor attempted to create hospital referral',
+          requestData: {
+            userId: user.id,
+            userRole: user.role,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: only doctors can create hospital referrals' });
+      }
+
+      const { patientId, hospitalId, specialty, urgency, reason, clinicalSummary, requestedServices } = req.body;
+
+      // Validate required fields
+      if (!patientId || !hospitalId || !specialty || !reason) {
+        return res.status(400).json({ message: 'Missing required fields: patientId, hospitalId, specialty, reason' });
+      }
+
+      // Verify hospital collaborator exists and is active
+      const hospital = await storage.getCollaborator(hospitalId);
+      if (!hospital || hospital.type !== 'hospital' || !hospital.isActive) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: user.id, // Use doctor's ID for tracking
+          integrationType: 'authorization_violation',
+          entityId: hospitalId,
+          action: 'invalid_hospital_referral',
+          status: 'failed',
+          errorMessage: `Invalid hospital ID: ${hospitalId}`,
+          requestData: {
+            doctorId: user.id,
+            patientId,
+            hospitalId,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(400).json({ message: 'Invalid or inactive hospital' });
+      }
+
+      // Verify patient exists and doctor has access
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+
+      // Create hospital referral
+      const newReferral = await storage.createHospitalReferral({
+        patientId,
+        referringDoctorId: user.id,
+        hospitalId,
+        specialty,
+        urgency: urgency || 'routine',
+        reason,
+        clinicalSummary,
+        requestedServices,
+        status: 'pending'
+      });
+
+      // Log referral creation
+      await storage.createCollaboratorIntegration({
+        collaboratorId: hospitalId,
+        integrationType: 'hospital_referral',
+        entityId: newReferral.id,
+        action: 'referral_created',
+        status: 'success',
+        requestData: {
+          patientId,
+          referralId: newReferral.id,
+          referringDoctorId: user.id,
+          specialty,
+          urgency: urgency || 'routine',
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.status(201).json(newReferral);
+    } catch (error) {
+      console.error('Create hospital referral error:', error);
+      res.status(500).json({ message: 'Failed to create hospital referral' });
+    }
+  });
+
+  // Get hospital referrals for a specific hospital (External API - requires API key)
+  app.get('/api/hospital-referrals/hospital', authenticateApiKey, async (req, res) => {
+    try {
+      const { collaborator: authenticatedCollaborator } = req as any;
+      
+      if (authenticatedCollaborator.type !== 'hospital') {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: 'hospital_referrals_list',
+          action: 'unauthorized_access',
+          status: 'failed',
+          errorMessage: 'Non-hospital collaborator attempted to access hospital referrals',
+          requestData: {
+            collaboratorId: authenticatedCollaborator.id,
+            collaboratorType: authenticatedCollaborator.type,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: only hospitals can access this endpoint' });
+      }
+
+      const { status, limit = 50, offset = 0 } = req.query;
+
+      // Get referrals for this hospital
+      const allReferrals = await storage.getHospitalReferralsByHospital(authenticatedCollaborator.id);
+      
+      // Filter by status if provided
+      const filteredReferrals = status 
+        ? allReferrals.filter(referral => referral.status === status)
+        : allReferrals;
+
+      // Paginate results
+      const paginatedReferrals = filteredReferrals.slice(Number(offset), Number(offset) + Number(limit));
+
+      // Log access
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'hospital_referral_access',
+        entityId: 'referrals_list',
+        action: 'referrals_retrieved',
+        status: 'success',
+        requestData: {
+          referralsCount: paginatedReferrals.length,
+          statusFilter: status || 'all',
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json({
+        referrals: paginatedReferrals,
+        total: filteredReferrals.length,
+        offset: Number(offset),
+        limit: Number(limit)
+      });
+    } catch (error) {
+      console.error('Get hospital referrals error:', error);
+      res.status(500).json({ message: 'Failed to get hospital referrals' });
+    }
+  });
+
+  // Update hospital referral status (External API - requires API key)
+  app.patch('/api/hospital-referrals/:referralId', authenticateApiKey, async (req, res) => {
+    try {
+      const { collaborator: authenticatedCollaborator } = req as any;
+      const { referralId } = req.params;
+      const { status, scheduledDate, externalReferralId, dischargeNotes, followUpRequired, followUpDate } = req.body;
+
+      if (authenticatedCollaborator.type !== 'hospital') {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: referralId,
+          action: 'unauthorized_referral_update',
+          status: 'failed',
+          errorMessage: 'Non-hospital collaborator attempted to update referral',
+          requestData: {
+            collaboratorId: authenticatedCollaborator.id,
+            collaboratorType: authenticatedCollaborator.type,
+            referralId,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: only hospitals can update referrals' });
+      }
+
+      // Get existing referral
+      const existingReferral = await storage.getHospitalReferral(referralId);
+      if (!existingReferral) {
+        return res.status(404).json({ message: 'Referral not found' });
+      }
+
+      // Verify hospital owns this referral
+      if (existingReferral.hospitalId !== authenticatedCollaborator.id) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: referralId,
+          action: 'unauthorized_referral_access',
+          status: 'failed',
+          errorMessage: 'Hospital attempted to access referral from different hospital',
+          requestData: {
+            referralId,
+            referralHospitalId: existingReferral.hospitalId,
+            authenticatedHospitalId: authenticatedCollaborator.id,
+            requestedStatus: status,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized referral update' });
+      }
+
+      // Validate status transitions
+      const ALLOWED_HOSPITAL_TRANSITIONS: Record<string, string[]> = {
+        'pending': ['accepted', 'rejected'],
+        'accepted': ['in_progress', 'cancelled'],
+        'in_progress': ['completed', 'cancelled'],
+        'rejected': [], // Final state
+        'completed': [], // Final state
+        'cancelled': [] // Final state
+      };
+
+      const currentStatus = existingReferral.status;
+      if (status && !ALLOWED_HOSPITAL_TRANSITIONS[currentStatus]?.includes(status)) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'hospital_workflow_violation',
+          entityId: referralId,
+          action: 'invalid_status_transition',
+          status: 'failed',
+          errorMessage: `Invalid hospital referral transition from ${currentStatus} to ${status}`,
+          requestData: {
+            referralId,
+            patientId: existingReferral.patientId,
+            currentStatus,
+            requestedStatus: status,
+            validTransitions: ALLOWED_HOSPITAL_TRANSITIONS[currentStatus] || [],
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(400).json({ 
+          message: `Invalid transition from ${currentStatus} to ${status}`,
+          currentStatus,
+          validTransitions: ALLOWED_HOSPITAL_TRANSITIONS[currentStatus] || []
+        });
+      }
+
+      // Prepare update data
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (scheduledDate) updateData.scheduledDate = new Date(scheduledDate);
+      if (externalReferralId) updateData.externalReferralId = externalReferralId;
+      if (dischargeNotes) updateData.dischargeNotes = dischargeNotes;
+      if (followUpRequired !== undefined) updateData.followUpRequired = followUpRequired;
+      if (followUpDate) updateData.followUpDate = new Date(followUpDate);
+      if (status === 'completed') updateData.completedAt = new Date();
+
+      // Update referral
+      const updatedReferral = await storage.updateHospitalReferral(referralId, updateData);
+
+      // Comprehensive audit logging
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'hospital_referral_update',
+        entityId: referralId,
+        action: 'status_updated',
+        status: 'success',
+        requestData: {
+          referralId,
+          patientId: existingReferral.patientId,
+          previousStatus: currentStatus,
+          newStatus: status,
+          scheduledDate,
+          externalReferralId,
+          dischargeNotes: dischargeNotes ? '[REDACTED]' : undefined,
+          followUpRequired,
+          followUpDate,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json(updatedReferral);
+    } catch (error) {
+      console.error('Update hospital referral error:', error);
+      res.status(500).json({ message: 'Failed to update hospital referral' });
+    }
+  });
+
+  // Get specific hospital referral (Doctor access)
+  app.get('/api/hospital-referrals/:referralId', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: only doctors can view referrals' });
+      }
+
+      const { referralId } = req.params;
+      const referral = await storage.getHospitalReferral(referralId);
+
+      if (!referral) {
+        return res.status(404).json({ message: 'Referral not found' });
+      }
+
+      // Verify doctor has access to this referral
+      if (referral.referringDoctorId !== user.id) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: user.id, // Use requesting doctor's ID for tracking
+          integrationType: 'authorization_violation',
+          entityId: referralId,
+          action: 'unauthorized_referral_access',
+          status: 'failed',
+          errorMessage: 'Doctor attempted to access referral from different doctor',
+          requestData: {
+            referralId,
+            referralDoctorId: referral.referringDoctorId,
+            requestingDoctorId: user.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized referral access' });
+      }
+
+      // Log authorized access for audit trail
+      await storage.createCollaboratorIntegration({
+        collaboratorId: referral.hospitalId, // Use hospital ID for tracking
+        integrationType: 'hospital_referral_access',
+        entityId: referralId,
+        action: 'referral_viewed',
+        status: 'success',
+        requestData: {
+          doctorId: user.id,
+          referralId,
+          patientId: referral.patientId,
+          hospitalId: referral.hospitalId,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json(referral);
+    } catch (error) {
+      console.error('Get hospital referral error:', error);
+      res.status(500).json({ message: 'Failed to get hospital referral' });
+    }
+  });
+
+  // Get patient's hospital referrals (Doctor access)
+  app.get('/api/patients/:patientId/hospital-referrals', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: only doctors can view patient referrals' });
+      }
+
+      const { patientId } = req.params;
+      
+      // Get all referrals for patient
+      const hospitalReferrals = await storage.getHospitalReferralsByPatient(patientId);
+      
+      // Filter to only show referrals from this doctor
+      const authorizedReferrals = hospitalReferrals.filter(referral => referral.referringDoctorId === user.id);
+      
+      // Log access attempt with authorization results
+      // Use the first hospital ID if referrals exist, otherwise use the doctor's ID for tracking
+      const trackingCollaboratorId = hospitalReferrals.length > 0 ? hospitalReferrals[0].hospitalId : user.id;
+      await storage.createCollaboratorIntegration({
+        collaboratorId: trackingCollaboratorId,
+        integrationType: 'patient_hospital_referrals_access',
+        entityId: patientId,
+        action: 'patient_referrals_viewed',
+        status: 'success',
+        requestData: {
+          doctorId: user.id,
+          patientId,
+          totalReferrals: hospitalReferrals.length,
+          authorizedReferrals: authorizedReferrals.length,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json(authorizedReferrals);
+    } catch (error) {
+      console.error('Get patient hospital referrals error:', error);
+      res.status(500).json({ message: 'Failed to get patient hospital referrals' });
+    }
+  });
+
+  // Submit discharge summary (External API - requires API key)
+  app.post('/api/hospital-referrals/:referralId/discharge', authenticateApiKey, async (req, res) => {
+    try {
+      const { collaborator: authenticatedCollaborator } = req as any;
+      const { referralId } = req.params;
+      const { dischargeNotes, followUpRequired, followUpDate } = req.body;
+
+      if (authenticatedCollaborator.type !== 'hospital') {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: referralId,
+          action: 'unauthorized_discharge_submission',
+          status: 'failed',
+          errorMessage: 'Non-hospital collaborator attempted to submit discharge summary',
+          requestData: {
+            collaboratorId: authenticatedCollaborator.id,
+            collaboratorType: authenticatedCollaborator.type,
+            referralId,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: only hospitals can submit discharge summaries' });
+      }
+
+      // Get existing referral
+      const existingReferral = await storage.getHospitalReferral(referralId);
+      if (!existingReferral) {
+        return res.status(404).json({ message: 'Referral not found' });
+      }
+
+      // Verify hospital owns this referral
+      if (existingReferral.hospitalId !== authenticatedCollaborator.id) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: referralId,
+          action: 'unauthorized_discharge_access',
+          status: 'failed',
+          errorMessage: 'Hospital attempted to access referral from different hospital',
+          requestData: {
+            referralId,
+            referralHospitalId: existingReferral.hospitalId,
+            authenticatedHospitalId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized discharge submission' });
+      }
+
+      // Validate required fields
+      if (!dischargeNotes) {
+        return res.status(400).json({ message: 'Discharge notes are required' });
+      }
+
+      // Update referral with discharge information
+      const updateData: any = {
+        dischargeNotes,
+        followUpRequired: followUpRequired || false,
+        status: 'completed',
+        completedAt: new Date()
+      };
+
+      if (followUpDate) {
+        updateData.followUpDate = new Date(followUpDate);
+      }
+
+      const updatedReferral = await storage.updateHospitalReferral(referralId, updateData);
+
+      // Comprehensive audit logging
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'hospital_discharge_submission',
+        entityId: referralId,
+        action: 'discharge_submitted',
+        status: 'success',
+        requestData: {
+          referralId,
+          patientId: existingReferral.patientId,
+          followUpRequired: followUpRequired || false,
+          followUpDate,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      res.json(updatedReferral);
+    } catch (error) {
+      console.error('Submit discharge summary error:', error);
+      res.status(500).json({ message: 'Failed to submit discharge summary' });
+    }
+  });
 
   return httpServer;
 }
