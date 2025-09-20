@@ -547,6 +547,25 @@ export class DatabaseStorage implements IStorage {
       ));
     return apiKey || undefined;
   }
+
+  // Admin Methods for API Key Management
+  async getAllApiKeys(): Promise<CollaboratorApiKey[]> {
+    return await db.select().from(collaboratorApiKeys)
+      .orderBy(desc(collaboratorApiKeys.createdAt));
+  }
+
+  // Admin Methods for Integration Monitoring
+  async getAllCollaboratorIntegrations(): Promise<CollaboratorIntegration[]> {
+    return await db.select().from(collaboratorIntegrations)
+      .orderBy(desc(collaboratorIntegrations.createdAt))
+      .limit(1000); // Limit to prevent overwhelming the admin interface
+  }
+
+  async getCollaboratorIntegrationsAfterDate(date: Date): Promise<CollaboratorIntegration[]> {
+    return await db.select().from(collaboratorIntegrations)
+      .where(gte(collaboratorIntegrations.createdAt, date))
+      .orderBy(desc(collaboratorIntegrations.createdAt));
+  }
 }
 
 export const storage = new DatabaseStorage();
