@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
+import PatientProfile from "@/pages/patient-profile";
 import Schedule from "@/pages/schedule";
 import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
@@ -18,6 +19,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/dashboard" component={Dashboard} />
+        <Route path="/patients/:id" component={PatientProfile} />
         <Route path="/patients" component={Patients} />
         <Route path="/schedule" component={Schedule} />
         <Route path="/whatsapp" component={WhatsApp} />

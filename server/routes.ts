@@ -214,6 +214,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/appointments/patient/:patientId', async (req, res) => {
+    try {
+      const appointments = await storage.getAppointmentsByPatient(req.params.patientId);
+      res.json(appointments);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to get patient appointments' });
+    }
+  });
+
   app.post('/api/appointments', async (req, res) => {
     try {
       const validatedData = insertAppointmentSchema.parse(req.body);

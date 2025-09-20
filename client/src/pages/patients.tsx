@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertPatientSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { z } from "zod";
 
 const patientFormSchema = insertPatientSchema.extend({
@@ -24,6 +25,7 @@ export default function Patients() {
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ['/api/patients'],
@@ -262,7 +264,12 @@ export default function Patients() {
                   )}
                 </div>
                 <div className="flex space-x-2 mt-4">
-                  <Button variant="outline" size="sm" data-testid={`button-view-patient-${patient.id}`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setLocation(`/patients/${patient.id}`)}
+                    data-testid={`button-view-patient-${patient.id}`}
+                  >
                     <i className="fas fa-eye mr-2"></i>
                     Ver Detalhes
                   </Button>
