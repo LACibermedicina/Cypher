@@ -22,18 +22,18 @@ export default function Schedule() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: appointments, isLoading } = useQuery({
+  const { data: appointments, isLoading } = useQuery<any[]>({
     queryKey: ['/api/appointments/doctor', DEFAULT_DOCTOR_ID, selectedDate.toISOString()],
   });
 
   // Fetch available slots for appointment creation
-  const { data: availableSlots, isLoading: slotsLoading } = useQuery({
+  const { data: availableSlots, isLoading: slotsLoading } = useQuery<any[]>({
     queryKey: ['/api/scheduling/available-slots', DEFAULT_DOCTOR_ID],
     enabled: isCreateModalOpen, // Only fetch when modal is open
   });
 
   // Fetch patients for selection
-  const { data: patients } = useQuery({
+  const { data: patients } = useQuery<any[]>({
     queryKey: ['/api/patients'],
     enabled: isCreateModalOpen, // Only fetch when modal is open  
   });
@@ -74,7 +74,7 @@ export default function Schedule() {
     }
 
     // Find the selected slot to get proper date/time
-    const slot = availableSlots?.find((s: any) => s.formatted === selectedSlot);
+    const slot = (availableSlots || []).find((s: any) => s.formatted === selectedSlot);
     if (!slot) {
       toast({
         title: "Horário inválido",

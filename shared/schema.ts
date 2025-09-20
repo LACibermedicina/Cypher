@@ -129,12 +129,36 @@ export const digitalSignatures = pgTable("digital_signatures", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const videoConsultations = pgTable("video_consultations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  appointmentId: uuid("appointment_id").references(() => appointments.id).notNull(),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  doctorId: uuid("doctor_id").references(() => users.id).notNull(),
+  sessionId: text("session_id").notNull().unique(), // WebRTC session identifier
+  status: text("status").notNull().default("waiting"), // waiting, active, ended, cancelled
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  recordingUrl: text("recording_url"),
+  audioRecordingUrl: text("audio_recording_url"),
+  transcriptionStatus: text("transcription_status").default("pending"), // pending, processing, completed, failed
+  fullTranscript: text("full_transcript"),
+  meetingNotes: text("meeting_notes"),
+  duration: integer("duration"), // in seconds
+  participants: jsonb("participants"), // WebRTC participant data
+  connectionLogs: jsonb("connection_logs"), // Connection quality and issues
+  isRecorded: boolean("is_recorded").default(false),
+  encryptionEnabled: boolean("encryption_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   appointments: many(appointments),
   medicalRecords: many(medicalRecords),
   doctorSchedule: many(doctorSchedule),
   digitalSignatures: many(digitalSignatures),
+  videoConsultations: many(videoConsultations),
 }));
 
 export const patientsRelations = relations(patients, ({ many }) => ({
@@ -143,6 +167,7 @@ export const patientsRelations = relations(patients, ({ many }) => ({
   whatsappMessages: many(whatsappMessages),
   examResults: many(examResults),
   digitalSignatures: many(digitalSignatures),
+  videoConsultations: many(videoConsultations),
 }));
 
 export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
@@ -156,6 +181,7 @@ export const appointmentsRelations = relations(appointments, ({ one, many }) => 
   }),
   medicalRecords: many(medicalRecords),
   whatsappMessages: many(whatsappMessages),
+  videoConsultations: many(videoConsultations),
 }));
 
 export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
@@ -198,6 +224,21 @@ export const digitalSignaturesRelations = relations(digitalSignatures, ({ one })
   }),
   doctor: one(users, {
     fields: [digitalSignatures.doctorId],
+    references: [users.id],
+  }),
+}));
+
+export const videoConsultationsRelations = relations(videoConsultations, ({ one }) => ({
+  appointment: one(appointments, {
+    fields: [videoConsultations.appointmentId],
+    references: [appointments.id],
+  }),
+  patient: one(patients, {
+    fields: [videoConsultations.patientId],
+    references: [patients.id],
+  }),
+  doctor: one(users, {
+    fields: [videoConsultations.doctorId],
     references: [users.id],
   }),
 }));
@@ -250,6 +291,12 @@ export const insertDigitalSignatureSchema = createInsertSchema(digitalSignatures
   createdAt: true,
 });
 
+export const insertVideoConsultationSchema = createInsertSchema(videoConsultations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -277,6 +324,9 @@ export type InsertDoctorSchedule = z.infer<typeof insertDoctorScheduleSchema>;
 
 export type DigitalSignature = typeof digitalSignatures.$inferSelect;
 export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema>;
+
+export type VideoConsultation = typeof videoConsultations.$inferSelect;
+export type InsertVideoConsultation = z.infer<typeof insertVideoConsultationSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {
