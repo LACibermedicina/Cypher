@@ -227,4 +227,90 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.8; }
   }
+
+  /* Mobile-First Optimizations */
+  @media (max-width: 768px) {
+    /* Enhanced Touch Targets */
+    .mobile-touch-optimized button,
+    .mobile-touch-optimized [role="button"],
+    .mobile-touch-optimized a {
+      min-height: 44px;
+      min-width: 44px;
+      padding: 12px;
+    }
+    
+    /* Mobile Card Spacing */
+    .mobile-card {
+      padding: 1rem !important;
+      margin-bottom: 0.75rem !important;
+      border-radius: calc(var(--radius) * 0.75);
+    }
+    
+    /* Mobile Typography Adjustments */
+    .mobile-text-scale h1 {
+      font-size: 1.75rem !important;
+    }
+    
+    .mobile-text-scale h2 {
+      font-size: 1.5rem !important;
+    }
+    
+    .mobile-text-scale .text-2xl {
+      font-size: 1.5rem !important;
+    }
+    
+    /* Mobile Navigation Enhancements */
+    .mobile-nav-item {
+      padding: 1rem !important;
+      margin-bottom: 0.5rem;
+      border-radius: calc(var(--radius) * 0.75);
+      transition: all 0.2s ease;
+    }
+    
+    /* Mobile Gestures & Scrolling */
+    .mobile-scrollable {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
+    }
+    
+    /* Mobile Focus States */
+    .mobile-focus-enhanced:focus,
+    .mobile-focus-enhanced:focus-within {
+      outline: 2px solid hsl(var(--primary));
+      outline-offset: 2px;
+      border-radius: var(--radius);
+    }
+    
+    /* Mobile Grid Optimizations */
+    .mobile-grid-stack {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 1rem !important;
+    }
+    
+    /* Mobile Header Adjustments */
+    .mobile-header-compact {
+      padding: 0.75rem 1rem !important;
+      min-height: 3.5rem !important;
+    }
+    
+    /* Mobile Form Elements */
+    .mobile-input-enhanced input,
+    .mobile-input-enhanced textarea,
+    .mobile-input-enhanced select {
+      min-height: 44px;
+      font-size: 16px; /* Prevents zoom on iOS */
+      border-radius: calc(var(--radius) * 0.75);
+    }
+  }
+
+  /* Progressive Enhancement for Large Touch Devices */
+  @media (max-width: 1024px) and (pointer: coarse) {
+    .touch-device-optimized button,
+    .touch-device-optimized [role="button"] {
+      min-height: 48px;
+      padding: 14px 16px;
+    }
+  }
 }
