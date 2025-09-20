@@ -9,6 +9,7 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
+import crypto from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -48,6 +49,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
         client.send(JSON.stringify(data));
       }
     });
+  };
+
+  // API Key Authentication Middleware for External Collaborators
+  const authenticateApiKey = async (req: any, res: any, next: any) => {
+    try {
+      const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
+      const collaboratorId = req.headers['x-collaborator-id'];
+      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'];
+
+      // Validate required headers
+      if (!apiKey) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId || 'unknown',
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'Missing API key',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(401).json({ message: 'API key required' });
+      }
+
+      if (!collaboratorId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: 'unknown',
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'Missing collaborator ID',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(401).json({ message: 'Collaborator ID required' });
+      }
+
+      // Hash the provided API key for comparison
+      const hashedKey = crypto.createHash('sha256').update(apiKey).digest('hex');
+      
+      // Validate API key in database
+      const validApiKey = await storage.validateApiKey(hashedKey);
+      
+      if (!validApiKey || validApiKey.collaboratorId !== collaboratorId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'Invalid API key or collaborator ID mismatch',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(401).json({ message: 'Invalid API key' });
+      }
+
+      // Check if API key is active
+      if (!validApiKey.isActive) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'API key is inactive',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(401).json({ message: 'API key is inactive' });
+      }
+
+      // Check expiry
+      if (validApiKey.expiresAt && new Date(validApiKey.expiresAt) < new Date()) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'API key has expired',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            expiresAt: validApiKey.expiresAt,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(401).json({ message: 'API key has expired' });
+      }
+
+      // Check IP whitelist with proper CIDR support
+      if (validApiKey.ipWhitelist && validApiKey.ipWhitelist.length > 0) {
+        const isIpAllowed = validApiKey.ipWhitelist.some(allowedIp => {
+          // Exact IP match
+          if (!allowedIp.includes('/')) {
+            return allowedIp === clientIp;
+          }
+          
+          // CIDR notation - basic implementation for demo
+          // In production, use libraries like 'ip-cidr' or 'ipaddr.js'
+          const [network, prefixLength] = allowedIp.split('/');
+          if (!network || !prefixLength) return false;
+          
+          // For demo: only support common /24 networks
+          if (prefixLength === '24') {
+            const networkPrefix = network.substring(0, network.lastIndexOf('.'));
+            const clientPrefix = clientIp.substring(0, clientIp.lastIndexOf('.'));
+            return networkPrefix === clientPrefix;
+          }
+          
+          // For other CIDR ranges, deny for security (production would use proper library)
+          return false;
+        });
+
+        if (!isIpAllowed) {
+          await storage.createCollaboratorIntegration({
+            collaboratorId: collaboratorId,
+            integrationType: 'api_access',
+            entityId: req.path,
+            action: 'authentication_failed',
+            status: 'failed',
+            errorMessage: 'IP address not whitelisted',
+            requestData: {
+              endpoint: req.path,
+              method: req.method,
+              clientIp: clientIp,
+              allowedIps: validApiKey.ipWhitelist,
+              timestamp: new Date().toISOString()
+            },
+          });
+          return res.status(403).json({ message: 'IP address not allowed' });
+        }
+      }
+
+      // Rate limiting check (simplified implementation)
+      const hourAgo = new Date();
+      hourAgo.setHours(hourAgo.getHours() - 1);
+      
+      const recentIntegrations = await storage.getCollaboratorIntegrationsByCollaborator(collaboratorId);
+      const recentRequests = recentIntegrations.filter(integration => 
+        new Date(integration.createdAt) >= hourAgo && 
+        integration.action === 'api_request'
+      ).length;
+
+      if (validApiKey.rateLimit && recentRequests >= validApiKey.rateLimit) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'rate_limit_exceeded',
+          status: 'failed',
+          errorMessage: 'Rate limit exceeded',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            requestCount: recentRequests,
+            rateLimit: validApiKey.rateLimit,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(429).json({ message: 'Rate limit exceeded' });
+      }
+
+      // Update last used timestamp
+      await storage.updateCollaboratorApiKey(validApiKey.id, {
+        lastUsed: new Date()
+      });
+
+      // Verify collaborator exists and is valid
+      const collaborator = await storage.getCollaborator(collaboratorId);
+      if (!collaborator) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_access',
+          entityId: req.path,
+          action: 'authentication_failed',
+          status: 'failed',
+          errorMessage: 'Collaborator not found',
+          requestData: {
+            endpoint: req.path,
+            method: req.method,
+            clientIp: clientIp,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(404).json({ message: 'Collaborator not found' });
+      }
+
+      // Log successful authentication and attach to request
+      await storage.createCollaboratorIntegration({
+        collaboratorId: collaboratorId,
+        integrationType: 'api_access',
+        entityId: req.path,
+        action: 'api_request',
+        status: 'success',
+        requestData: {
+          endpoint: req.path,
+          method: req.method,
+          clientIp: clientIp,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Attach authentication data to request for use in route handlers
+      req.authenticatedCollaborator = collaborator;
+      req.apiKey = validApiKey;
+      req.clientIp = clientIp;
+
+      next();
+    } catch (error) {
+      console.error('API key authentication error:', error);
+      res.status(500).json({ message: 'Authentication service error' });
+    }
   };
 
   // WhatsApp webhook verification
@@ -1141,11 +1375,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get shared prescriptions for a pharmacy
-  app.get('/api/pharmacies/:pharmacyId/prescriptions', async (req, res) => {
+  // Get shared prescriptions for a pharmacy (External API - requires authentication)
+  app.get('/api/pharmacies/:pharmacyId/prescriptions', authenticateApiKey, async (req, res) => {
     try {
       const { pharmacyId } = req.params;
       const { status } = req.query;
+
+      // CRITICAL: Verify collaborator can only access their own resources
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_resource_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another collaborator\'s resources',
+          requestData: {
+            requestedPharmacyId: pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            endpoint: req.path,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized resource access' });
+      }
 
       let prescriptionShares = await storage.getPrescriptionSharesByPharmacy(pharmacyId);
       
@@ -1178,15 +1432,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update prescription fulfillment status
-  app.patch('/api/prescription-shares/:shareId/fulfillment', async (req, res) => {
+  // Update prescription fulfillment status (External API - requires authentication)
+  app.patch('/api/prescription-shares/:shareId/fulfillment', authenticateApiKey, async (req, res) => {
     try {
       const { shareId } = req.params;
       const { status, fulfilledAt, pharmacistNotes, fulfilledBy } = req.body;
 
-      const validStatuses = ['pending', 'preparing', 'ready', 'dispensed', 'completed', 'cancelled'];
+      // CRITICAL: Verify collaborator can only update their own prescription shares
+      const existingShare = await storage.getPrescriptionShare(shareId);
+      if (!existingShare) {
+        return res.status(404).json({ message: 'Prescription share not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== existingShare.pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_fulfillment_update',
+          status: 'failed',
+          errorMessage: 'Attempted to update another collaborator\'s prescription share',
+          requestData: {
+            requestedShareId: shareId,
+            sharePharmacyId: existingShare.pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            endpoint: req.path,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized fulfillment update' });
+      }
+
+      // Enhanced status workflow validation
+      const validStatuses = ['shared', 'preparing', 'ready', 'dispensed', 'partially_dispensed', 'completed', 'cancelled'];
       if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      // Validate status transition workflow
+      const currentStatus = existingShare.status;
+      const validTransitions: Record<string, string[]> = {
+        'shared': ['preparing', 'cancelled'],
+        'preparing': ['ready', 'cancelled'],
+        'ready': ['dispensed', 'partially_dispensed', 'cancelled'],
+        'dispensed': ['completed'],
+        'partially_dispensed': ['dispensed', 'completed', 'cancelled'],
+        'completed': [], // Final state
+        'cancelled': [] // Final state
+      };
+
+      if (!validTransitions[currentStatus]?.includes(status)) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'fulfillment_workflow_violation',
+          entityId: shareId,
+          action: 'invalid_status_transition',
+          status: 'failed',
+          errorMessage: `Invalid status transition from ${currentStatus} to ${status}`,
+          requestData: {
+            currentStatus,
+            requestedStatus: status,
+            validTransitions: validTransitions[currentStatus] || [],
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(400).json({ 
+          message: `Invalid status transition from ${currentStatus} to ${status}`,
+          currentStatus,
+          validTransitions: validTransitions[currentStatus] || []
+        });
       }
 
       const updateData: any = { 
@@ -1194,12 +1509,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pharmacistNotes: pharmacistNotes || '',
       };
 
-      // Set fulfillment timestamp for completed statuses
-      if (['dispensed', 'completed'].includes(status)) {
-        updateData.fulfilledAt = fulfilledAt ? new Date(fulfilledAt) : new Date();
-        if (fulfilledBy) {
-          updateData.fulfilledBy = fulfilledBy;
+      // Enhanced fulfillment timestamp and validation
+      if (['dispensed', 'partially_dispensed', 'completed'].includes(status)) {
+        updateData.dispensedAt = fulfilledAt ? new Date(fulfilledAt) : new Date();
+        
+        // Validate prescription hasn't expired
+        if (existingShare.expiresAt && new Date(existingShare.expiresAt) < new Date()) {
+          await storage.createCollaboratorIntegration({
+            collaboratorId: authenticatedCollaborator.id,
+            integrationType: 'fulfillment_business_rule_violation',
+            entityId: shareId,
+            action: 'expired_prescription_fulfillment_attempt',
+            status: 'failed',
+            errorMessage: 'Attempted to fulfill expired prescription',
+            requestData: {
+              prescriptionExpiresAt: existingShare.expiresAt,
+              requestedStatus: status,
+              timestamp: new Date().toISOString()
+            },
+          });
+          return res.status(400).json({ 
+            message: 'Cannot fulfill expired prescription',
+            expiresAt: existingShare.expiresAt
+          });
         }
+        
+        if (fulfilledBy) {
+          updateData.dispensingNotes = (updateData.dispensingNotes || '') + `\nDispensed by: ${fulfilledBy} at ${new Date().toISOString()}`;
+        }
+      }
+
+      // Validation for cancellation
+      if (status === 'cancelled' && !pharmacistNotes) {
+        return res.status(400).json({ 
+          message: 'Cancellation reason required in pharmacistNotes' 
+        });
       }
 
       const updatedShare = await storage.updatePrescriptionShare(shareId, updateData);
@@ -1207,7 +1551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Prescription share not found' });
       }
 
-      // Log integration activity
+      // Enhanced integration activity logging
       await storage.createCollaboratorIntegration({
         collaboratorId: updatedShare.pharmacyId,
         integrationType: 'fulfillment_update',
@@ -1215,9 +1559,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: 'status_updated',
         status: 'success',
         requestData: {
-          oldStatus: 'unknown', // Would need to track previous status
+          previousStatus: currentStatus,
           newStatus: status,
-          pharmacistNotes
+          pharmacistNotes,
+          fulfilledBy: fulfilledBy || 'system',
+          fulfillmentTimestamp: new Date().toISOString(),
+          patientId: existingShare.patientId,
+          medicalRecordId: existingShare.medicalRecordId
         },
       });
 
@@ -1265,10 +1613,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get pharmacy analytics and statistics
-  app.get('/api/pharmacies/:pharmacyId/analytics', async (req, res) => {
+  // Get pharmacy analytics and statistics (External API - requires authentication)
+  app.get('/api/pharmacies/:pharmacyId/analytics', authenticateApiKey, async (req, res) => {
     try {
       const { pharmacyId } = req.params;
+      
+      // CRITICAL: Verify collaborator can only access their own resources
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_resource_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another collaborator\'s analytics',
+          requestData: {
+            requestedPharmacyId: pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            endpoint: req.path,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized resource access' });
+      }
       
       // Validate pharmacy exists
       const pharmacy = await storage.getCollaborator(pharmacyId);
@@ -1333,27 +1701,499 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Pharmacy API key validation endpoint (for external pharmacy systems)
-  app.post('/api/pharmacies/validate-access', async (req, res) => {
+  // ===== COMPREHENSIVE FULFILLMENT TRACKING ENDPOINTS =====
+
+  // Get detailed fulfillment status and history for a prescription share
+  app.get('/api/prescription-shares/:shareId/fulfillment-details', authenticateApiKey, async (req, res) => {
     try {
-      const { apiKey, pharmacyId } = req.body;
+      const { shareId } = req.params;
       
-      if (!apiKey || !pharmacyId) {
-        return res.status(400).json({ message: 'API key and pharmacy ID are required' });
+      // Get prescription share with tenant binding check
+      const prescriptionShare = await storage.getPrescriptionShare(shareId);
+      if (!prescriptionShare) {
+        return res.status(404).json({ message: 'Prescription share not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== prescriptionShare.pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_fulfillment_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another collaborator\'s fulfillment details',
+          requestData: {
+            requestedShareId: shareId,
+            sharePharmacyId: prescriptionShare.pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized fulfillment access' });
+      }
+
+      // Get fulfillment history from integration logs
+      const fulfillmentHistory = await storage.getCollaboratorIntegrationsByEntity(shareId, 'fulfillment_update');
+      
+      // Get prescription and patient details
+      const medicalRecord = await storage.getMedicalRecord(prescriptionShare.medicalRecordId);
+      const patient = await storage.getPatient(prescriptionShare.patientId);
+
+      res.json({
+        prescriptionShare: {
+          id: prescriptionShare.id,
+          status: prescriptionShare.status,
+          createdAt: prescriptionShare.createdAt,
+          dispensedAt: prescriptionShare.dispensedAt,
+          expiresAt: prescriptionShare.expiresAt,
+          dispensingNotes: prescriptionShare.dispensingNotes,
+          shareMethod: prescriptionShare.shareMethod,
+          accessCode: prescriptionShare.accessCode
+        },
+        patient: patient ? {
+          id: patient.id,
+          name: patient.name,
+          phone: patient.phone
+        } : null,
+        prescription: {
+          text: medicalRecord?.prescription,
+          doctorId: prescriptionShare.doctorId,
+          isDigitallySigned: !!prescriptionShare.digitalSignatureId
+        },
+        fulfillmentHistory: fulfillmentHistory.map(log => ({
+          action: log.action,
+          status: log.status,
+          timestamp: log.createdAt,
+          details: log.requestData,
+          errorMessage: log.errorMessage
+        }))
+      });
+    } catch (error) {
+      console.error('Get fulfillment details error:', error);
+      res.status(500).json({ message: 'Failed to get fulfillment details' });
+    }
+  });
+
+  // Get fulfillment workflow statistics for pharmacy
+  app.get('/api/pharmacies/:pharmacyId/fulfillment-workflows', authenticateApiKey, async (req, res) => {
+    try {
+      const { pharmacyId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      // Tenant binding check
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== pharmacyId) {
+        return res.status(403).json({ message: 'Access denied: unauthorized resource access' });
+      }
+
+      // Date range filtering
+      const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+
+      const prescriptionShares = await storage.getPrescriptionSharesByPharmacy(pharmacyId);
+      const filteredShares = prescriptionShares.filter(share => 
+        new Date(share.createdAt) >= start && new Date(share.createdAt) <= end
+      );
+
+      // Get integration logs for workflow analysis
+      const workflowLogs = await storage.getCollaboratorIntegrationsByCollaborator(pharmacyId);
+      const fulfillmentLogs = workflowLogs.filter(log => 
+        log.integrationType === 'fulfillment_update' && 
+        new Date(log.createdAt) >= start && 
+        new Date(log.createdAt) <= end
+      );
+
+      const workflowViolations = workflowLogs.filter(log => 
+        log.integrationType === 'fulfillment_workflow_violation' &&
+        new Date(log.createdAt) >= start && 
+        new Date(log.createdAt) <= end
+      );
+
+      // Calculate status distribution
+      const statusDistribution = filteredShares.reduce((acc, share) => {
+        acc[share.status] = (acc[share.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      res.json({
+        dateRange: { start, end },
+        totalPrescriptions: filteredShares.length,
+        statusDistribution,
+        completionRate: filteredShares.length > 0 ? 
+          (statusDistribution['completed'] || 0) / filteredShares.length * 100 : 0,
+        workflowMetrics: {
+          totalStatusUpdates: fulfillmentLogs.length,
+          workflowViolations: workflowViolations.length,
+          violationTypes: workflowViolations.reduce((acc, log) => {
+            const action = log.action;
+            acc[action] = (acc[action] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        },
+        expiredPrescriptions: filteredShares.filter(share => 
+          share.expiresAt && new Date(share.expiresAt) < new Date()
+        ).length
+      });
+    } catch (error) {
+      console.error('Get fulfillment workflows error:', error);
+      res.status(500).json({ message: 'Failed to get fulfillment workflows' });
+    }
+  });
+
+  // ===== CORE FULFILLMENT WORKFLOW ENDPOINTS =====
+
+  // Centralized fulfillment status transition endpoint
+  app.patch('/api/fulfillments/:shareId/status', authenticateApiKey, async (req, res) => {
+    try {
+      const { shareId } = req.params;
+      const { status, notes, actor } = req.body;
+
+      // Get existing share with tenant binding
+      const existingShare = await storage.getPrescriptionShare(shareId);
+      if (!existingShare) {
+        return res.status(404).json({ message: 'Prescription share not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== existingShare.pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: shareId,
+          action: 'unauthorized_fulfillment_mutation',
+          status: 'failed',
+          errorMessage: 'Attempted to modify another collaborator\'s fulfillment',
+          requestData: {
+            shareId,
+            sharePharmacyId: existingShare.pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            requestedStatus: status,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized fulfillment mutation' });
+      }
+
+      // Centralized transition rules - ALLOWED_TRANSITIONS map
+      const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+        'shared': ['preparing', 'cancelled'],
+        'preparing': ['ready', 'cancelled'],
+        'ready': ['dispensed', 'partially_dispensed', 'cancelled'],
+        'dispensed': ['completed'],
+        'partially_dispensed': ['dispensed', 'completed', 'cancelled'],
+        'completed': [], // Final state
+        'cancelled': [] // Final state
+      };
+
+      const currentStatus = existingShare.status;
+      if (!ALLOWED_TRANSITIONS[currentStatus]?.includes(status)) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'fulfillment_workflow_violation',
+          entityId: shareId,
+          action: 'invalid_status_transition',
+          status: 'failed',
+          errorMessage: `Invalid transition from ${currentStatus} to ${status}`,
+          requestData: {
+            shareId,
+            patientId: existingShare.patientId,
+            medicalRecordId: existingShare.medicalRecordId,
+            currentStatus,
+            requestedStatus: status,
+            validTransitions: ALLOWED_TRANSITIONS[currentStatus] || [],
+            actor: actor || 'unknown',
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(400).json({ 
+          message: `Invalid transition from ${currentStatus} to ${status}`,
+          currentStatus,
+          validTransitions: ALLOWED_TRANSITIONS[currentStatus] || []
+        });
+      }
+
+      // Prescription expiry validation for dispensing
+      if (['dispensed', 'partially_dispensed', 'completed'].includes(status)) {
+        if (existingShare.expiresAt && new Date(existingShare.expiresAt) < new Date()) {
+          await storage.createCollaboratorIntegration({
+            collaboratorId: authenticatedCollaborator.id,
+            integrationType: 'fulfillment_business_rule_violation',
+            entityId: shareId,
+            action: 'expired_prescription_fulfillment',
+            status: 'failed',
+            errorMessage: 'Cannot fulfill expired prescription',
+            requestData: {
+              shareId,
+              patientId: existingShare.patientId,
+              medicalRecordId: existingShare.medicalRecordId,
+              expiresAt: existingShare.expiresAt,
+              requestedStatus: status,
+              actor: actor || 'unknown',
+              timestamp: new Date().toISOString()
+            },
+          });
+          return res.status(400).json({ 
+            message: 'Cannot fulfill expired prescription',
+            expiresAt: existingShare.expiresAt 
+          });
+        }
+      }
+
+      // Cancellation validation - require reason
+      if (status === 'cancelled' && !notes) {
+        return res.status(400).json({ message: 'Cancellation reason required in notes field' });
+      }
+
+      // Prepare update data with automatic timestamp stamping
+      const updateData: any = { status };
+      const now = new Date();
+
+      // Automatic timestamp stamping based on status
+      switch (status) {
+        case 'preparing':
+          updateData.acceptedAt = now;
+          break;
+        case 'ready':
+          updateData.preparedAt = now;
+          break;
+        case 'dispensed':
+        case 'partially_dispensed':
+          updateData.dispensedAt = now;
+          break;
+        case 'completed':
+          updateData.completedAt = now;
+          if (!existingShare.dispensedAt) updateData.dispensedAt = now;
+          break;
+        case 'cancelled':
+          updateData.cancelledAt = now;
+          break;
+      }
+
+      if (notes) {
+        updateData.dispensingNotes = notes;
+      }
+
+      // Update the share
+      const updatedShare = await storage.updatePrescriptionShare(shareId, updateData);
+      if (!updatedShare) {
+        return res.status(500).json({ message: 'Failed to update prescription share' });
+      }
+
+      // Comprehensive audit logging for successful transition
+      await storage.createCollaboratorIntegration({
+        collaboratorId: authenticatedCollaborator.id,
+        integrationType: 'fulfillment_event',
+        entityId: shareId,
+        action: 'status_transition_successful',
+        status: 'success',
+        requestData: {
+          shareId,
+          patientId: existingShare.patientId,
+          medicalRecordId: existingShare.medicalRecordId,
+          previousStatus: currentStatus,
+          newStatus: status,
+          actor: actor || 'system',
+          notes: notes || '',
+          automaticTimestamps: {
+            acceptedAt: updateData.acceptedAt,
+            preparedAt: updateData.preparedAt,
+            dispensedAt: updateData.dispensedAt,
+            completedAt: updateData.completedAt,
+            cancelledAt: updateData.cancelledAt
+          },
+          ruleEvaluations: {
+            transitionAllowed: true,
+            prescriptionValid: !existingShare.expiresAt || new Date(existingShare.expiresAt) >= now,
+            tenantAuthorized: true
+          },
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Real-time broadcast
+      broadcast({
+        type: 'fulfillment_status_updated',
+        data: { shareId, newStatus: status, pharmacyId: authenticatedCollaborator.id }
+      });
+
+      res.json({
+        id: updatedShare.id,
+        status: updatedShare.status,
+        previousStatus: currentStatus,
+        updatedAt: now.toISOString(),
+        notes: updatedShare.dispensingNotes,
+        automaticTimestamps: {
+          acceptedAt: updateData.acceptedAt,
+          preparedAt: updateData.preparedAt,
+          dispensedAt: updateData.dispensedAt,
+          completedAt: updateData.completedAt,
+          cancelledAt: updateData.cancelledAt
+        }
+      });
+    } catch (error) {
+      console.error('Update fulfillment status error:', error);
+      res.status(500).json({ message: 'Failed to update fulfillment status' });
+    }
+  });
+
+  // Get fulfillment history for a specific prescription share (with pagination)
+  app.get('/api/fulfillments/:shareId/history', authenticateApiKey, async (req, res) => {
+    try {
+      const { shareId } = req.params;
+      const { limit = 50, offset = 0 } = req.query;
+
+      // Get share with tenant binding
+      const prescriptionShare = await storage.getPrescriptionShare(shareId);
+      if (!prescriptionShare) {
+        return res.status(404).json({ message: 'Prescription share not found' });
+      }
+
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== prescriptionShare.pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: shareId,
+          action: 'unauthorized_fulfillment_history_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another collaborator\'s fulfillment history',
+          requestData: {
+            shareId,
+            sharePharmacyId: prescriptionShare.pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized fulfillment history access' });
+      }
+
+      // Get fulfillment events from integration logs
+      const fulfillmentEvents = await storage.getCollaboratorIntegrationsByEntity(shareId, 'fulfillment_event');
+      
+      // Apply pagination
+      const total = fulfillmentEvents.length;
+      const paginatedEvents = fulfillmentEvents
+        .slice(Number(offset), Number(offset) + Number(limit))
+        .map(event => ({
+          id: event.id,
+          action: event.action,
+          status: event.status,
+          timestamp: event.createdAt,
+          details: event.requestData,
+          errorMessage: event.errorMessage
+        }));
+
+      res.json({
+        shareId,
+        total,
+        limit: Number(limit),
+        offset: Number(offset),
+        hasMore: Number(offset) + Number(limit) < total,
+        events: paginatedEvents
+      });
+    } catch (error) {
+      console.error('Get fulfillment history error:', error);
+      res.status(500).json({ message: 'Failed to get fulfillment history' });
+    }
+  });
+
+  // Get fulfillment history for pharmacy (with date filtering and pagination)
+  app.get('/api/pharmacies/:pharmacyId/fulfillments/history', authenticateApiKey, async (req, res) => {
+    try {
+      const { pharmacyId } = req.params;
+      const { limit = 100, offset = 0, startDate, endDate } = req.query;
+
+      // Tenant binding check
+      const authenticatedCollaborator = (req as any).authenticatedCollaborator;
+      if (authenticatedCollaborator.id !== pharmacyId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: authenticatedCollaborator.id,
+          integrationType: 'authorization_violation',
+          entityId: req.path,
+          action: 'unauthorized_pharmacy_history_access',
+          status: 'failed',
+          errorMessage: 'Attempted to access another collaborator\'s pharmacy history',
+          requestData: {
+            requestedPharmacyId: pharmacyId,
+            authenticatedCollaboratorId: authenticatedCollaborator.id,
+            timestamp: new Date().toISOString()
+          },
+        });
+        return res.status(403).json({ message: 'Access denied: unauthorized pharmacy history access' });
+      }
+
+      // Date filtering
+      const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+
+      // Get all integration logs for this pharmacy
+      const allLogs = await storage.getCollaboratorIntegrationsByCollaborator(pharmacyId);
+      
+      // Filter fulfillment events within date range
+      const fulfillmentEvents = allLogs.filter(log => 
+        log.integrationType === 'fulfillment_event' &&
+        new Date(log.createdAt) >= start && 
+        new Date(log.createdAt) <= end
+      );
+
+      // Apply pagination
+      const total = fulfillmentEvents.length;
+      const paginatedEvents = fulfillmentEvents
+        .slice(Number(offset), Number(offset) + Number(limit))
+        .map(event => ({
+          id: event.id,
+          shareId: event.entityId,
+          action: event.action,
+          status: event.status,
+          timestamp: event.createdAt,
+          details: event.requestData,
+          errorMessage: event.errorMessage
+        }));
+
+      res.json({
+        pharmacyId,
+        dateRange: { start, end },
+        total,
+        limit: Number(limit),
+        offset: Number(offset),
+        hasMore: Number(offset) + Number(limit) < total,
+        events: paginatedEvents
+      });
+    } catch (error) {
+      console.error('Get pharmacy fulfillment history error:', error);
+      res.status(500).json({ message: 'Failed to get pharmacy fulfillment history' });
+    }
+  });
+
+  // API key validation endpoint (External API - uses lightweight validation)
+  app.post('/api/collaborators/validate-access', async (req, res) => {
+    try {
+      const { apiKey, collaboratorId } = req.body;
+      
+      if (!apiKey || !collaboratorId) {
+        return res.status(400).json({ message: 'API key and collaborator ID are required' });
       }
 
       // Hash the provided API key for comparison
-      // In production, use proper salting and timing-safe comparison
-      const hashedKey = require('crypto').createHash('sha256').update(apiKey).digest('hex');
+      const hashedKey = crypto.createHash('sha256').update(apiKey).digest('hex');
       const validApiKey = await storage.validateApiKey(hashedKey);
       
-      if (!validApiKey || validApiKey.collaboratorId !== pharmacyId) {
-        return res.status(401).json({ message: 'Invalid API key or pharmacy ID' });
+      if (!validApiKey || validApiKey.collaboratorId !== collaboratorId) {
+        await storage.createCollaboratorIntegration({
+          collaboratorId: collaboratorId,
+          integrationType: 'api_validation',
+          entityId: 'validate-access',
+          action: 'validation_failed',
+          status: 'failed',
+          errorMessage: 'Invalid API key or collaborator ID mismatch',
+        });
+        return res.status(401).json({ message: 'Invalid API key or collaborator ID' });
       }
 
-      const pharmacy = await storage.getCollaborator(pharmacyId);
-      if (!pharmacy || pharmacy.type !== 'pharmacy') {
-        return res.status(404).json({ message: 'Pharmacy not found' });
+      const collaborator = await storage.getCollaborator(collaboratorId);
+      if (!collaborator) {
+        return res.status(404).json({ message: 'Collaborator not found' });
       }
 
       // Update last access time
@@ -1361,12 +2201,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastUsed: new Date()
       });
 
+      // Log successful validation
+      await storage.createCollaboratorIntegration({
+        collaboratorId: collaboratorId,
+        integrationType: 'api_validation',
+        entityId: 'validate-access',
+        action: 'validation_successful',
+        status: 'success',
+      });
+
       res.json({
         valid: true,
-        pharmacy: {
-          id: pharmacy.id,
-          name: pharmacy.name,
-          permissions: ['read_prescriptions', 'update_fulfillment']
+        collaborator: {
+          id: collaborator.id,
+          name: collaborator.name,
+          type: collaborator.type,
+          permissions: (validApiKey.permissions as any) || ['read_prescriptions', 'update_fulfillment']
+        },
+        apiKey: {
+          keyName: validApiKey.keyName,
+          isActive: validApiKey.isActive,
+          expiresAt: validApiKey.expiresAt,
+          rateLimit: validApiKey.rateLimit
         }
       });
     } catch (error) {
