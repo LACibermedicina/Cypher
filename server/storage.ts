@@ -1,11 +1,11 @@
 import { 
   users, patients, appointments, medicalRecords, whatsappMessages, 
-  examResults, collaborators, doctorSchedule, digitalSignatures,
+  examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
   type Collaborator, type InsertCollaborator, type DoctorSchedule, type InsertDoctorSchedule,
-  type DigitalSignature, type InsertDigitalSignature
+  type DigitalSignature, type InsertDigitalSignature, type VideoConsultation, type InsertVideoConsultation
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
@@ -60,6 +60,14 @@ export interface IStorage {
 
   // Digital Signatures
   getPendingSignatures(doctorId: string): Promise<DigitalSignature[]>;
+
+  // Video Consultations
+  getVideoConsultation(id: string): Promise<VideoConsultation | undefined>;
+  getVideoConsultationBySessionId(sessionId: string): Promise<VideoConsultation | undefined>;
+  getVideoConsultationsByAppointment(appointmentId: string): Promise<VideoConsultation[]>;
+  getActiveVideoConsultations(doctorId: string): Promise<VideoConsultation[]>;
+  createVideoConsultation(consultation: InsertVideoConsultation): Promise<VideoConsultation>;
+  updateVideoConsultation(id: string, consultation: Partial<InsertVideoConsultation>): Promise<VideoConsultation | undefined>;
   createDigitalSignature(signature: InsertDigitalSignature): Promise<DigitalSignature>;
   updateDigitalSignature(id: string, signature: Partial<InsertDigitalSignature>): Promise<DigitalSignature | undefined>;
 }
@@ -278,6 +286,46 @@ export class DatabaseStorage implements IStorage {
       .where(eq(digitalSignatures.id, id))
       .returning();
     return signature || undefined;
+  }
+
+  // Video Consultations
+  async getVideoConsultation(id: string): Promise<VideoConsultation | undefined> {
+    const [consultation] = await db.select().from(videoConsultations).where(eq(videoConsultations.id, id));
+    return consultation || undefined;
+  }
+
+  async getVideoConsultationBySessionId(sessionId: string): Promise<VideoConsultation | undefined> {
+    const [consultation] = await db.select().from(videoConsultations)
+      .where(eq(videoConsultations.sessionId, sessionId));
+    return consultation || undefined;
+  }
+
+  async getVideoConsultationsByAppointment(appointmentId: string): Promise<VideoConsultation[]> {
+    return await db.select().from(videoConsultations)
+      .where(eq(videoConsultations.appointmentId, appointmentId))
+      .orderBy(desc(videoConsultations.createdAt));
+  }
+
+  async getActiveVideoConsultations(doctorId: string): Promise<VideoConsultation[]> {
+    return await db.select().from(videoConsultations)
+      .where(and(
+        eq(videoConsultations.doctorId, doctorId),
+        eq(videoConsultations.status, 'active')
+      ))
+      .orderBy(desc(videoConsultations.startedAt));
+  }
+
+  async createVideoConsultation(insertConsultation: InsertVideoConsultation): Promise<VideoConsultation> {
+    const [consultation] = await db.insert(videoConsultations).values(insertConsultation).returning();
+    return consultation;
+  }
+
+  async updateVideoConsultation(id: string, updateConsultation: Partial<InsertVideoConsultation>): Promise<VideoConsultation | undefined> {
+    const [consultation] = await db.update(videoConsultations)
+      .set(updateConsultation)
+      .where(eq(videoConsultations.id, id))
+      .returning();
+    return consultation || undefined;
   }
 }
 

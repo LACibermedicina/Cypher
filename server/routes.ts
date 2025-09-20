@@ -5,7 +5,8 @@ import { storage } from "./storage";
 import { openAIService } from "./services/openai";
 import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { whisperService } from "./services/whisper";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -455,7 +456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate AI diagnostic hypotheses
       let hypotheses;
       try {
-        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history);
+        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history || '');
       } catch (openaiError) {
         console.error('OpenAI service unavailable:', {
           status: openaiError instanceof Error ? openaiError.name : 'Unknown',
@@ -612,6 +613,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Recent exam results error:', error);
       res.status(500).json({ message: 'Failed to get exam results' });
+    }
+  });
+
+  // Video Consultation API Routes
+  
+  // Create a new video consultation session
+  app.post('/api/video-consultations', async (req, res) => {
+    try {
+      const validatedData = insertVideoConsultationSchema.parse(req.body);
+      const consultation = await storage.createVideoConsultation(validatedData);
+      
+      // Broadcast to WebSocket clients
+      broadcast({ type: 'consultation_created', data: consultation });
+      
+      res.status(201).json(consultation);
+    } catch (error) {
+      console.error('Create video consultation error:', error);
+      res.status(400).json({ message: 'Invalid video consultation data', error });
+    }
+  });
+
+  // Get video consultation by ID
+  app.get('/api/video-consultations/:id', async (req, res) => {
+    try {
+      const consultation = await storage.getVideoConsultation(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+      res.json(consultation);
+    } catch (error) {
+      console.error('Get video consultation error:', error);
+      res.status(500).json({ message: 'Failed to get video consultation' });
+    }
+  });
+
+  // Get video consultations by appointment
+  app.get('/api/video-consultations/appointment/:appointmentId', async (req, res) => {
+    try {
+      const consultations = await storage.getVideoConsultationsByAppointment(req.params.appointmentId);
+      res.json(consultations);
+    } catch (error) {
+      console.error('Get consultations by appointment error:', error);
+      res.status(500).json({ message: 'Failed to get video consultations' });
+    }
+  });
+
+  // Get active video consultations for a doctor
+  app.get('/api/video-consultations/active/:doctorId', async (req, res) => {
+    try {
+      const consultations = await storage.getActiveVideoConsultations(req.params.doctorId);
+      res.json(consultations);
+    } catch (error) {
+      console.error('Get active consultations error:', error);
+      res.status(500).json({ message: 'Failed to get active consultations' });
+    }
+  });
+
+  // Update video consultation status and details
+  app.patch('/api/video-consultations/:id', async (req, res) => {
+    try {
+      const { status, startedAt, endedAt, duration, recordingUrl, audioRecordingUrl, connectionLogs } = req.body;
+      
+      const updateData: any = {};
+      if (status) updateData.status = status;
+      if (startedAt) updateData.startedAt = new Date(startedAt);
+      if (endedAt) updateData.endedAt = new Date(endedAt);
+      if (duration !== undefined) updateData.duration = duration;
+      if (recordingUrl) updateData.recordingUrl = recordingUrl;
+      if (audioRecordingUrl) updateData.audioRecordingUrl = audioRecordingUrl;
+      if (connectionLogs) updateData.connectionLogs = connectionLogs;
+
+      const consultation = await storage.updateVideoConsultation(req.params.id, updateData);
+      
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+
+      // Broadcast status updates
+      broadcast({ type: 'consultation_updated', data: consultation });
+      
+      res.json(consultation);
+    } catch (error) {
+      console.error('Update video consultation error:', error);
+      res.status(500).json({ message: 'Failed to update video consultation' });
+    }
+  });
+
+  // Start video consultation (updates status to active)
+  app.post('/api/video-consultations/:id/start', async (req, res) => {
+    try {
+      const consultation = await storage.updateVideoConsultation(req.params.id, {
+        status: 'active',
+        startedAt: new Date()
+      });
+      
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+
+      broadcast({ type: 'consultation_started', data: consultation });
+      
+      res.json(consultation);
+    } catch (error) {
+      console.error('Start consultation error:', error);
+      res.status(500).json({ message: 'Failed to start consultation' });
+    }
+  });
+
+  // End video consultation
+  app.post('/api/video-consultations/:id/end', async (req, res) => {
+    try {
+      const { duration, meetingNotes } = req.body;
+      
+      const consultation = await storage.updateVideoConsultation(req.params.id, {
+        status: 'ended',
+        endedAt: new Date(),
+        duration: duration || 0,
+        meetingNotes: meetingNotes || ''
+      });
+      
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+
+      broadcast({ type: 'consultation_ended', data: consultation });
+      
+      res.json(consultation);
+    } catch (error) {
+      console.error('End consultation error:', error);
+      res.status(500).json({ message: 'Failed to end consultation' });
+    }
+  });
+
+  // Upload and transcribe consultation audio
+  app.post('/api/video-consultations/:id/transcribe', async (req, res) => {
+    try {
+      const consultationId = req.params.id;
+      const { audioData, patientName } = req.body;
+      
+      if (!audioData) {
+        return res.status(400).json({ message: 'Audio data is required' });
+      }
+
+      // Get consultation details
+      const consultation = await storage.getVideoConsultation(consultationId);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+
+      // Update transcription status to processing
+      await storage.updateVideoConsultation(consultationId, {
+        transcriptionStatus: 'processing'
+      });
+
+      broadcast({ type: 'transcription_started', consultationId });
+
+      try {
+        // Convert base64 audio data to buffer
+        const audioBuffer = Buffer.from(audioData, 'base64');
+        
+        // Validate audio file
+        const validation = whisperService.validateAudioFile(audioBuffer);
+        if (!validation.isValid) {
+          return res.status(400).json({ message: validation.error });
+        }
+
+        // Transcribe audio with OpenAI Whisper
+        const transcriptionResult = await whisperService.transcribeConsultationAudio(
+          audioBuffer,
+          consultationId,
+          patientName
+        );
+
+        // Update consultation with transcription results
+        const updatedConsultation = await storage.updateVideoConsultation(consultationId, {
+          fullTranscript: transcriptionResult.text,
+          meetingNotes: transcriptionResult.summary,
+          transcriptionStatus: 'completed'
+        });
+
+        // Create medical record with transcription data
+        const medicalRecord = await storage.createMedicalRecord({
+          patientId: consultation.patientId,
+          doctorId: consultation.doctorId,
+          appointmentId: consultation.appointmentId,
+          audioTranscript: transcriptionResult.text,
+          diagnosis: transcriptionResult.diagnosis,
+          treatment: transcriptionResult.treatment,
+          isEncrypted: true
+        });
+
+        broadcast({ 
+          type: 'transcription_completed', 
+          consultationId,
+          data: transcriptionResult
+        });
+
+        res.json({
+          transcription: transcriptionResult,
+          consultation: updatedConsultation,
+          medicalRecordId: medicalRecord.id,
+          message: 'Audio transcribed and analyzed successfully'
+        });
+
+      } catch (transcriptionError) {
+        console.error('Transcription processing error:', transcriptionError);
+        
+        // Update status to failed
+        await storage.updateVideoConsultation(consultationId, {
+          transcriptionStatus: 'failed'
+        });
+
+        broadcast({ type: 'transcription_failed', consultationId });
+
+        res.status(500).json({ 
+          message: 'Failed to process audio transcription',
+          error: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'
+        });
+      }
+
+    } catch (error) {
+      console.error('Video consultation transcription error:', error);
+      res.status(500).json({ message: 'Failed to transcribe consultation audio' });
+    }
+  });
+
+  // Get transcription status
+  app.get('/api/video-consultations/:id/transcription-status', async (req, res) => {
+    try {
+      const consultation = await storage.getVideoConsultation(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+
+      res.json({
+        status: consultation.transcriptionStatus,
+        transcript: consultation.fullTranscript,
+        notes: consultation.meetingNotes
+      });
+    } catch (error) {
+      console.error('Get transcription status error:', error);
+      res.status(500).json({ message: 'Failed to get transcription status' });
     }
   });
 
