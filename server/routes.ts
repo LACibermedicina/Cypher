@@ -6,6 +6,7 @@ import { openAIService } from "./services/openai";
 import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
+import { cryptoService } from "./services/crypto";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 
@@ -563,6 +564,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: 'Failed to sign document' });
+    }
+  });
+
+  // Prescription Digital Signature API - Demo Implementation
+  app.post('/api/medical-records/:id/sign-prescription', async (req, res) => {
+    try {
+      const medicalRecordId = req.params.id;
+      // TODO: Get doctorId from authenticated session instead of client request
+      const doctorId = DEFAULT_DOCTOR_ID; // Fixed doctor for demo
+
+      // Get medical record with prescription
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord) {
+        return res.status(404).json({ message: 'Medical record not found' });
+      }
+
+      if (!medicalRecord.prescription) {
+        return res.status(400).json({ message: 'No prescription to sign in this medical record' });
+      }
+
+      // Generate key pair and store for verification (in production, use persistent key management)
+      const { privateKey, publicKey } = await cryptoService.generateKeyPair();
+      const certificateInfo = cryptoService.createMockCertificateInfo(doctorId);
+
+      // Create digital signature
+      const signatureResult = await cryptoService.signPrescription(
+        medicalRecord.prescription,
+        privateKey,
+        certificateInfo
+      );
+
+      // Create digital signature record with persistent key information
+      const digitalSignature = await storage.createDigitalSignature({
+        documentType: 'prescription',
+        documentId: medicalRecordId,
+        patientId: medicalRecord.patientId,
+        doctorId: doctorId,
+        signature: signatureResult.signature,
+        certificateInfo: {
+          ...signatureResult.certificateInfo,
+          publicKey: publicKey, // Store public key for verification
+          timestamp: signatureResult.timestamp
+        },
+        status: 'signed',
+        signedAt: new Date(),
+      });
+
+      // Update medical record with digital signature ID reference
+      await storage.updateMedicalRecord(medicalRecordId, {
+        digitalSignature: digitalSignature.id, // Store signature ID instead of raw signature
+      });
+
+      // Generate audit trail
+      const auditHash = cryptoService.generateAuditHash(
+        signatureResult,
+        doctorId,
+        medicalRecord.patientId
+      );
+
+      // Broadcast signature event for real-time updates
+      broadcast({ 
+        type: 'prescription_signed', 
+        data: { 
+          medicalRecordId,
+          signatureId: digitalSignature.id,
+          auditHash 
+        } 
+      });
+
+      res.status(201).json({
+        signature: digitalSignature,
+        auditHash,
+        note: 'Demo implementation - not production compliant'
+      });
+
+    } catch (error) {
+      console.error('Prescription signing error:', error);
+      res.status(500).json({ message: 'Failed to sign prescription' });
+    }
+  });
+
+  // Verify prescription signature
+  app.get('/api/medical-records/:id/verify-signature', async (req, res) => {
+    try {
+      const medicalRecordId = req.params.id;
+
+      // Get medical record
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord) {
+        return res.status(404).json({ message: 'Medical record not found' });
+      }
+
+      if (!medicalRecord.digitalSignature) {
+        return res.status(404).json({ message: 'No digital signature found for this prescription' });
+      }
+
+      // TODO: Implement storage.getSignatureByDocument() method
+      // For now, search all signatures by document ID
+      const allSignatures = await storage.getPendingSignatures(medicalRecord.doctorId);
+      const prescriptionSignature = allSignatures.find(
+        sig => sig.documentId === medicalRecordId && sig.documentType === 'prescription'
+      );
+
+      if (!prescriptionSignature) {
+        return res.status(404).json({ message: 'Digital signature record not found' });
+      }
+
+      // Extract stored verification data
+      const certInfo = prescriptionSignature.certificateInfo as any || {};
+      const storedPublicKey = certInfo.publicKey;
+      const storedTimestamp = certInfo.timestamp;
+
+      if (!storedPublicKey || !storedTimestamp) {
+        return res.status(400).json({ message: 'Invalid signature record - missing verification data' });
+      }
+
+      // Verify signature using stored public key and timestamp
+      const isValid = await cryptoService.verifySignature(
+        medicalRecord.prescription || '',
+        prescriptionSignature.signature,
+        storedPublicKey,
+        storedTimestamp
+      );
+
+      res.json({
+        isValid,
+        signatureInfo: {
+          algorithm: certInfo.algorithm || 'Unknown',
+          signedAt: prescriptionSignature.signedAt,
+          certificateInfo: prescriptionSignature.certificateInfo,
+          note: 'Demo verification - not production compliant'
+        }
+      });
+
+    } catch (error) {
+      console.error('Signature verification error:', error);
+      res.status(500).json({ message: 'Failed to verify signature' });
     }
   });
 

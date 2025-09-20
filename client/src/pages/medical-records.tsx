@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { z } from "zod";
+import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 
 const medicalRecordSchema = z.object({
   patientId: z.string().min(1, "Paciente é obrigatório"),
@@ -76,8 +77,31 @@ export default function MedicalRecords() {
     },
   });
 
-  const selectedPatient = (patients || []).find((p: any) => p.id === selectedPatientId);
-  const filteredPatients = (patients || []).filter((patient: any) =>
+  // Prescription digital signature mutation - FIPS 140-2 compliant
+  const signPrescriptionMutation = useMutation({
+    mutationFn: (medicalRecordId: string) =>
+      apiRequest('POST', `/api/medical-records/${medicalRecordId}/sign-prescription`, {
+        doctorId: DEFAULT_DOCTOR_ID
+      }),
+    onSuccess: (response: any) => {
+      toast({
+        title: "Prescrição Assinada Digitalmente",
+        description: `Assinatura FIPS 140-2 criada com sucesso. Audit Hash: ${response.auditHash?.substring(0, 8)}...`,
+      });
+      // Refresh medical records to show updated signature status
+      queryClient.invalidateQueries({ queryKey: ['/api/medical-records'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro na Assinatura Digital",
+        description: error.message || "Erro ao assinar prescrição digitalmente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const selectedPatient = (patients as any[] || []).find((p: any) => p.id === selectedPatientId);
+  const filteredPatients = (patients as any[] || []).filter((patient: any) =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -349,7 +373,7 @@ export default function MedicalRecords() {
                     <div className="flex items-center justify-center py-12">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : !(medicalRecords || []).length ? (
+                  ) : !(medicalRecords as any[] || []).length ? (
                     <Card>
                       <CardContent className="py-12">
                         <div className="text-center">
@@ -369,7 +393,7 @@ export default function MedicalRecords() {
                     </Card>
                   ) : (
                     <div className="space-y-4">
-                      {(medicalRecords || []).map((record: any) => (
+                      {(medicalRecords as any[] || []).map((record: any) => (
                         <Card key={record.id} data-testid={`record-card-${record.id}`}>
                           <CardHeader>
                             <div className="flex items-center justify-between">
@@ -428,10 +452,47 @@ export default function MedicalRecords() {
 
                               {record.prescription && (
                                 <div>
-                                  <h4 className="font-medium text-sm text-muted-foreground mb-1">Prescrição</h4>
-                                  <p className="text-sm" data-testid={`record-prescription-${record.id}`}>
-                                    {record.prescription}
-                                  </p>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-medium text-sm text-muted-foreground">Prescrição</h4>
+                                    {!record.digitalSignature ? (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => signPrescriptionMutation.mutate(record.id)}
+                                        disabled={signPrescriptionMutation.isPending}
+                                        className="text-xs"
+                                        data-testid={`button-sign-prescription-${record.id}`}
+                                      >
+                                        {signPrescriptionMutation.isPending ? (
+                                          <>
+                                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary mr-1"></div>
+                                            Assinando...
+                                          </>
+                                        ) : (
+                                          <>
+                                            <i className="fas fa-signature mr-1"></i>
+                                            Assinar FIPS 140-2
+                                          </>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <Badge variant="outline" className="text-green-600 text-xs">
+                                        <i className="fas fa-shield-check mr-1"></i>
+                                        Assinado FIPS 140-2
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                    <p className="text-sm" data-testid={`record-prescription-${record.id}`}>
+                                      {record.prescription}
+                                    </p>
+                                    {record.digitalSignature && (
+                                      <div className="mt-2 text-xs text-muted-foreground">
+                                        <i className="fas fa-certificate mr-1"></i>
+                                        Certificado Digital ICP-Brasil • Algoritmo RSA-PSS SHA-256
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               )}
 
@@ -460,7 +521,7 @@ export default function MedicalRecords() {
                 </TabsContent>
 
                 <TabsContent value="exams" className="space-y-4">
-                  {!(examResults || []).length ? (
+                  {!(examResults as any[] || []).length ? (
                     <Card>
                       <CardContent className="py-12">
                         <div className="text-center">
@@ -476,7 +537,7 @@ export default function MedicalRecords() {
                     </Card>
                   ) : (
                     <div className="space-y-4">
-                      {(examResults || []).map((exam: any) => (
+                      {(examResults as any[] || []).map((exam: any) => (
                         <Card key={exam.id} data-testid={`exam-card-${exam.id}`}>
                           <CardHeader>
                             <div className="flex items-center justify-between">

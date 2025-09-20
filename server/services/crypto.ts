@@ -59,7 +59,7 @@ export class CryptographicService {
 
   /**
    * Create digital signature for prescription document
-   * FIPS 140-2 Level 2 compliant with RSA-PSS and SHA-256
+   * Fixed RSA-PSS implementation for Node.js crypto
    */
   async signPrescription(
     documentContent: string,
@@ -67,7 +67,7 @@ export class CryptographicService {
     certificateInfo: any
   ): Promise<SignatureResult> {
     try {
-      // Create document hash using FIPS-approved SHA-256
+      // Create document hash using SHA-256
       const documentHash = crypto
         .createHash(this.HASH_ALGORITHM)
         .update(documentContent, 'utf8')
@@ -77,29 +77,29 @@ export class CryptographicService {
       const timestamp = new Date().toISOString();
       const signableContent = `${documentHash}|${timestamp}`;
 
-      // Create digital signature using RSA-PSS (FIPS 140-2 approved)
+      // Create digital signature using correct RSA-PSS implementation for Node.js
       const signature = crypto
-        .createSign(this.FIPS_ALGORITHM)
+        .createSign(this.HASH_ALGORITHM)
         .update(signableContent, 'utf8')
         .sign({
           key: privateKey,
+          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
           saltLength: this.SALT_LENGTH
         }, 'base64');
 
-      // Enhanced certificate information for ICP-Brasil compliance
+      // Certificate information (not claiming full compliance until implemented)
       const enhancedCertificateInfo = {
         ...certificateInfo,
-        algorithm: `${this.FIPS_ALGORITHM} with ${this.HASH_ALGORITHM.toUpperCase()}`,
+        algorithm: `RSA-PSS with ${this.HASH_ALGORITHM.toUpperCase()}`,
         keySize: this.KEY_SIZE,
         saltLength: this.SALT_LENGTH,
-        fipsCompliant: true,
-        icpBrasil: true,
-        signedAt: timestamp
+        signedAt: timestamp,
+        note: 'Demo implementation - not production compliant'
       };
 
       return {
         signature,
-        algorithm: `${this.FIPS_ALGORITHM}_${this.HASH_ALGORITHM}`,
+        algorithm: `RSA-PSS_${this.HASH_ALGORITHM}`,
         timestamp,
         certificateInfo: enhancedCertificateInfo,
         documentHash
@@ -107,13 +107,13 @@ export class CryptographicService {
 
     } catch (error) {
       console.error('Cryptographic signing error:', error);
-      throw new Error('Failed to create FIPS-compliant digital signature');
+      throw new Error('Failed to create digital signature');
     }
   }
 
   /**
    * Verify digital signature authenticity
-   * FIPS 140-2 compliant verification process
+   * Fixed RSA-PSS verification for Node.js crypto
    */
   async verifySignature(
     documentContent: string,
@@ -131,12 +131,13 @@ export class CryptographicService {
       // Recreate signable content
       const signableContent = `${documentHash}|${timestamp}`;
 
-      // Verify signature using RSA-PSS
+      // Verify signature using correct RSA-PSS implementation for Node.js
       const isValid = crypto
-        .createVerify(this.FIPS_ALGORITHM)
+        .createVerify(this.HASH_ALGORITHM)
         .update(signableContent, 'utf8')
         .verify({
           key: publicKey,
+          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
           saltLength: this.SALT_LENGTH
         }, signature, 'base64');
 
