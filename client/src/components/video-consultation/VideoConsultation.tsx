@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { VideoIcon, VideoOffIcon, MicIcon, MicOffIcon, PhoneOffIcon, ScreenShareIcon, CircleIcon } from 'lucide-react';
+import { VideoIcon, VideoOffIcon, MicIcon, MicOffIcon, PhoneOffIcon, ScreenShareIcon, CircleIcon, Settings, Maximize2, Minimize2, Camera, CameraOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import { cn } from '@/lib/utils';
 
 interface VideoConsultationProps {
   appointmentId: string;
@@ -30,13 +31,16 @@ export default function VideoConsultation({
   onCallEnd
 }: VideoConsultationProps) {
   // State management
-  const [callStatus, setCallStatus] = useState<'initializing' | 'connecting' | 'connected' | 'ended'>('initializing');
+  const [callStatus, setCallStatus] = useState<'pre-call' | 'initializing' | 'connecting' | 'connected' | 'ended'>('pre-call');
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState<'good' | 'fair' | 'poor'>('good');
   const [callDuration, setCallDuration] = useState(0);
   const [errors, setErrors] = useState<string[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isLocalVideoVisible, setIsLocalVideoVisible] = useState(true);
+  const [isMediaReady, setIsMediaReady] = useState(false);
 
   // Video element refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -63,13 +67,52 @@ export default function VideoConsultation({
   };
 
   useEffect(() => {
-    initializeWebRTC();
+    if (callStatus === 'pre-call') {
+      initializeMedia();
+    }
     setupDurationTimer();
     
     return () => {
       cleanup();
     };
   }, []);
+
+  // Initialize media for pre-call testing
+  const initializeMedia = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720 },
+        audio: { echoCancellation: true, noiseSuppression: true }
+      });
+      
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      setIsMediaReady(true);
+      
+      toast({
+        title: "Câmera e microfone prontos",
+        description: "Você pode testar sua configuração antes de iniciar a consulta.",
+      });
+    } catch (error) {
+      console.error('Error accessing media:', error);
+      setErrors(prev => [...prev, 'Erro ao acessar câmera/microfone']);
+      toast({
+        title: "Erro de mídia",
+        description: "Verifique as permissões de câmera e microfone.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Start the actual video call
+  const startVideoCall = async () => {
+    if (!isMediaReady) {
+      await initializeMedia();
+    }
+    await initializeWebRTC();
+  };
 
   const setupDurationTimer = () => {
     const interval = setInterval(() => {
@@ -86,15 +129,17 @@ export default function VideoConsultation({
     try {
       setCallStatus('connecting');
       
-      // Get user media
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: { echoCancellation: true, noiseSuppression: true }
-      });
-      
-      localStreamRef.current = stream;
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+      // Use existing stream if available, otherwise get new one
+      let stream = localStreamRef.current;
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 1280, height: 720 },
+          audio: { echoCancellation: true, noiseSuppression: true }
+        });
+        localStreamRef.current = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
       }
 
       // Create peer connection
@@ -138,7 +183,7 @@ export default function VideoConsultation({
       }, 5000); // Check every 5 seconds
 
       // Setup WebSocket for signaling
-      setupSignaling();
+      await setupSignaling();
 
       // Create video consultation session
       await createConsultationSession();
@@ -154,33 +199,52 @@ export default function VideoConsultation({
     }
   };
 
-  const setupSignaling = () => {
-    // Connect to existing WebSocket or create new one
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
-    
-    socketRef.current = new WebSocket(wsUrl);
-    
-    socketRef.current.onopen = () => {
-      console.log('WebSocket connected for video consultation');
-      // Join video consultation room
-      socketRef.current?.send(JSON.stringify({
-        type: 'join-consultation',
-        appointmentId,
-        userId: doctorId,
-        role: 'doctor'
-      }));
-    };
+  const setupSignaling = async () => {
+    try {
+      // Fetch JWT token for WebSocket authentication (like WhatsApp integration does)
+      const tokenResponse = await fetch('/api/auth/websocket-token', {
+        credentials: 'include'
+      });
+      
+      if (!tokenResponse.ok) {
+        console.error('Failed to get WebSocket token:', tokenResponse.status);
+        setErrors(prev => [...prev, 'Erro de autenticação WebSocket']);
+        return;
+      }
+      
+      const { token } = await tokenResponse.json();
+      console.log('WebSocket token obtained successfully');
+      
+      // Connect to WebSocket with authentication token
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+      
+      socketRef.current = new WebSocket(wsUrl);
+      
+      socketRef.current.onopen = () => {
+        console.log('WebSocket connected for video consultation');
+        // Join video consultation room
+        socketRef.current?.send(JSON.stringify({
+          type: 'join-consultation',
+          appointmentId,
+          userId: doctorId,
+          role: 'doctor'
+        }));
+      };
 
-    socketRef.current.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-      await handleSignalingMessage(data);
-    };
+      socketRef.current.onmessage = async (event) => {
+        const data = JSON.parse(event.data);
+        await handleSignalingMessage(data);
+      };
 
-    socketRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setErrors(prev => [...prev, 'Erro de conexão']);
-    };
+      socketRef.current.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setErrors(prev => [...prev, 'Erro de conexão']);
+      };
+    } catch (error) {
+      console.error('Error setting up WebSocket signaling:', error);
+      setErrors(prev => [...prev, 'Erro ao configurar WebSocket']);
+    }
   };
 
   const handleSignalingMessage = async (data: any) => {
@@ -416,122 +480,268 @@ export default function VideoConsultation({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
-      <div className="w-full h-full max-w-6xl mx-auto p-4 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-white text-xl font-semibold">
-              Consulta: {patientName}
+  // Pre-call interface for media testing
+  if (callStatus === 'pre-call') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 z-50 flex items-center justify-center p-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl border border-white/20 p-8 max-w-lg w-full mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-white mb-2">
+              Consulta com {patientName}
             </h1>
-            <Badge variant="outline" className="bg-blue-100 text-blue-800">
-              {callStatus === 'connected' ? 'Conectado' : 
-               callStatus === 'connecting' ? 'Conectando...' : 
-               callStatus === 'ended' ? 'Encerrado' : 'Inicializando'}
-            </Badge>
-            <Badge className={getConnectionQualityColor()}>
-              Qualidade: {connectionQuality === 'good' ? 'Boa' : 
-                         connectionQuality === 'fair' ? 'Regular' : 'Ruim'}
-            </Badge>
+            <p className="text-white/80">
+              Teste sua câmera e microfone antes de iniciar
+            </p>
           </div>
-          <div className="text-white text-lg">
+
+          {/* Pre-call video preview */}
+          <div className="relative mb-8 rounded-2xl overflow-hidden bg-gray-900/50 aspect-video">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              data-testid="video-preview"
+            />
+            {!isMediaReady && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-white text-center">
+                  <Camera className="h-12 w-12 mx-auto mb-2 animate-pulse" />
+                  <p>Carregando câmera...</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pre-call controls */}
+          <div className="flex justify-center space-x-4 mb-8">
+            <Button
+              variant={isVideoEnabled ? "default" : "destructive"}
+              size="lg"
+              onClick={toggleVideo}
+              className="rounded-full w-14 h-14 p-0"
+              data-testid="button-preview-video"
+            >
+              {isVideoEnabled ? <VideoIcon className="h-6 w-6" /> : <VideoOffIcon className="h-6 w-6" />}
+            </Button>
+
+            <Button
+              variant={isAudioEnabled ? "default" : "destructive"}
+              size="lg"
+              onClick={toggleAudio}
+              className="rounded-full w-14 h-14 p-0"
+              data-testid="button-preview-audio"
+            >
+              {isAudioEnabled ? <MicIcon className="h-6 w-6" /> : <MicOffIcon className="h-6 w-6" />}
+            </Button>
+          </div>
+
+          {/* Start call button */}
+          <Button
+            onClick={startVideoCall}
+            disabled={!isMediaReady}
+            className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold py-4 rounded-2xl transition-all duration-300 transform hover:scale-105"
+            size="lg"
+            data-testid="button-start-call"
+          >
+            <VideoIcon className="mr-2 h-5 w-5" />
+            Iniciar Videoconsulta
+          </Button>
+
+          {errors.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {errors.map((error, index) => (
+                <div key={index} className="bg-red-500/20 text-red-100 p-3 rounded-xl border border-red-500/30">
+                  {error}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Main video consultation interface
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 z-50">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-black/20 backdrop-blur-sm">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <div className={cn(
+              "w-3 h-3 rounded-full animate-pulse",
+              callStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500'
+            )} />
+            <h1 className="text-white text-lg sm:text-xl font-semibold">
+              {patientName}
+            </h1>
+          </div>
+          <Badge variant="outline" className={cn(
+            "border-white/30 text-xs",
+            callStatus === 'connected' ? 'bg-green-500/20 text-green-300' : 
+            callStatus === 'connecting' ? 'bg-yellow-500/20 text-yellow-300' : 
+            'bg-blue-500/20 text-blue-300'
+          )}>
+            {callStatus === 'connected' ? 'Conectado' : 
+             callStatus === 'connecting' ? 'Conectando...' : 
+             callStatus === 'ended' ? 'Encerrado' : 'Inicializando'}
+          </Badge>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <Badge className={cn(
+            "text-xs border-0",
+            connectionQuality === 'good' ? 'bg-green-500/20 text-green-300' :
+            connectionQuality === 'fair' ? 'bg-yellow-500/20 text-yellow-300' :
+            'bg-red-500/20 text-red-300'
+          )}>
+            {connectionQuality === 'good' ? '● Boa' : 
+             connectionQuality === 'fair' ? '● Regular' : '● Ruim'}
+          </Badge>
+          <div className="text-white text-sm font-mono">
             {formatDuration(callDuration)}
           </div>
         </div>
+      </div>
 
-        {/* Video Area */}
-        <div className="flex-1 flex gap-4">
-          {/* Remote Video (Patient) */}
-          <div className="flex-1 relative">
-            <Card className="h-full bg-gray-900">
-              <CardContent className="p-0 h-full">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover rounded-lg"
-                  data-testid="video-remote"
-                />
-                <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
-                  {patientName}
-                </div>
-              </CardContent>
-            </Card>
+      {/* Video Area */}
+      <div className="flex-1 relative p-4">
+        {/* Remote Video (Patient) - Main view */}
+        <div className="relative w-full h-[calc(100vh-200px)] rounded-2xl overflow-hidden bg-gray-900">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full h-full object-cover"
+            data-testid="video-remote"
+          />
+          
+          {/* Patient name overlay */}
+          <div className="absolute bottom-4 left-4 bg-black/50 backdrop-blur-sm text-white px-3 py-2 rounded-xl">
+            <p className="text-sm font-medium">{patientName}</p>
           </div>
 
-          {/* Local Video (Doctor) */}
-          <div className="w-80">
-            <Card className="h-full bg-gray-900">
-              <CardContent className="p-0 h-full">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover rounded-lg"
-                  data-testid="video-local"
-                />
-                <div className="absolute bottom-4 left-4 text-white bg-black bg-opacity-50 px-2 py-1 rounded">
-                  Você (Dr.)
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Local Video (Doctor) - Picture-in-picture */}
+          {isLocalVideoVisible && (
+            <div className="absolute top-4 right-4 w-32 sm:w-40 h-24 sm:h-32 rounded-xl overflow-hidden bg-gray-900 border-2 border-white/20 shadow-lg">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+                data-testid="video-local"
+              />
+              <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                Você
+              </div>
+              
+              {/* Toggle local video visibility */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsLocalVideoVisible(false)}
+                className="absolute top-1 right-1 w-6 h-6 p-0 text-white/70 hover:text-white hover:bg-black/30"
+                data-testid="button-hide-local"
+              >
+                <Minimize2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+
+          {/* Show local video button when hidden */}
+          {!isLocalVideoVisible && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsLocalVideoVisible(true)}
+              className="absolute top-4 right-4 bg-black/50 text-white hover:bg-black/70 rounded-xl"
+              data-testid="button-show-local"
+            >
+              <Maximize2 className="h-4 w-4 mr-1" />
+              Mostrar
+            </Button>
+          )}
         </div>
+      </div>
 
-        {/* Controls */}
-        <div className="flex items-center justify-center space-x-4 mt-4">
+      {/* Controls - Floating bottom bar */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+        <div className="bg-black/40 backdrop-blur-xl rounded-full p-2 flex items-center space-x-2">
+          
+          {/* Video toggle */}
           <Button
             variant={isVideoEnabled ? "default" : "destructive"}
             size="lg"
             onClick={toggleVideo}
+            className={cn(
+              "rounded-full w-14 h-14 p-0 transition-all duration-300",
+              isVideoEnabled 
+                ? "bg-white/20 hover:bg-white/30 text-white border-white/30" 
+                : "bg-red-500 hover:bg-red-600 text-white"
+            )}
             data-testid="button-toggle-video"
           >
-            {isVideoEnabled ? <VideoIcon className="h-5 w-5" /> : <VideoOffIcon className="h-5 w-5" />}
+            {isVideoEnabled ? <VideoIcon className="h-6 w-6" /> : <VideoOffIcon className="h-6 w-6" />}
           </Button>
 
+          {/* Audio toggle */}
           <Button
             variant={isAudioEnabled ? "default" : "destructive"}
             size="lg"
             onClick={toggleAudio}
+            className={cn(
+              "rounded-full w-14 h-14 p-0 transition-all duration-300",
+              isAudioEnabled 
+                ? "bg-white/20 hover:bg-white/30 text-white border-white/30" 
+                : "bg-red-500 hover:bg-red-600 text-white"
+            )}
             data-testid="button-toggle-audio"
           >
-            {isAudioEnabled ? <MicIcon className="h-5 w-5" /> : <MicOffIcon className="h-5 w-5" />}
+            {isAudioEnabled ? <MicIcon className="h-6 w-6" /> : <MicOffIcon className="h-6 w-6" />}
           </Button>
 
+          {/* Recording toggle */}
           <Button
             variant={isRecording ? "destructive" : "outline"}
             size="lg"
             onClick={isRecording ? stopRecording : startRecording}
+            className={cn(
+              "rounded-full w-14 h-14 p-0 transition-all duration-300",
+              isRecording 
+                ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" 
+                : "bg-white/20 hover:bg-white/30 text-white border-white/30"
+            )}
             data-testid="button-toggle-recording"
           >
-            <CircleIcon className="h-5 w-5" />
-            {isRecording ? "Parar Gravação" : "Gravar"}
+            <CircleIcon className="h-6 w-6" />
           </Button>
 
+          {/* End call */}
           <Button
             variant="destructive"
             size="lg"
             onClick={endCall}
+            className="rounded-full w-14 h-14 p-0 bg-red-500 hover:bg-red-600 text-white transition-all duration-300"
             data-testid="button-end-call"
           >
-            <PhoneOffIcon className="h-5 w-5" />
-            Encerrar
+            <PhoneOffIcon className="h-6 w-6" />
           </Button>
         </div>
-
-        {/* Errors */}
-        {errors.length > 0 && (
-          <div className="mt-4">
-            {errors.map((error, index) => (
-              <div key={index} className="bg-red-100 text-red-800 p-2 rounded mb-2">
-                {error}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Errors */}
+      {errors.length > 0 && (
+        <div className="absolute top-20 right-4 space-y-2 max-w-sm">
+          {errors.map((error, index) => (
+            <div key={index} className="bg-red-500/20 text-red-100 p-3 rounded-xl border border-red-500/30 backdrop-blur-sm">
+              {error}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
