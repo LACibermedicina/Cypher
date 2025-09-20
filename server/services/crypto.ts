@@ -177,15 +177,14 @@ export class CryptographicService {
     validUntil.setFullYear(validUntil.getFullYear() + 3); // 3-year validity
 
     return {
-      issuer: "Autoridade Certificadora Raiz Brasileira v5",
-      subject: `CN=Dr. Medical Signature,O=Healthcare System,C=BR,doctorId=${doctorId}`,
+      issuer: "Demo Certificate Authority (NOT ICP-Brasil)",
+      subject: `CN=Dr. Medical Signature Demo,O=Healthcare System Demo,C=BR,doctorId=${doctorId}`,
       serialNumber: crypto.randomBytes(16).toString('hex'),
       validFrom: validFrom.toISOString(),
       validUntil: validUntil.toISOString(),
       keyUsage: ["digitalSignature", "nonRepudiation"],
       extendedKeyUsage: ["codeSigning", "emailProtection"],
-      icpBrasilCompliant: true,
-      fipsApproved: true
+      note: "Demo certificate - not ICP-Brasil or FIPS compliant"
     };
   }
 }

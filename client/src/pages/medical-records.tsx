@@ -86,7 +86,7 @@ export default function MedicalRecords() {
     onSuccess: (response: any) => {
       toast({
         title: "Prescrição Assinada Digitalmente",
-        description: `Assinatura FIPS 140-2 criada com sucesso. Audit Hash: ${response.auditHash?.substring(0, 8)}...`,
+        description: `Assinatura digital demo criada com sucesso. Audit Hash: ${response.auditHash?.substring(0, 8)}...`,
       });
       // Refresh medical records to show updated signature status
       queryClient.invalidateQueries({ queryKey: ['/api/medical-records'] });
@@ -121,7 +121,7 @@ export default function MedicalRecords() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Prontuários Médicos</h1>
-          <p className="text-muted-foreground">Sistema seguro de gestão de prontuários com criptografia FIPS 140-2</p>
+          <p className="text-muted-foreground">Sistema seguro de gestão de prontuários com assinatura digital demo</p>
         </div>
         <div className="flex items-center space-x-2">
           <div className="security-badge px-3 py-1 rounded-full text-white text-xs font-medium">
