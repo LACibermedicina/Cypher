@@ -22,7 +22,7 @@ export default function Header() {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <i className="fas fa-user-md text-primary-foreground text-sm"></i>
                 </div>
-                <h1 className="text-xl font-bold text-primary">MedIA Pro</h1>
+                <h1 className="text-xl font-bold text-primary">Telemed</h1>
               </div>
             </Link>
             <div className="security-badge px-3 py-1 rounded-full text-white text-xs font-medium">

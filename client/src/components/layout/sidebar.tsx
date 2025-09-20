@@ -75,8 +75,8 @@ function SidebarContent() {
           <i className="fas fa-user-md text-primary-foreground"></i>
         </div>
         <div>
-          <h2 className="text-lg font-bold text-primary">MedIA Pro</h2>
-          <p className="text-xs text-muted-foreground">Sistema Médico IA</p>
+          <h2 className="text-lg font-bold text-primary">Telemed</h2>
+          <p className="text-xs text-muted-foreground">Sistema de Telemedicina</p>
         </div>
       </div>
 

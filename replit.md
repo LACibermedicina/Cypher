@@ -1,8 +1,8 @@
-# MedIA Pro - Intelligent Medical System
+# Telemed - Sistema de Telemedicina
 
 ## Overview
 
-MedIA Pro is an AI-powered medical management system designed for healthcare professionals. The application combines traditional medical practice management with modern AI capabilities, including WhatsApp integration for patient communication, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. Built as a full-stack web application, it provides real-time communication through WebSockets and comprehensive patient data management.
+Telemed is an AI-powered telemedicine platform designed for modern healthcare delivery. The application combines traditional medical practice management with cutting-edge telemedicine capabilities, including multilingual support, video consultations, WhatsApp integration for patient communication, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. Built as a responsive full-stack web application, it provides real-time communication through WebSockets, comprehensive patient data management, and optimized mobile experience for both patients and doctors.
 
 ## User Preferences
 

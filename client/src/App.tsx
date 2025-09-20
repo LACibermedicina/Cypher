@@ -48,7 +48,7 @@ function Router() {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              © 2024 MedIA Pro - Sistema Médico Inteligente
+              © 2024 Telemed - Sistema de Telemedicina
             </div>
           </div>
         </div>
