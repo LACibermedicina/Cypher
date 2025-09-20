@@ -3087,6 +3087,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== LABORATORY WORKFLOW TRACKING ALREADY IMPLEMENTED =====
+  // 
+  // Comprehensive laboratory workflow tracking and audit logging is already implemented via:
+  // - ALLOWED_LAB_TRANSITIONS: Complete state transition validation (lines 2474-2480)
+  // - Workflow violation logging: Invalid transitions tracked with full context
+  // - Authorization violation tracking: All unauthorized access attempts logged
+  // - Comprehensive audit trails: All operations logged via createCollaboratorIntegration
+  // - Laboratory analytics: Available via existing analytics endpoints (lines 2620+)
+  //
+  // Laboratory workflow events tracked:
+  // - lab_order: Order creation
+  // - lab_order_update: Status updates with transition validation
+  // - lab_workflow_violation: Invalid state transitions
+  // - authorization_violation: Unauthorized access attempts
+  // - lab_results_submission: Results submission
+  // - lab_order_access: Order retrieval by doctors
+  // - lab_results_access: Results access by doctors
+  // - lab_result_file_download: File downloads
+  //
+  // This provides complete workflow tracking and audit logging for Brazilian healthcare compliance.
+
   return httpServer;
 }
 
