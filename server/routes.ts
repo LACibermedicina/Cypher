@@ -7,7 +7,7 @@ import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -997,6 +997,381 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get transcription status error:', error);
       res.status(500).json({ message: 'Failed to get transcription status' });
+    }
+  });
+
+  // ===== PHARMACY INTEGRATION API ROUTES =====
+  
+  // Get all pharmacy collaborators
+  app.get('/api/pharmacies', async (req, res) => {
+    try {
+      const pharmacies = await storage.getCollaboratorsByType('pharmacy');
+      res.json(pharmacies);
+    } catch (error) {
+      console.error('Get pharmacies error:', error);
+      res.status(500).json({ message: 'Failed to get pharmacies' });
+    }
+  });
+
+  // Create new pharmacy collaborator
+  app.post('/api/pharmacies', async (req, res) => {
+    try {
+      const validatedData = insertCollaboratorSchema.parse({
+        ...req.body,
+        type: 'pharmacy'
+      });
+      
+      const pharmacy = await storage.createCollaborator(validatedData);
+      res.status(201).json(pharmacy);
+    } catch (error) {
+      console.error('Create pharmacy error:', error);
+      res.status(500).json({ message: 'Failed to create pharmacy' });
+    }
+  });
+
+  // Share prescription with pharmacy
+  app.post('/api/prescriptions/:medicalRecordId/share', async (req, res) => {
+    try {
+      const { medicalRecordId } = req.params;
+      const { pharmacyId, notes } = req.body;
+
+      // Validate medical record exists and has signed prescription
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord) {
+        return res.status(404).json({ message: 'Medical record not found' });
+      }
+
+      if (!medicalRecord.prescription) {
+        return res.status(400).json({ message: 'No prescription to share' });
+      }
+
+      if (!medicalRecord.digitalSignature) {
+        return res.status(400).json({ message: 'Prescription must be digitally signed before sharing' });
+      }
+
+      // Verify digital signature cryptographically
+      const digitalSignature = await storage.getDigitalSignature(medicalRecord.digitalSignature);
+      if (!digitalSignature) {
+        return res.status(400).json({ message: 'Digital signature record not found' });
+      }
+
+      // Extract certificate info and public key for verification
+      const certInfo = digitalSignature.certificateInfo as any || {};
+      const publicKey = certInfo.publicKey;
+      const timestamp = certInfo.timestamp;
+
+      if (!publicKey || !timestamp) {
+        return res.status(400).json({ message: 'Invalid digital signature - missing verification data' });
+      }
+
+      // Verify the prescription signature cryptographically
+      const isValidSignature = await cryptoService.verifySignature(
+        medicalRecord.prescription || '',
+        digitalSignature.signature,
+        publicKey,
+        timestamp
+      );
+
+      if (!isValidSignature) {
+        // Log failed verification attempt
+        await storage.createCollaboratorIntegration({
+          collaboratorId: pharmacyId,
+          integrationType: 'prescription_share',
+          entityId: medicalRecordId,
+          action: 'signature_verification_failed',
+          status: 'failed',
+          errorMessage: 'Digital signature verification failed',
+          requestData: {
+            medicalRecordId: medicalRecordId,
+            patientId: medicalRecord.patientId,
+            verificationTimestamp: new Date().toISOString()
+          },
+        });
+
+        return res.status(400).json({ 
+          message: 'Prescription digital signature verification failed - cannot share with pharmacy' 
+        });
+      }
+
+      // Validate pharmacy exists
+      const pharmacy = await storage.getCollaborator(pharmacyId);
+      if (!pharmacy || pharmacy.type !== 'pharmacy') {
+        return res.status(404).json({ message: 'Pharmacy not found' });
+      }
+
+      // Create prescription share record
+      const shareData = {
+        patientId: medicalRecord.patientId,
+        medicalRecordId: medicalRecordId,
+        doctorId: actualDoctorId || DEFAULT_DOCTOR_ID,
+        pharmacyId,
+        prescriptionText: medicalRecord.prescription || '',
+        digitalSignatureId: medicalRecord.digitalSignature,
+        status: 'shared' as const,
+      };
+
+      const validatedShareData = insertPrescriptionShareSchema.parse(shareData);
+      const prescriptionShare = await storage.createPrescriptionShare(validatedShareData);
+
+      // Log successful integration activity with signature verification
+      await storage.createCollaboratorIntegration({
+        collaboratorId: pharmacyId,
+        integrationType: 'prescription_share',
+        entityId: prescriptionShare.id,
+        action: 'prescription_shared',
+        status: 'success',
+        requestData: {
+          medicalRecordId: medicalRecordId,
+          patientId: medicalRecord.patientId,
+          signatureVerified: true,
+          verificationTimestamp: new Date().toISOString()
+        },
+      });
+
+      // Broadcast real-time update
+      broadcast({
+        type: 'prescription_shared',
+        data: { prescriptionShare, pharmacy, patient: medicalRecord.patientId }
+      });
+
+      res.status(201).json(prescriptionShare);
+    } catch (error) {
+      console.error('Share prescription error:', error);
+      res.status(500).json({ message: 'Failed to share prescription' });
+    }
+  });
+
+  // Get shared prescriptions for a pharmacy
+  app.get('/api/pharmacies/:pharmacyId/prescriptions', async (req, res) => {
+    try {
+      const { pharmacyId } = req.params;
+      const { status } = req.query;
+
+      let prescriptionShares = await storage.getPrescriptionSharesByPharmacy(pharmacyId);
+      
+      // Filter by status if provided
+      if (status) {
+        prescriptionShares = prescriptionShares.filter(share => share.status === status);
+      }
+
+      // Enrich with medical record and patient data
+      const enrichedShares = await Promise.all(
+        prescriptionShares.map(async (share) => {
+          const medicalRecord = await storage.getMedicalRecord(share.medicalRecordId);
+          const patient = await storage.getPatient(share.patientId);
+          return {
+            ...share,
+            medicalRecord,
+            patient: patient ? {
+              id: patient.id,
+              name: patient.name,
+              phone: patient.phone
+            } : null
+          };
+        })
+      );
+
+      res.json(enrichedShares);
+    } catch (error) {
+      console.error('Get pharmacy prescriptions error:', error);
+      res.status(500).json({ message: 'Failed to get pharmacy prescriptions' });
+    }
+  });
+
+  // Update prescription fulfillment status
+  app.patch('/api/prescription-shares/:shareId/fulfillment', async (req, res) => {
+    try {
+      const { shareId } = req.params;
+      const { status, fulfilledAt, pharmacistNotes, fulfilledBy } = req.body;
+
+      const validStatuses = ['pending', 'preparing', 'ready', 'dispensed', 'completed', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      const updateData: any = { 
+        status,
+        pharmacistNotes: pharmacistNotes || '',
+      };
+
+      // Set fulfillment timestamp for completed statuses
+      if (['dispensed', 'completed'].includes(status)) {
+        updateData.fulfilledAt = fulfilledAt ? new Date(fulfilledAt) : new Date();
+        if (fulfilledBy) {
+          updateData.fulfilledBy = fulfilledBy;
+        }
+      }
+
+      const updatedShare = await storage.updatePrescriptionShare(shareId, updateData);
+      if (!updatedShare) {
+        return res.status(404).json({ message: 'Prescription share not found' });
+      }
+
+      // Log integration activity
+      await storage.createCollaboratorIntegration({
+        collaboratorId: updatedShare.pharmacyId,
+        integrationType: 'fulfillment_update',
+        entityId: shareId,
+        action: 'status_updated',
+        status: 'success',
+        requestData: {
+          oldStatus: 'unknown', // Would need to track previous status
+          newStatus: status,
+          pharmacistNotes
+        },
+      });
+
+      // Broadcast real-time update
+      broadcast({
+        type: 'prescription_fulfillment_updated',
+        data: { prescriptionShare: updatedShare, status }
+      });
+
+      res.json(updatedShare);
+    } catch (error) {
+      console.error('Update fulfillment error:', error);
+      res.status(500).json({ message: 'Failed to update fulfillment status' });
+    }
+  });
+
+  // Get prescription fulfillment history for a patient
+  app.get('/api/patients/:patientId/prescription-shares', async (req, res) => {
+    try {
+      const { patientId } = req.params;
+      const prescriptionShares = await storage.getPrescriptionSharesByPatient(patientId);
+
+      // Enrich with pharmacy data
+      const enrichedShares = await Promise.all(
+        prescriptionShares.map(async (share) => {
+          const pharmacy = await storage.getCollaborator(share.pharmacyId);
+          const medicalRecord = await storage.getMedicalRecord(share.medicalRecordId);
+          return {
+            ...share,
+            pharmacy: pharmacy ? {
+              id: pharmacy.id,
+              name: pharmacy.name,
+              phone: pharmacy.phone,
+              address: pharmacy.address
+            } : null,
+            prescription: medicalRecord?.prescription
+          };
+        })
+      );
+
+      res.json(enrichedShares);
+    } catch (error) {
+      console.error('Get patient prescription shares error:', error);
+      res.status(500).json({ message: 'Failed to get patient prescription shares' });
+    }
+  });
+
+  // Get pharmacy analytics and statistics
+  app.get('/api/pharmacies/:pharmacyId/analytics', async (req, res) => {
+    try {
+      const { pharmacyId } = req.params;
+      
+      // Validate pharmacy exists
+      const pharmacy = await storage.getCollaborator(pharmacyId);
+      if (!pharmacy || pharmacy.type !== 'pharmacy') {
+        return res.status(404).json({ message: 'Pharmacy not found' });
+      }
+
+      const prescriptionShares = await storage.getPrescriptionSharesByPharmacy(pharmacyId);
+      const integrationLogs = await storage.getCollaboratorIntegrationsByCollaborator(pharmacyId);
+
+      // Calculate statistics
+      const totalShares = prescriptionShares.length;
+      const completedShares = prescriptionShares.filter(share => 
+        ['dispensed', 'completed'].includes(share.status)
+      ).length;
+      const pendingShares = prescriptionShares.filter(share => 
+        share.status === 'pending'
+      ).length;
+      const cancelledShares = prescriptionShares.filter(share => 
+        share.status === 'cancelled'
+      ).length;
+
+      // Average fulfillment time (in hours)
+      const fulfilledShares = prescriptionShares.filter(share => 
+        share.dispensedAt && share.createdAt
+      );
+      const avgFulfillmentTime = fulfilledShares.length > 0
+        ? fulfilledShares.reduce((sum, share) => {
+            const timeDiff = new Date(share.dispensedAt!).getTime() - new Date(share.createdAt).getTime();
+            return sum + (timeDiff / (1000 * 60 * 60)); // Convert to hours
+          }, 0) / fulfilledShares.length
+        : 0;
+
+      // Recent activity (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentShares = prescriptionShares.filter(share => 
+        new Date(share.createdAt) >= thirtyDaysAgo
+      );
+
+      res.json({
+        pharmacy: {
+          id: pharmacy.id,
+          name: pharmacy.name,
+          type: pharmacy.type
+        },
+        statistics: {
+          totalShares,
+          completedShares,
+          pendingShares,
+          cancelledShares,
+          completionRate: totalShares > 0 ? (completedShares / totalShares * 100) : 0,
+          avgFulfillmentTimeHours: Math.round(avgFulfillmentTime * 100) / 100,
+          recentActivity: recentShares.length,
+          integrationEvents: integrationLogs.length
+        },
+        recentShares: recentShares.slice(0, 10) // Last 10 recent shares
+      });
+    } catch (error) {
+      console.error('Get pharmacy analytics error:', error);
+      res.status(500).json({ message: 'Failed to get pharmacy analytics' });
+    }
+  });
+
+  // Pharmacy API key validation endpoint (for external pharmacy systems)
+  app.post('/api/pharmacies/validate-access', async (req, res) => {
+    try {
+      const { apiKey, pharmacyId } = req.body;
+      
+      if (!apiKey || !pharmacyId) {
+        return res.status(400).json({ message: 'API key and pharmacy ID are required' });
+      }
+
+      // Hash the provided API key for comparison
+      // In production, use proper salting and timing-safe comparison
+      const hashedKey = require('crypto').createHash('sha256').update(apiKey).digest('hex');
+      const validApiKey = await storage.validateApiKey(hashedKey);
+      
+      if (!validApiKey || validApiKey.collaboratorId !== pharmacyId) {
+        return res.status(401).json({ message: 'Invalid API key or pharmacy ID' });
+      }
+
+      const pharmacy = await storage.getCollaborator(pharmacyId);
+      if (!pharmacy || pharmacy.type !== 'pharmacy') {
+        return res.status(404).json({ message: 'Pharmacy not found' });
+      }
+
+      // Update last access time
+      await storage.updateCollaboratorApiKey(validApiKey.id, {
+        lastUsed: new Date()
+      });
+
+      res.json({
+        valid: true,
+        pharmacy: {
+          id: pharmacy.id,
+          name: pharmacy.name,
+          permissions: ['read_prescriptions', 'update_fulfillment']
+        }
+      });
+    } catch (error) {
+      console.error('Validate API key error:', error);
+      res.status(500).json({ message: 'Failed to validate API key' });
     }
   });
 
