@@ -101,6 +101,7 @@ export interface IStorage {
 
   // Digital Signatures
   getPendingSignatures(doctorId: string): Promise<DigitalSignature[]>;
+  getDigitalSignature(id: string): Promise<DigitalSignature | undefined>;
 
   // Video Consultations
   getVideoConsultation(id: string): Promise<VideoConsultation | undefined>;
@@ -314,6 +315,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(digitalSignatures)
       .where(and(eq(digitalSignatures.doctorId, doctorId), eq(digitalSignatures.status, 'pending')))
       .orderBy(desc(digitalSignatures.createdAt));
+  }
+
+  async getDigitalSignature(id: string): Promise<DigitalSignature | undefined> {
+    const [signature] = await db.select().from(digitalSignatures).where(eq(digitalSignatures.id, id));
+    return signature || undefined;
   }
 
   async createDigitalSignature(insertSignature: InsertDigitalSignature): Promise<DigitalSignature> {
