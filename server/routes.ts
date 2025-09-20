@@ -7,9 +7,10 @@ import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
+import jwt from 'jsonwebtoken';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -36,14 +37,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   wss.on('connection', (ws: WebSocket, req) => {
     console.log('Client connected to WebSocket');
     
-    // WebSocket connections require authentication via query parameter or header
-    // In production, use proper JWT tokens
+    // WebSocket connections require JWT authentication
     const url = new URL(req.url || '', `http://${req.headers.host}`);
-    const doctorId = url.searchParams.get('doctorId');
+    const token = url.searchParams.get('token') || req.headers.authorization?.replace('Bearer ', '');
     
-    if (!doctorId) {
-      console.log('WebSocket connection denied: missing authentication');
-      ws.close(1008, 'Authentication required');
+    if (!token) {
+      console.log('WebSocket connection denied: missing JWT token');
+      ws.close(1008, 'JWT token required');
+      return;
+    }
+    
+    // Verify JWT token and extract doctorId with proper signature verification
+    let doctorId: string;
+    try {
+      // Require SESSION_SECRET - fail if not set
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (!jwtSecret) {
+        console.error('SESSION_SECRET not configured - WebSocket authentication failed');
+        ws.close(1008, 'Server configuration error');
+        return;
+      }
+      
+      // Use proper JWT signature verification with full validation
+      const payload = jwt.verify(token, jwtSecret, {
+        issuer: 'healthcare-system',
+        audience: 'websocket',
+        algorithms: ['HS256']
+      }) as any;
+      
+      doctorId = payload.doctorId;
+      
+      // Verify doctorId exists in payload
+      if (!doctorId) {
+        console.log('WebSocket connection denied: Invalid JWT payload - missing doctorId');
+        ws.close(1008, 'Invalid token payload');
+        return;
+      }
+      
+      // Additional security checks
+      if (payload.type !== 'doctor_auth') {
+        console.log('WebSocket connection denied: Invalid token type');
+        ws.close(1008, 'Invalid token type');
+        return;
+      }
+      
+    } catch (error) {
+      console.log('WebSocket connection denied: Invalid JWT token', error);
+      ws.close(1008, 'Invalid token');
       return;
     }
     
@@ -87,15 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
-  // Legacy broadcast function for non-sensitive data (deprecated - should be replaced)
-  const broadcast = (data: any) => {
-    console.warn('Using insecure broadcast - should be replaced with broadcastToDoctor');
-    wss.clients.forEach(client => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(data));
-      }
-    });
-  };
+  // Legacy broadcast function removed for security - use broadcastToDoctor exclusively
 
   // API Key Authentication Middleware for External Collaborators
   const authenticateApiKey = async (req: any, res: any, next: any) => {
@@ -444,8 +476,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Mark original message as read
         await whatsAppService.markMessageAsRead(message.messageId);
 
-        // Broadcast real-time update
-        broadcast({
+        // Broadcast real-time update to authenticated doctor only
+        broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
           type: 'whatsapp_message',
           data: { patient, message: whatsappMessage, aiResponse },
         });
@@ -560,7 +592,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertAppointmentSchema.parse(requestData);
       const appointment = await storage.createAppointment(validatedData);
-      broadcast({ type: 'appointment_created', data: appointment });
+      broadcastToDoctor(appointment.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'appointment_created', data: appointment });
       res.status(201).json(appointment);
     } catch (error) {
       res.status(400).json({ message: 'Invalid appointment data', error });
@@ -573,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!appointment) {
         return res.status(404).json({ message: 'Appointment not found' });
       }
-      broadcast({ type: 'appointment_updated', data: appointment });
+      broadcastToDoctor(appointment.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'appointment_updated', data: appointment });
       res.json(appointment);
     } catch (error) {
       res.status(500).json({ message: 'Failed to update appointment' });
@@ -808,7 +840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Signature not found' });
       }
       
-      broadcast({ type: 'document_signed', data: updated });
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'document_signed', data: updated });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ message: 'Failed to sign document' });
@@ -872,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Broadcast signature event for real-time updates
-      broadcast({ 
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, { 
         type: 'prescription_signed', 
         data: { 
           medicalRecordId,
@@ -1010,8 +1042,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertVideoConsultationSchema.parse(req.body);
       const consultation = await storage.createVideoConsultation(validatedData);
       
-      // Broadcast to WebSocket clients
-      broadcast({ type: 'consultation_created', data: consultation });
+      // Broadcast to authenticated doctor only
+      broadcastToDoctor(consultation.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'consultation_created', data: consultation });
       
       res.status(201).json(consultation);
     } catch (error) {
@@ -1076,8 +1108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Video consultation not found' });
       }
 
-      // Broadcast status updates
-      broadcast({ type: 'consultation_updated', data: consultation });
+      // Broadcast status updates to authenticated doctor only
+      broadcastToDoctor(consultation.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'consultation_updated', data: consultation });
       
       res.json(consultation);
     } catch (error) {
@@ -1098,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Video consultation not found' });
       }
 
-      broadcast({ type: 'consultation_started', data: consultation });
+      broadcastToDoctor(consultation.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'consultation_started', data: consultation });
       
       res.json(consultation);
     } catch (error) {
@@ -1123,7 +1155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Video consultation not found' });
       }
 
-      broadcast({ type: 'consultation_ended', data: consultation });
+      broadcastToDoctor(consultation.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'consultation_ended', data: consultation });
       
       res.json(consultation);
     } catch (error) {
@@ -1153,7 +1185,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcriptionStatus: 'processing'
       });
 
-      broadcast({ type: 'transcription_started', consultationId, status: 'processing' });
+      // Get consultation to broadcast to correct doctor
+      const consultationForBroadcast = await storage.getVideoConsultation(consultationId);
+      const targetDoctorId = consultationForBroadcast?.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID;
+      broadcastToDoctor(targetDoctorId, { type: 'transcription_started', consultationId, status: 'processing' });
 
       try {
         // Convert base64 audio data to buffer
@@ -1193,7 +1228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isEncrypted: true
         });
 
-        broadcast({ 
+        broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, { 
           type: 'transcription_completed', 
           consultationId,
           status: 'completed',
@@ -1215,7 +1250,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           transcriptionStatus: 'failed'
         });
 
-        broadcast({ type: 'transcription_failed', consultationId });
+        // Get consultation to broadcast to correct doctor
+        const consultation = await storage.getVideoConsultation(consultationId);
+        const targetDoctorId = consultation?.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID;
+        broadcastToDoctor(targetDoctorId, { type: 'transcription_failed', consultationId });
 
         res.status(500).json({ 
           message: 'Failed to process audio transcription',
@@ -1376,8 +1414,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      // Broadcast real-time update
-      broadcast({
+      // Broadcast real-time update to authenticated doctor only
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
         type: 'prescription_shared',
         data: { prescriptionShare, pharmacy, patient: medicalRecord.patientId }
       });
@@ -1583,8 +1621,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      // Broadcast real-time update
-      broadcast({
+      // Broadcast real-time update to authenticated doctor only
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
         type: 'prescription_fulfillment_updated',
         data: { prescriptionShare: updatedShare, status }
       });
@@ -2025,8 +2063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      // Real-time broadcast
-      broadcast({
+      // Real-time broadcast to authenticated doctor only
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
         type: 'fulfillment_status_updated',
         data: { shareId, newStatus: status, pharmacyId: authenticatedCollaborator.id }
       });
@@ -2313,8 +2351,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      // Real-time broadcast
-      broadcast({
+      // Real-time broadcast to authenticated doctor only
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
         type: 'lab_order_created',
         data: { orderId: newOrder.id, laboratoryId, patientId }
       });
@@ -2509,8 +2547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
 
-      // Real-time broadcast
-      broadcast({
+      // Real-time broadcast to authenticated doctor only
+      broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
         type: 'lab_order_status_updated',
         data: { orderId, newStatus: status, laboratoryId: authenticatedCollaborator.id }
       });
@@ -3106,6 +3144,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // ===== HOSPITAL INTEGRATION ENDPOINTS =====
+
+  // Get JWT token for WebSocket authentication (requires session auth)
+  app.get('/api/auth/websocket-token', requireAuth, async (req, res) => {
+    try {
+      // Require SESSION_SECRET - fail if not set
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (!jwtSecret) {
+        console.error('SESSION_SECRET not configured - cannot generate JWT token');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
+      
+      const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+      
+      // Generate JWT token for WebSocket authentication with proper options
+      const token = jwt.sign(
+        { 
+          doctorId,
+          type: 'doctor_auth'
+        },
+        jwtSecret,
+        { 
+          expiresIn: '24h',
+          issuer: 'healthcare-system',
+          audience: 'websocket',
+          algorithm: 'HS256'
+        }
+      );
+      
+      res.json({ token, doctorId });
+    } catch (error) {
+      console.error('Error generating WebSocket token:', error);
+      res.status(500).json({ message: 'Failed to generate WebSocket token' });
+    }
+  });
 
   // Get all hospital collaborators (Doctor-only)
   app.get('/api/hospitals', requireAuth, async (req, res) => {
@@ -3739,6 +3811,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Admin analytics fetch error:', error);
       res.status(500).json({ message: 'Failed to fetch analytics' });
+    }
+  });
+
+  // ===============================
+  // COMPLIANCE MONITORING ENDPOINTS
+  // ===============================
+
+  // Generate compliance report for audit purposes
+  app.get('/api/admin/compliance/report', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { startDate, endDate, collaboratorId, reportType } = req.query;
+      
+      // Default to last 30 days if no dates provided
+      const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const end = endDate ? new Date(endDate as string) : new Date();
+
+      // Generate comprehensive compliance report
+      const report = await storage.generateComplianceReport(start, end, collaboratorId as string, reportType as string);
+      
+      res.json(report);
+    } catch (error) {
+      console.error('Compliance report generation error:', error);
+      res.status(500).json({ message: 'Failed to generate compliance report' });
+    }
+  });
+
+  // Run automated compliance checks
+  app.post('/api/admin/compliance/check', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      // Run comprehensive compliance checks
+      const complianceResults = await storage.runComplianceChecks();
+      
+      // Log compliance check execution (use system collaborator for system-wide events)
+      const systemCollaborator = await storage.getOrCreateSystemCollaborator();
+      await storage.createCollaboratorIntegration({
+        collaboratorId: systemCollaborator.id,
+        integrationType: 'compliance_check',
+        entityId: 'system_wide',
+        action: 'compliance_audit_executed',
+        status: 'success',
+        requestData: {
+          executedBy: user.id,
+          executedByRole: user.role,
+          timestamp: new Date().toISOString(),
+          checksPerformed: complianceResults.totalChecks,
+          issuesFound: complianceResults.totalIssues
+        },
+      });
+
+      res.json(complianceResults);
+    } catch (error) {
+      console.error('Compliance check execution error:', error);
+      res.status(500).json({ message: 'Failed to execute compliance checks' });
+    }
+  });
+
+  // Get audit trail for specific entity
+  app.get('/api/admin/audit-trail/:entityId', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { entityId } = req.params;
+      const { integrationType, limit = 50 } = req.query;
+
+      const auditTrail = await storage.getDetailedAuditTrail(
+        entityId, 
+        integrationType as string, 
+        parseInt(limit as string)
+      );
+
+      res.json(auditTrail);
+    } catch (error) {
+      console.error('Audit trail fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch audit trail' });
+    }
+  });
+
+  // Brazilian healthcare compliance validation
+  app.post('/api/admin/compliance/validate-healthcare', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const validationResults = await storage.validateBrazilianHealthcareCompliance();
+      
+      // Log healthcare compliance validation (use system collaborator for system-wide events)
+      const systemCollaborator = await storage.getOrCreateSystemCollaborator();
+      await storage.createCollaboratorIntegration({
+        collaboratorId: systemCollaborator.id,
+        integrationType: 'healthcare_compliance_validation',
+        entityId: 'system_wide',
+        action: 'brazilian_healthcare_compliance_check',
+        status: validationResults.overallStatus,
+        requestData: {
+          executedBy: user.id,
+          executedByRole: user.role,
+          timestamp: new Date().toISOString(),
+          validationResults
+        },
+      });
+
+      res.json(validationResults);
+    } catch (error) {
+      console.error('Healthcare compliance validation error:', error);
+      res.status(500).json({ message: 'Failed to validate healthcare compliance' });
     }
   });
 

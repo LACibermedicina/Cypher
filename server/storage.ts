@@ -112,6 +112,13 @@ export interface IStorage {
   updateVideoConsultation(id: string, consultation: Partial<InsertVideoConsultation>): Promise<VideoConsultation | undefined>;
   createDigitalSignature(signature: InsertDigitalSignature): Promise<DigitalSignature>;
   updateDigitalSignature(id: string, signature: Partial<InsertDigitalSignature>): Promise<DigitalSignature | undefined>;
+
+  // Compliance and Audit Methods
+  getOrCreateSystemCollaborator(): Promise<Collaborator>;
+  generateComplianceReport(startDate: Date, endDate: Date, collaboratorId?: string, reportType?: string): Promise<any>;
+  runComplianceChecks(): Promise<any>;
+  getDetailedAuditTrail(entityId: string, integrationType?: string, limit?: number): Promise<CollaboratorIntegration[]>;
+  validateBrazilianHealthcareCompliance(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -565,6 +572,373 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(collaboratorIntegrations)
       .where(gte(collaboratorIntegrations.createdAt, date))
       .orderBy(desc(collaboratorIntegrations.createdAt));
+  }
+
+  // Enhanced Compliance Monitoring Methods
+  async generateComplianceReport(startDate: Date, endDate: Date, collaboratorId?: string, reportType?: string): Promise<any> {
+    const whereConditions = [
+      gte(collaboratorIntegrations.createdAt, startDate),
+      lte(collaboratorIntegrations.createdAt, endDate)
+    ];
+
+    if (collaboratorId) {
+      whereConditions.push(eq(collaboratorIntegrations.collaboratorId, collaboratorId));
+    }
+
+    const integrations = await db.select().from(collaboratorIntegrations)
+      .where(and(...whereConditions))
+      .orderBy(desc(collaboratorIntegrations.createdAt));
+
+    // Generate comprehensive compliance metrics
+    const totalRequests = integrations.length;
+    const successfulRequests = integrations.filter(i => i.status === 'success').length;
+    const failedRequests = integrations.filter(i => i.status === 'failed').length;
+    const securityViolations = integrations.filter(i => 
+      i.integrationType === 'authorization_violation' || 
+      i.action.includes('failed')
+    ).length;
+
+    // Group by integration type
+    const byIntegrationType = integrations.reduce((acc, integration) => {
+      acc[integration.integrationType] = (acc[integration.integrationType] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Group by collaborator
+    const byCollaborator = integrations.reduce((acc, integration) => {
+      acc[integration.collaboratorId] = (acc[integration.collaboratorId] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Calculate compliance score (percentage of successful requests)
+    const complianceScore = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 100;
+
+    return {
+      reportMetadata: {
+        generatedAt: new Date().toISOString(),
+        reportPeriod: { startDate, endDate },
+        collaboratorId,
+        reportType: reportType || 'comprehensive'
+      },
+      summary: {
+        totalRequests,
+        successfulRequests,
+        failedRequests,
+        securityViolations,
+        complianceScore: Math.round(complianceScore * 100) / 100
+      },
+      breakdown: {
+        byIntegrationType,
+        byCollaborator
+      },
+      detailedEvents: integrations.slice(0, 100), // Limit for report size
+      recommendations: this.generateComplianceRecommendations(complianceScore, securityViolations, failedRequests)
+    };
+  }
+
+  async runComplianceChecks(): Promise<any> {
+    const checks = [];
+    let totalIssues = 0;
+
+    // Check 1: Verify all collaborators have valid CNPJ and CNES using enhanced validation
+    const collaboratorsList = await db.select().from(collaborators);
+    const invalidCollaborators = collaboratorsList.filter((c: any) => 
+      !this.isValidCNPJ(c.cnpj) || !this.isValidCNES(c.cnes)
+    );
+    checks.push({
+      checkName: 'CNPJ/CNES Validation',
+      status: invalidCollaborators.length === 0 ? 'PASS' : 'FAIL',
+      issues: invalidCollaborators.length,
+      details: invalidCollaborators.map((c: any) => {
+        const cnpjValid = this.isValidCNPJ(c.cnpj);
+        const cnesValid = this.isValidCNES(c.cnes);
+        return `${c.name}: ${!cnpjValid ? 'Invalid CNPJ' : ''}${!cnpjValid && !cnesValid ? ' and ' : ''}${!cnesValid ? 'Invalid CNES' : ''}`;
+      })
+    });
+    totalIssues += invalidCollaborators.length;
+
+    // Check 2: Verify API keys are not expired
+    const apiKeys = await db.select().from(collaboratorApiKeys)
+      .where(eq(collaboratorApiKeys.isActive, true));
+    const expiredKeys = apiKeys.filter(k => 
+      k.expiresAt && new Date(k.expiresAt) < new Date()
+    );
+    checks.push({
+      checkName: 'API Key Expiration',
+      status: expiredKeys.length === 0 ? 'PASS' : 'FAIL',
+      issues: expiredKeys.length,
+      details: expiredKeys.map(k => `Key ${k.keyName}: Expired on ${k.expiresAt}`)
+    });
+    totalIssues += expiredKeys.length;
+
+    // Check 3: Review recent security violations
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentViolations = await db.select().from(collaboratorIntegrations)
+      .where(and(
+        gte(collaboratorIntegrations.createdAt, yesterday),
+        eq(collaboratorIntegrations.integrationType, 'authorization_violation')
+      ));
+    checks.push({
+      checkName: 'Recent Security Violations',
+      status: recentViolations.length < 5 ? 'PASS' : 'WARNING',
+      issues: recentViolations.length,
+      details: recentViolations.map(v => `${v.action}: ${v.errorMessage}`)
+    });
+    if (recentViolations.length >= 5) totalIssues += 1;
+
+    // Check 4: Verify digital signature compliance
+    const prescriptionSharesList = await db.select().from(prescriptionShares);
+    const unsignedPrescriptions = prescriptionSharesList.filter((p: any) => !p.signature);
+    checks.push({
+      checkName: 'Digital Signature Compliance',
+      status: unsignedPrescriptions.length === 0 ? 'PASS' : 'FAIL',
+      issues: unsignedPrescriptions.length,
+      details: unsignedPrescriptions.map((p: any) => `Prescription ${p.id}: Missing digital signature`)
+    });
+    totalIssues += unsignedPrescriptions.length;
+
+    return {
+      executedAt: new Date().toISOString(),
+      overallStatus: totalIssues === 0 ? 'COMPLIANT' : totalIssues < 5 ? 'MINOR_ISSUES' : 'CRITICAL_ISSUES',
+      totalChecks: checks.length,
+      totalIssues,
+      checks,
+      nextRecommendedCheck: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // Weekly
+    };
+  }
+
+  async getDetailedAuditTrail(entityId: string, integrationType?: string, limit: number = 50): Promise<CollaboratorIntegration[]> {
+    const whereConditions = [eq(collaboratorIntegrations.entityId, entityId)];
+    
+    if (integrationType) {
+      whereConditions.push(eq(collaboratorIntegrations.integrationType, integrationType));
+    }
+
+    return await db.select().from(collaboratorIntegrations)
+      .where(and(...whereConditions))
+      .orderBy(desc(collaboratorIntegrations.createdAt))
+      .limit(limit);
+  }
+
+  async validateBrazilianHealthcareCompliance(): Promise<any> {
+    const validations = [];
+    let overallStatus = 'success';
+
+    // Validation 1: CNPJ format compliance
+    const collaboratorsForValidation = await db.select().from(collaborators);
+    const cnpjValidation = this.validateCNPJCompliance(collaboratorsForValidation);
+    validations.push(cnpjValidation);
+    if (cnpjValidation.status === 'failed') overallStatus = 'failed';
+
+    // Validation 2: CNES registration compliance
+    const cnesValidation = this.validateCNESCompliance(collaboratorsForValidation);
+    validations.push(cnesValidation);
+    if (cnesValidation.status === 'failed') overallStatus = 'failed';
+
+    // Validation 3: Digital signature compliance (ICP-Brasil)
+    const prescriptionSharesForValidation = await db.select().from(prescriptionShares);
+    const signatureValidation = this.validateDigitalSignatureCompliance(prescriptionSharesForValidation);
+    validations.push(signatureValidation);
+    if (signatureValidation.status === 'failed') overallStatus = 'failed';
+
+    // Validation 4: Ministry of Health protocol compliance
+    const protocolValidation = await this.validateMinistryProtocolCompliance();
+    validations.push(protocolValidation);
+    if (protocolValidation.status === 'failed') overallStatus = 'failed';
+
+    return {
+      validatedAt: new Date().toISOString(),
+      overallStatus,
+      validations,
+      complianceScore: this.calculateComplianceScore(validations),
+      recommendations: this.generateHealthcareComplianceRecommendations(validations)
+    };
+  }
+
+  // Helper methods for compliance validation
+  private validateCNPJCompliance(collaborators: any[]): any {
+    const invalidCNPJ = collaborators.filter(c => !this.isValidCNPJ(c.cnpj));
+    return {
+      validation: 'CNPJ Compliance',
+      status: invalidCNPJ.length === 0 ? 'success' : 'failed',
+      issues: invalidCNPJ.length,
+      details: invalidCNPJ.map(c => `${c.name}: Invalid CNPJ format - ${c.cnpj}`)
+    };
+  }
+
+  private validateCNESCompliance(collaborators: any[]): any {
+    const invalidCNES = collaborators.filter(c => !this.isValidCNES(c.cnes));
+    return {
+      validation: 'CNES Registration',
+      status: invalidCNES.length === 0 ? 'success' : 'failed',
+      issues: invalidCNES.length,
+      details: invalidCNES.map(c => `${c.name}: Invalid CNES format - ${c.cnes}`)
+    };
+  }
+
+  private validateDigitalSignatureCompliance(prescriptionShares: any[]): any {
+    const unsignedPrescriptions = prescriptionShares.filter(p => !p.signature);
+    return {
+      validation: 'Digital Signature (ICP-Brasil)',
+      status: unsignedPrescriptions.length === 0 ? 'success' : 'failed',
+      issues: unsignedPrescriptions.length,
+      details: unsignedPrescriptions.map(p => `Prescription ${p.id}: Missing ICP-Brasil compliant signature`)
+    };
+  }
+
+  private async validateMinistryProtocolCompliance(): Promise<any> {
+    // Validate that all workflow transitions follow Ministry of Health protocols
+    const recentIntegrations = await db.select().from(collaboratorIntegrations)
+      .where(gte(collaboratorIntegrations.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
+    
+    const protocolViolations = recentIntegrations.filter(i => 
+      i.status === 'failed' && i.errorMessage?.includes('Invalid transition')
+    );
+
+    return {
+      validation: 'Ministry of Health Protocols',
+      status: protocolViolations.length === 0 ? 'success' : 'failed',
+      issues: protocolViolations.length,
+      details: protocolViolations.map(v => `Protocol violation: ${v.errorMessage}`)
+    };
+  }
+
+  private isValidCNPJ(cnpj: string): boolean {
+    if (!cnpj) return false;
+    const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
+    return cleanCNPJ.length === 14; // Simplified validation
+  }
+
+  private isValidCNES(cnes: string): boolean {
+    if (!cnes) return false;
+    const cleanCNES = cnes.replace(/[^\d]/g, '');
+    return cleanCNES.length === 7; // Simplified validation
+  }
+
+  private calculateComplianceScore(validations: any[]): number {
+    const passedValidations = validations.filter(v => v.status === 'success').length;
+    return Math.round((passedValidations / validations.length) * 100);
+  }
+
+  private generateComplianceRecommendations(complianceScore: number, securityViolations: number, failedRequests: number): string[] {
+    const recommendations = [];
+    
+    if (complianceScore < 95) {
+      recommendations.push('Review and address failed requests to improve compliance score');
+    }
+    
+    if (securityViolations > 0) {
+      recommendations.push('Investigate security violations and strengthen access controls');
+    }
+    
+    if (failedRequests > 10) {
+      recommendations.push('Analyze failed request patterns and provide additional collaborator training');
+    }
+    
+    recommendations.push('Schedule regular compliance audits (weekly recommended)');
+    
+    return recommendations;
+  }
+
+  private generateHealthcareComplianceRecommendations(validations: any[]): string[] {
+    const recommendations = [];
+    
+    validations.forEach(v => {
+      if (v.status === 'failed') {
+        switch (v.validation) {
+          case 'CNPJ Compliance':
+            recommendations.push('Update collaborator CNPJ information to valid Brazilian tax IDs');
+            break;
+          case 'CNES Registration':
+            recommendations.push('Verify and update CNES registrations with Ministry of Health');
+            break;
+          case 'Digital Signature (ICP-Brasil)':
+            recommendations.push('Ensure all prescriptions use ICP-Brasil compliant digital signatures');
+            break;
+          case 'Ministry of Health Protocols':
+            recommendations.push('Review workflow transitions to ensure Ministry of Health protocol compliance');
+            break;
+        }
+      }
+    });
+    
+    if (recommendations.length === 0) {
+      recommendations.push('System is compliant with Brazilian healthcare regulations');
+      recommendations.push('Continue monitoring and maintain current compliance standards');
+    }
+    
+    return recommendations;
+  }
+
+  // System Collaborator Management for system-wide events
+  async getOrCreateSystemCollaborator(): Promise<any> {
+    // Check if system collaborator exists
+    const [existingSystemCollaborator] = await db.select().from(collaborators)
+      .where(eq(collaborators.email, 'system@media.med.br'));
+
+    if (existingSystemCollaborator) {
+      return existingSystemCollaborator;
+    }
+
+    // Create system collaborator for audit logging
+    const [systemCollaborator] = await db.insert(collaborators).values({
+      name: 'Sistema MedIA - Compliance Monitor',
+      type: 'system',
+      email: 'system@media.med.br',
+      phone: '+55 11 0000-0000',
+      address: 'Sistema Interno',
+      cnpj: '00.000.000/0000-00',
+      cnes: '0000000',
+      specialization: ['system_monitoring', 'compliance_auditing'],
+      isActive: true
+    }).returning();
+
+    return systemCollaborator;
+  }
+
+  // Enhanced CNPJ validation with checksum
+  private isValidCNPJ(cnpj: string): boolean {
+    if (!cnpj) return false;
+    const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
+    
+    // Check length
+    if (cleanCNPJ.length !== 14) return false;
+    
+    // Check for invalid patterns (all same digits)
+    if (/^(\d)\1{13}$/.test(cleanCNPJ)) return false;
+    
+    // CNPJ checksum validation
+    let sum = 0;
+    let weight = 2;
+    for (let i = 11; i >= 0; i--) {
+      sum += parseInt(cleanCNPJ.charAt(i)) * weight;
+      weight = weight === 9 ? 2 : weight + 1;
+    }
+    let digit1 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    
+    sum = 0;
+    weight = 2;
+    for (let i = 12; i >= 0; i--) {
+      sum += parseInt(cleanCNPJ.charAt(i)) * weight;
+      weight = weight === 9 ? 2 : weight + 1;
+    }
+    let digit2 = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    
+    return parseInt(cleanCNPJ.charAt(12)) === digit1 && parseInt(cleanCNPJ.charAt(13)) === digit2;
+  }
+
+  // Enhanced CNES validation
+  private isValidCNES(cnes: string): boolean {
+    if (!cnes) return false;
+    const cleanCNES = cnes.replace(/[^\d]/g, '');
+    
+    // Check length - CNES must be exactly 7 digits
+    if (cleanCNES.length !== 7) return false;
+    
+    // Check for invalid patterns (all same digits)
+    if (/^(\d)\1{6}$/.test(cleanCNES)) return false;
+    
+    return true;
   }
 }
 

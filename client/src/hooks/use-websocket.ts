@@ -12,10 +12,23 @@ export function useWebSocket() {
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
     
-    const connectWebSocket = () => {
+    const connectWebSocket = async () => {
       try {
+        // Fetch JWT token for WebSocket authentication
+        const tokenResponse = await fetch('/api/auth/websocket-token', {
+          credentials: 'include'
+        });
+        
+        if (!tokenResponse.ok) {
+          console.error('Failed to get WebSocket token:', tokenResponse.status);
+          setTimeout(connectWebSocket, 3000);
+          return;
+        }
+        
+        const { token } = await tokenResponse.json();
+        const wsUrl = `${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
+        
         wsRef.current = new WebSocket(wsUrl);
         
         wsRef.current.onopen = () => {
