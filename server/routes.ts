@@ -17,7 +17,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const schedulingService = new SchedulingService(storage);
   
   // Ensure default schedule exists for the doctor
-  await schedulingService.createDefaultSchedule(actualDoctorId);
+  if (actualDoctorId) {
+    await schedulingService.createDefaultSchedule(actualDoctorId);
+  } else {
+    console.error('Failed to initialize doctor, using DEFAULT_DOCTOR_ID as fallback');
+  }
   
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -94,7 +98,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle scheduling requests
         if (analysis.isSchedulingRequest) {
           // Get real available slots from doctor schedule
-          const availableSlots = await schedulingService.getAvailableSlots(actualDoctorId);
+          const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+          const availableSlots = await schedulingService.getAvailableSlots(doctorId);
           const formattedSlots = availableSlots.map(slot => slot.formatted);
 
           const schedulingResponse = await openAIService.processSchedulingRequest(
@@ -119,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             // Verify the slot is still available before creating
             const isAvailable = await schedulingService.isSpecificSlotAvailable(
-              actualDoctorId,
+              doctorId,
               scheduledAt.toISOString().split('T')[0],
               scheduledAt.toTimeString().slice(0, 5)
             );
@@ -130,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Create appointment automatically
               const appointment = await storage.createAppointment({
                 patientId: patient.id,
-                doctorId: actualDoctorId,
+                doctorId: doctorId,
                 scheduledAt,
                 type: schedulingResponse.suggestedAppointment.type || 'consulta',
                 status: 'scheduled',
@@ -456,15 +461,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Missing routes that are called by frontend
+
+  // WhatsApp Messages API
   app.get('/api/whatsapp/messages/recent', async (req, res) => {
     try {
-      // Get recent messages from all patients (last 50)
       const messages = await storage.getUnprocessedWhatsappMessages();
-      res.json(messages.slice(0, 50));
+      const recentMessages = messages.slice(0, 50);
+      res.json(recentMessages);
     } catch (error) {
-      console.error('Recent messages error:', error);
-      res.status(500).json({ message: 'Failed to get recent messages' });
+      console.error('WhatsApp messages error:', error);
+      res.status(500).json({ message: 'Failed to get messages' });
     }
   });
 
