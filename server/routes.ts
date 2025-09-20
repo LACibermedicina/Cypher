@@ -3610,6 +3610,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================
+  // ADMIN ENDPOINTS
+  // ===============================
+
+  // Get all API keys for admin management
+  app.get('/api/admin/api-keys', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const apiKeys = await storage.getAllApiKeys();
+      res.json(apiKeys);
+    } catch (error) {
+      console.error('Admin API keys fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch API keys' });
+    }
+  });
+
+  // Create new API key for collaborator
+  app.post('/api/admin/api-keys', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const apiKeyData = insertCollaboratorApiKeySchema.parse(req.body);
+      
+      // Generate secure API key
+      const newApiKey = await storage.createCollaboratorApiKey(apiKeyData);
+      
+      res.status(201).json(newApiKey);
+    } catch (error) {
+      console.error('Admin API key creation error:', error);
+      res.status(500).json({ message: 'Failed to create API key' });
+    }
+  });
+
+  // Update API key (activate/deactivate)
+  app.patch('/api/admin/api-keys/:keyId', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { keyId } = req.params;
+      const { isActive } = req.body;
+
+      const updatedKey = await storage.updateCollaboratorApiKey(keyId, { isActive });
+      
+      if (!updatedKey) {
+        return res.status(404).json({ message: 'API key not found' });
+      }
+
+      res.json(updatedKey);
+    } catch (error) {
+      console.error('Admin API key update error:', error);
+      res.status(500).json({ message: 'Failed to update API key' });
+    }
+  });
+
+  // Get integration monitoring data
+  app.get('/api/admin/integrations', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const integrations = await storage.getAllCollaboratorIntegrations();
+      
+      // Enrich with collaborator names
+      const enrichedIntegrations = await Promise.all(
+        integrations.map(async (integration) => {
+          const collaborator = await storage.getCollaborator(integration.collaboratorId);
+          return {
+            ...integration,
+            collaboratorName: collaborator?.name || 'Unknown'
+          };
+        })
+      );
+
+      res.json(enrichedIntegrations);
+    } catch (error) {
+      console.error('Admin integrations fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch integration data' });
+    }
+  });
+
+  // Get analytics and security metrics
+  app.get('/api/admin/analytics', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // Get today's requests
+      const todayIntegrations = await storage.getCollaboratorIntegrationsAfterDate(today);
+      const todayRequests = todayIntegrations.filter(i => i.action === 'api_request').length;
+      const todaySuccess = todayIntegrations.filter(i => i.status === 'success').length;
+
+      // Get security alerts (failed authentications, violations)
+      const securityAlerts = todayIntegrations.filter(i => 
+        i.status === 'failed' || 
+        i.integrationType === 'authorization_violation' ||
+        i.action.includes('failed')
+      ).length;
+
+      const analytics = {
+        todayRequests,
+        todaySuccess,
+        securityAlerts,
+        lastUpdated: new Date().toISOString()
+      };
+
+      res.json(analytics);
+    } catch (error) {
+      console.error('Admin analytics fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch analytics' });
+    }
+  });
+
   return httpServer;
 }
 

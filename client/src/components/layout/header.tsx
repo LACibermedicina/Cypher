@@ -9,6 +9,7 @@ export default function Header() {
     { path: "/schedule", label: "Agenda", icon: "fas fa-calendar-alt" },
     { path: "/whatsapp", label: "WhatsApp IA", icon: "fab fa-whatsapp" },
     { path: "/records", label: "Prontuários", icon: "fas fa-file-medical" },
+    { path: "/admin", label: "Admin", icon: "fas fa-shield-alt" },
   ];
 
   return (

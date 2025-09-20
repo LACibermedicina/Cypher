@@ -9,6 +9,7 @@ import PatientProfile from "@/pages/patient-profile";
 import Schedule from "@/pages/schedule";
 import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
+import AdminPage from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/schedule" component={Schedule} />
         <Route path="/whatsapp" component={WhatsApp} />
         <Route path="/records" component={MedicalRecords} />
+        <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
       
