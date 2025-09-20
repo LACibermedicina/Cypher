@@ -45,7 +45,11 @@ export default function Schedule() {
   // Create appointment mutation
   const createAppointmentMutation = useMutation({
     mutationFn: (appointmentData: any) => apiRequest('POST', '/api/appointments', appointmentData),
-    onSuccess: () => {
+    onSuccess: (response, appointmentData) => {
+      // Navigate to the appointment's date so user can see the created appointment
+      const appointmentDate = new Date(appointmentData.scheduledAt);
+      setSelectedDate(appointmentDate);
+      
       toast({
         title: "Consulta agendada",
         description: "A consulta foi agendada com sucesso.",

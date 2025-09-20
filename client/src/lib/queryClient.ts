@@ -29,7 +29,34 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    // Handle different queryKey patterns for proper URL construction
+    let url: string;
+    
+    if (queryKey.length === 1) {
+      // Simple case: ['/api/something']
+      url = queryKey[0] as string;
+    } else if (queryKey.length === 2) {
+      // Path param case: ['/api/appointments/doctor', doctorId]
+      url = `${queryKey[0]}/${queryKey[1]}`;
+    } else if (queryKey.length === 3) {
+      // Query param case: ['/api/appointments/doctor', doctorId, date]
+      const basePath = queryKey[0] as string;
+      const pathParam = queryKey[1] as string;
+      const queryParam = queryKey[2] as string;
+      
+      // Special handling for date parameters
+      if (basePath.includes('/doctor') && queryParam) {
+        const date = new Date(queryParam).toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+        url = `${basePath}/${pathParam}?date=${date}`;
+      } else {
+        url = `${basePath}/${pathParam}/${queryParam}`;
+      }
+    } else {
+      // Fallback to join for other cases
+      url = queryKey.join("/") as string;
+    }
+
+    const res = await fetch(url, {
       credentials: "include",
     });
 
