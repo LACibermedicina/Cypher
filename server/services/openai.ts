@@ -58,7 +58,11 @@ export class OpenAIService {
 
       return JSON.parse(response.choices[0].message.content || '{}');
     } catch (error) {
-      console.error('OpenAI analysis error:', error);
+      console.error('OpenAI analysis error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to analyze WhatsApp message'
+      });
       return {
         isSchedulingRequest: false,
         isClinicalQuestion: false,
@@ -90,7 +94,11 @@ export class OpenAIService {
 
       return JSON.parse(response.choices[0].message.content || '{}');
     } catch (error) {
-      console.error('OpenAI scheduling error:', error);
+      console.error('OpenAI scheduling error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to process scheduling request'
+      });
       return {
         isSchedulingRequest: false,
         response: 'Desculpe, não foi possível processar sua solicitação de agendamento no momento.',
@@ -107,13 +115,14 @@ export class OpenAIService {
         Sintomas: "${symptoms}"
         Histórico do paciente: "${patientHistory}"
         
-        Forneça até 5 hipóteses diagnósticas mais prováveis em JSON, cada uma com:
-        - condition: nome da condição
-        - probability: probabilidade em porcentagem (0-100)
-        - reasoning: justificativa clínica
-        - ministryGuidelines: referência às diretrizes do MS quando aplicável
+        Forneça até 5 hipóteses diagnósticas mais prováveis em JSON com:
+        - hypotheses: array de objetos, cada um com:
+          - condition: nome da condição
+          - probability: probabilidade em porcentagem (0-100)
+          - reasoning: justificativa clínica
+          - ministryGuidelines: referência às diretrizes do MS quando aplicável
         
-        Responda apenas com um array JSON de objetos.
+        Responda com um objeto JSON contendo o campo "hypotheses".
       `;
 
       const response = await openai.chat.completions.create({
@@ -125,8 +134,12 @@ export class OpenAIService {
       const result = JSON.parse(response.choices[0].message.content || '{"hypotheses": []}');
       return result.hypotheses || [];
     } catch (error) {
-      console.error('OpenAI diagnostic error:', error);
-      return [];
+      console.error('OpenAI diagnostic error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to generate diagnostic hypotheses'
+      });
+      throw error;
     }
   }
 
@@ -159,11 +172,12 @@ export class OpenAIService {
 
       return JSON.parse(response.choices[0].message.content || '{}');
     } catch (error) {
-      console.error('OpenAI transcription error:', error);
-      return {
-        summary: 'Erro ao processar transcrição',
-        keyPoints: [],
-      };
+      console.error('OpenAI transcription error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to process consultation transcription'
+      });
+      throw error;
     }
   }
 
@@ -191,8 +205,12 @@ export class OpenAIService {
 
       return response.choices[0].message.content || 'Desculpe, não foi possível processar sua pergunta no momento.';
     } catch (error) {
-      console.error('OpenAI clinical question error:', error);
-      return 'Desculpe, houve um erro ao processar sua pergunta. Por favor, consulte diretamente seu médico.';
+      console.error('OpenAI clinical question error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to process clinical question'
+      });
+      return `Desculpe, não foi possível processar sua pergunta médica no momento. Por favor, consulte diretamente com nossos profissionais de saúde.`;
     }
   }
 
@@ -222,7 +240,11 @@ export class OpenAIService {
 
       return JSON.parse(response.choices[0].message.content || '{}');
     } catch (error) {
-      console.error('OpenAI exam extraction error:', error);
+      console.error('OpenAI exam extraction error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to extract exam results'
+      });
       return {
         structuredResults: {},
         abnormalValues: [],

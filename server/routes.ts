@@ -5,7 +5,8 @@ import { storage } from "./storage";
 import { openAIService } from "./services/openai";
 import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -166,6 +167,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (analysis.isClinicalQuestion) {
           const clinicalResponse = await openAIService.answerClinicalQuestion(message.text);
           await whatsAppService.sendClinicalResponse(message.from, message.text, clinicalResponse);
+          
+          // Store clinical question and AI response as medical record
+          const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+          await storage.createMedicalRecord({
+            patientId: patient.id,
+            doctorId,
+            symptoms: `Pergunta via WhatsApp: ${message.text}`,
+            treatment: `Resposta IA: ${clinicalResponse}`,
+            isEncrypted: true
+          });
+          
           aiResponse = 'Enviei uma resposta detalhada sobre sua dúvida clínica.';
         }
 
@@ -353,13 +365,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/appointments/:appointmentId/transcribe', async (req, res) => {
+    try {
+      // Validate input
+      const validation = transcriptionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const { audioTranscript } = validation.data;
+      const appointmentId = req.params.appointmentId;
+      
+      // Validate appointmentId format
+      if (!z.string().uuid().safeParse(appointmentId).success) {
+        return res.status(400).json({ message: 'Invalid appointment ID format' });
+      }
+      
+      // Get appointment details
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ message: 'Appointment not found' });
+      }
+      
+      // Process consultation transcript with AI
+      const analysis = await openAIService.transcribeAndSummarizeConsultation(audioTranscript);
+      
+      // Create medical record with AI analysis and transcript
+      const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+      const medicalRecord = await storage.createMedicalRecord({
+        patientId: appointment.patientId,
+        doctorId,
+        appointmentId,
+        diagnosis: analysis.diagnosis,
+        treatment: analysis.treatment,
+        audioTranscript,
+        isEncrypted: true
+      });
+      
+      res.json({ 
+        analysis, 
+        medicalRecordId: medicalRecord.id,
+        message: 'Consultation transcribed and analyzed successfully' 
+      });
+    } catch (error) {
+      console.error('Consultation transcription error:', error);
+      res.status(500).json({ message: 'Failed to process consultation transcript' });
+    }
+  });
+
+  // Input validation schemas
+  const analyzeSchema = z.object({
+    symptoms: z.string().min(1, "Symptoms are required"),
+    history: z.string().optional(),
+    appointmentId: z.string().uuid().optional()
+  });
+
+  const transcriptionSchema = z.object({
+    audioTranscript: z.string().min(1, "Audio transcript is required")
+  });
+
   app.post('/api/medical-records/:patientId/analyze', async (req, res) => {
     try {
-      const { symptoms, history } = req.body;
-      const hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history);
-      res.json(hypotheses);
+      // Validate patient ID format
+      const patientId = req.params.patientId;
+      if (!z.string().uuid().safeParse(patientId).success) {
+        return res.status(400).json({ message: 'Invalid patient ID format' });
+      }
+      
+      // Validate input
+      const validation = analyzeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const { symptoms, history, appointmentId } = validation.data;
+      
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+      
+      // Generate AI diagnostic hypotheses
+      let hypotheses;
+      try {
+        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history);
+      } catch (openaiError) {
+        console.error('OpenAI service unavailable:', {
+          status: openaiError instanceof Error ? openaiError.name : 'Unknown',
+          message: 'AI diagnostic service temporarily unavailable'
+        });
+        return res.status(502).json({ 
+          message: 'AI diagnostic service temporarily unavailable',
+          hypotheses: [] 
+        });
+      }
+      
+      // Only create medical record if we have hypotheses
+      if (!hypotheses || hypotheses.length === 0) {
+        return res.json({ hypotheses: [], message: 'No diagnostic hypotheses generated' });
+      }
+      
+      // Save the AI analysis to medical records
+      const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+      const medicalRecord = await storage.createMedicalRecord({
+        patientId,
+        doctorId,
+        appointmentId,
+        symptoms,
+        diagnosticHypotheses: hypotheses,
+        isEncrypted: true
+      });
+      
+      // Return both hypotheses and the created medical record
+      res.json({ hypotheses, medicalRecordId: medicalRecord.id });
     } catch (error) {
-      res.status(500).json({ message: 'Failed to generate diagnostic hypotheses' });
+      console.error('Diagnostic analysis error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        patientId: req.params.patientId
+      });
+      res.status(500).json({ message: 'Failed to process diagnostic analysis' });
     }
   });
 
