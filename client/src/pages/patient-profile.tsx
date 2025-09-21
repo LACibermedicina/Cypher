@@ -130,10 +130,12 @@ export default function PatientProfile() {
             <User className="h-4 w-4 mr-2" />
             Editar Perfil
           </Button>
-          <Button variant="outline" data-testid="button-new-appointment">
-            <Calendar className="h-4 w-4 mr-2" />
-            Nova Consulta
-          </Button>
+          <Link href="/schedule">
+            <Button variant="outline" data-testid="button-new-appointment">
+              <Calendar className="h-4 w-4 mr-2" />
+              Nova Consulta
+            </Button>
+          </Link>
           <Button 
             variant="default" 
             onClick={handleStartVideoCall}
