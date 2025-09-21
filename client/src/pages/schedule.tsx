@@ -7,6 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay, endOfDay, isToday, addMinutes, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Clock, Calendar as CalendarIcon, Users, AlertCircle, Bell, CheckCircle2, Video, Plus, MoreHorizontal } from "lucide-react";
@@ -17,9 +18,13 @@ import VideoConsultation from "@/components/video-consultation/VideoConsultation
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAppointment, setEditingAppointment] = useState<any>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string>("");
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [appointmentType, setAppointmentType] = useState<string>("consultation");
+  const [editAppointmentType, setEditAppointmentType] = useState<string>("consultation");
+  const [editNotes, setEditNotes] = useState<string>("");
   const [isVideoConsultationOpen, setIsVideoConsultationOpen] = useState(false);
   const [activeConsultationId, setActiveConsultationId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
@@ -122,6 +127,28 @@ export default function Schedule() {
     },
   });
 
+  // Update appointment mutation
+  const updateAppointmentMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest('PATCH', `/api/appointments/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/doctor'] });
+      toast({
+        title: "Consulta atualizada",
+        description: "A consulta foi atualizada com sucesso.",
+      });
+      setIsEditModalOpen(false);
+      setEditingAppointment(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar a consulta.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStartConsultation = async (appointment: any) => {
     if (!appointment) return;
 
@@ -172,6 +199,29 @@ export default function Schedule() {
     };
 
     createAppointmentMutation.mutate(appointmentData);
+  };
+
+  // Handle edit appointment
+  const handleEditAppointment = (appointment: any) => {
+    setEditingAppointment(appointment);
+    setEditAppointmentType(appointment.type || 'consultation');
+    setEditNotes(appointment.notes || '');
+    setIsEditModalOpen(true);
+  };
+
+  // Handle update appointment
+  const handleUpdateAppointment = () => {
+    if (!editingAppointment) return;
+
+    const updateData = {
+      type: editAppointmentType,
+      notes: editNotes,
+    };
+
+    updateAppointmentMutation.mutate({
+      id: editingAppointment.id,
+      data: updateData,
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -481,6 +531,7 @@ export default function Schedule() {
                           variant="outline"
                           size="sm"
                           data-testid={`button-edit-appointment-${appointment.id}`}
+                          onClick={() => handleEditAppointment(appointment)}
                         >
                           <i className="fas fa-edit mr-1"></i>
                           Editar
@@ -630,6 +681,74 @@ export default function Schedule() {
                     Agendar Consulta
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Appointment Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-md" data-testid="modal-edit-appointment">
+          <DialogHeader>
+            <DialogTitle>Editar Consulta</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {editingAppointment && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Paciente: <span className="font-medium">{editingAppointment.patientName}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Data/Hora: <span className="font-medium">
+                    {format(new Date(editingAppointment.scheduledAt), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                  </span>
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de Consulta</label>
+              <Select value={editAppointmentType} onValueChange={setEditAppointmentType}>
+                <SelectTrigger data-testid="select-edit-appointment-type">
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consultation">Consulta</SelectItem>
+                  <SelectItem value="followup">Retorno</SelectItem>
+                  <SelectItem value="emergency">Emergência</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observações</label>
+              <Textarea 
+                placeholder="Observações sobre a consulta..."
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                data-testid="textarea-edit-notes"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditModalOpen(false)}
+                className="flex-1"
+                data-testid="button-cancel-edit"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleUpdateAppointment}
+                disabled={updateAppointmentMutation.isPending}
+                className="flex-1"
+                data-testid="button-save-edit"
+              >
+                {updateAppointmentMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
               </Button>
             </div>
           </div>
