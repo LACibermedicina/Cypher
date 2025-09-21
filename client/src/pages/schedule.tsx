@@ -763,7 +763,7 @@ export default function Schedule() {
               Videochamada - {selectedAppointment?.patientName || 'Consulta'}
             </DialogTitle>
           </DialogHeader>
-          {activeConsultationId && selectedAppointment && (
+          {selectedAppointment && (
             <VideoConsultation
               appointmentId={selectedAppointment.id}
               patientId={selectedAppointment.patientId}
