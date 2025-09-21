@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 
@@ -16,6 +16,13 @@ export default function ProtectedRoute({
   const { user, isLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
+  // Handle redirect to login when not authenticated
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      setLocation("/login");
+    }
+  }, [isLoading, isAuthenticated, setLocation]);
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
@@ -28,9 +35,8 @@ export default function ProtectedRoute({
     );
   }
 
-  // Redirect to login if not authenticated
+  // Don't render anything if not authenticated (redirect will happen via useEffect)
   if (!isAuthenticated) {
-    setLocation("/login");
     return null;
   }
 
