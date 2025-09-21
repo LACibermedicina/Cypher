@@ -23,13 +23,13 @@ export default function Header() {
     try {
       await logout();
       toast({
-        title: "Logout realizado",
-        description: "Você foi desconectado com sucesso.",
+        title: t("auth.logout_success"),
+        description: t("auth.logout_success_desc"),
       });
     } catch (error) {
       toast({
-        title: "Erro no logout",
-        description: "Não foi possível fazer logout.",
+        title: t("auth.logout_error"),
+        description: t("auth.logout_error_desc"),
         variant: "destructive",
       });
     }
@@ -47,11 +47,11 @@ export default function Header() {
   const getRoleDisplay = (role: string) => {
     switch (role) {
       case 'doctor':
-        return 'Médico';
+        return t('roles.doctor');
       case 'admin':
-        return 'Administrador';
+        return t('roles.admin');
       case 'patient':
-        return 'Paciente';
+        return t('roles.patient');
       default:
         return role;
     }
@@ -258,11 +258,11 @@ export default function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled>
                   <User className="mr-2 h-4 w-4" />
-                  Perfil
+                  {t("auth.profile")}
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled>
                   <Settings className="mr-2 h-4 w-4" />
-                  Configurações
+                  {t("auth.settings")}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
@@ -271,7 +271,7 @@ export default function Header() {
                   data-testid="button-desktop-logout"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Sair
+                  {t("auth.logout")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

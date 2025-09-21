@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { VideoIcon, PhoneIcon, ClockIcon, UserIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from 'react-i18next';
 import VideoConsultation from '@/components/video-consultation/VideoConsultation';
 
 interface PatientJoinData {
@@ -18,6 +19,7 @@ interface PatientJoinData {
 }
 
 export default function PatientJoin() {
+  const { t } = useTranslation();
   const [match, params] = useRoute('/join/:token');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -35,7 +37,7 @@ export default function PatientJoin() {
       validateJoinToken(params.token);
     } else {
       console.log('PatientJoin: No valid token found', { match, params });
-      setError('Link de consulta inválido ou expirado');
+      setError(t('patient_join.invalid_link'));
       setIsLoading(false);
     }
   }, [match, params?.token]); // Fixed dependency
@@ -61,7 +63,7 @@ export default function PatientJoin() {
       if (!response.ok) {
         const errorData = await response.json();
         console.log('PatientJoin: API error response:', errorData);
-        throw new Error(errorData.message || 'Token inválido ou expirado');
+        throw new Error(errorData.message || t('patient_join.invalid_token'));
       }
 
       const validationResult = await response.json();
@@ -82,7 +84,7 @@ export default function PatientJoin() {
 
     } catch (err) {
       console.error('PatientJoin: Error validating join token:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao validar link de consulta');
+      setError(err instanceof Error ? err.message : t('patient_join.validation_error'));
     } finally {
       console.log('PatientJoin: Setting isLoading to false');
       setIsLoading(false);
@@ -111,7 +113,7 @@ export default function PatientJoin() {
 
       if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json();
-        throw new Error(errorData.message || 'Erro ao gerar token de acesso');
+        throw new Error(errorData.message || t('patient_join.access_token_error'));
       }
 
       const { token } = await tokenResponse.json();
@@ -119,16 +121,16 @@ export default function PatientJoin() {
       setIsInCall(true);
 
       toast({
-        title: "Entrando na consulta",
-        description: "Conectando à videochamada...",
+        title: t('patient_join.joining_consultation'),
+        description: t('patient_join.connecting_call'),
       });
 
     } catch (err) {
       console.error('Error joining consultation:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao entrar na consulta');
+      setError(err instanceof Error ? err.message : t('patient_join.join_error'));
       toast({
-        title: "Erro",
-        description: "Não foi possível entrar na consulta. Tente novamente.",
+        title: t('common.error'),
+        description: t('patient_join.join_error_desc'),
         variant: "destructive",
       });
     } finally {

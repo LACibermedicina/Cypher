@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,25 +14,26 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { User, UserCheck, Stethoscope } from "lucide-react";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Nome de usuário é obrigatório"),
-  password: z.string().min(1, "Senha é obrigatória"),
+// Create schemas using translation function
+const createLoginSchema = (t: any) => z.object({
+  username: z.string().min(1, t("forms.validation.username_required")),
+  password: z.string().min(1, t("forms.validation.password_required")),
 });
 
-const registerSchema = z.object({
-  username: z.string().min(3, "Nome de usuário deve ter pelo menos 3 caracteres"),
-  password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
-  name: z.string().min(1, "Nome completo é obrigatório"),
+const createRegisterSchema = (t: any) => z.object({
+  username: z.string().min(3, t("forms.validation.username_min_length")),
+  password: z.string().min(6, t("forms.validation.password_min_length")),
+  name: z.string().min(1, t("forms.validation.name_required")),
   role: z.enum(["doctor", "patient", "admin"] as const),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  email: z.string().email(t("forms.validation.email_invalid")).optional().or(z.literal("")),
   phone: z.string().optional(),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
-type RegisterForm = z.infer<typeof registerSchema>;
+type LoginForm = z.infer<ReturnType<typeof createLoginSchema>>;
+type RegisterForm = z.infer<ReturnType<typeof createRegisterSchema>>;
 
 export default function Login() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
   const { login, register: registerUser, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -43,6 +44,10 @@ export default function Login() {
     setLocation("/");
     return null;
   }
+
+  // Create schemas with translations
+  const loginSchema = createLoginSchema(t);
+  const registerSchema = createRegisterSchema(t);
 
   const loginForm = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -64,19 +69,49 @@ export default function Login() {
     },
   });
 
+  // Update form resolvers when language changes
+  useEffect(() => {
+    const newLoginSchema = createLoginSchema(t);
+    const newRegisterSchema = createRegisterSchema(t);
+    
+    // Update resolvers with new schemas
+    loginForm.clearErrors();
+    registerForm.clearErrors();
+    
+    // Reset and update the resolver
+    loginForm.reset(loginForm.getValues(), {
+      keepDirty: true,
+      keepTouched: true
+    });
+    registerForm.reset(registerForm.getValues(), {
+      keepDirty: true,
+      keepTouched: true
+    });
+    
+    // Force re-validation with new schema
+    setTimeout(() => {
+      if (loginForm.formState.isSubmitted) {
+        loginForm.trigger();
+      }
+      if (registerForm.formState.isSubmitted) {
+        registerForm.trigger();
+      }
+    }, 50);
+  }, [i18n.language, t]);
+
   const handleLogin = async (data: LoginForm) => {
     setIsSubmitting(true);
     try {
       await login(data.username, data.password);
       toast({
-        title: "Login realizado",
-        description: "Bem-vindo ao Telemed!",
+        title: t("auth.login_success"),
+        description: t("auth.login_success_desc"),
       });
       setLocation("/");
     } catch (error: any) {
       toast({
-        title: "Erro no login",
-        description: error.message || "Credenciais inválidas",
+        title: t("auth.login_error"),
+        description: error.message || t("auth.login_error_desc"),
         variant: "destructive",
       });
     } finally {
@@ -94,14 +129,14 @@ export default function Login() {
       };
       await registerUser(registerData);
       toast({
-        title: "Cadastro realizado",
-        description: "Bem-vindo ao Telemed!",
+        title: t("auth.register_success"),
+        description: t("auth.register_success_desc"),
       });
       setLocation("/");
     } catch (error: any) {
       toast({
-        title: "Erro no cadastro",
-        description: error.message || "Não foi possível criar a conta",
+        title: t("auth.register_error"),
+        description: error.message || t("auth.register_error_desc"),
         variant: "destructive",
       });
     } finally {
@@ -121,7 +156,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
+    <div key={i18n.language} className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
@@ -133,26 +168,26 @@ export default function Login() {
             Telemed
           </h1>
           <p className="text-muted-foreground mt-2">
-            Sistema de Telemedicina
+            {t("ui.app_subtitle")}
           </p>
         </div>
 
         <Card className="shadow-xl border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm">
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs key={i18n.language} defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" data-testid="tab-login">
-                Entrar
+                {t("ui.login_tab")}
               </TabsTrigger>
               <TabsTrigger value="register" data-testid="tab-register">
-                Cadastrar
+                {t("ui.register_tab")}
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <CardHeader>
-                <CardTitle>Fazer Login</CardTitle>
+                <CardTitle>{t("ui.login_title")}</CardTitle>
                 <CardDescription>
-                  Entre com suas credenciais para acessar o sistema
+                  {t("ui.login_description")}
                 </CardDescription>
               </CardHeader>
               <Form {...loginForm}>
@@ -163,7 +198,7 @@ export default function Login() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome de usuário</FormLabel>
+                          <FormLabel>{t("ui.username")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -181,7 +216,7 @@ export default function Login() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Senha</FormLabel>
+                          <FormLabel>{t("ui.password")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -219,9 +254,9 @@ export default function Login() {
 
             <TabsContent value="register">
               <CardHeader>
-                <CardTitle>Criar Conta</CardTitle>
+                <CardTitle>{t("ui.register_title")}</CardTitle>
                 <CardDescription>
-                  Cadastre-se para acessar o sistema de telemedicina
+                  {t("ui.register_description")}
                 </CardDescription>
               </CardHeader>
               <Form {...registerForm}>
@@ -232,7 +267,7 @@ export default function Login() {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome completo</FormLabel>
+                          <FormLabel>{t("ui.full_name")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -250,7 +285,7 @@ export default function Login() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Nome de usuário</FormLabel>
+                          <FormLabel>{t("ui.username")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -268,7 +303,7 @@ export default function Login() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Senha</FormLabel>
+                          <FormLabel>{t("ui.password")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -287,7 +322,7 @@ export default function Login() {
                       name="role"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tipo de usuário</FormLabel>
+                          <FormLabel>{t("ui.user_type")}</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-register-role" className="mobile-input-enhanced">
@@ -324,7 +359,7 @@ export default function Login() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email (opcional)</FormLabel>
+                          <FormLabel>{t("ui.email_optional")}</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -383,7 +418,7 @@ export default function Login() {
         <div className="text-center mt-6 text-sm text-muted-foreground">
           <p>
             Para demonstração, use:<br />
-            <strong>Usuário:</strong> doctor | <strong>Senha:</strong> doctor123
+            <strong>Usuário:</strong> doctor | <strong>{t("ui.password")}:</strong> doctor123
           </p>
         </div>
       </div>

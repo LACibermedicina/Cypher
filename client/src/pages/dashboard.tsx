@@ -6,9 +6,11 @@ import DigitalSignature from "@/components/dashboard/digital-signature";
 import MedicalCollaborators from "@/components/dashboard/medical-collaborators";
 import ExamResults from "@/components/dashboard/exam-results";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { DEFAULT_DOCTOR_ID, type DashboardStats } from "@shared/schema";
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats', DEFAULT_DOCTOR_ID],
   });
@@ -26,7 +28,7 @@ export default function Dashboard() {
         <div className="medical-card p-6" data-testid="card-today-consultations">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Consultas Hoje</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.today_appointments")}</p>
               <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-today-consultations">
                 {stats?.todayConsultations || 0}
               </p>
@@ -40,7 +42,7 @@ export default function Dashboard() {
         <div className="medical-card p-6" data-testid="card-whatsapp-messages">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Mensagens WhatsApp</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.whatsapp_messages")}</p>
               <p className="text-2xl font-bold" style={{ color: 'var(--medical-accent)' }} data-testid="text-whatsapp-messages">
                 {stats?.whatsappMessages || 0}
               </p>
@@ -54,7 +56,7 @@ export default function Dashboard() {
         <div className="medical-card p-6" data-testid="card-ai-scheduling">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Agendamentos IA</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.ai_scheduling")}</p>
               <p className="text-2xl font-bold" style={{ color: 'var(--medical-secondary)' }} data-testid="text-ai-scheduling">
                 {stats?.aiScheduling || 0}
               </p>
@@ -68,7 +70,7 @@ export default function Dashboard() {
         <div className="medical-card p-6" data-testid="card-secure-records">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Prontuários Seguros</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.secure_records")}</p>
               <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-secure-records">
                 {stats?.secureRecords || 0}
               </p>

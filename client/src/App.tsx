@@ -24,7 +24,10 @@ function Router() {
     <div className="min-h-screen bg-background">
       <Switch>
         {/* Public routes */}
-        <Route path="/login" component={Login} />
+        <Route path="/login">
+          <Header />
+          <Login />
+        </Route>
         <Route path="/join/:token" component={PatientJoin} />
         
         {/* Protected routes with different role requirements */}
