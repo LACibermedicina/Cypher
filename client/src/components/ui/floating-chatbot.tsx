@@ -25,6 +25,11 @@ interface ChatMessage {
       reasoning: string;
     }>;
     suggestedAction?: string;
+    interviewId?: string;
+    interviewStage?: string;
+    urgencyLevel?: 'low' | 'medium' | 'high' | 'emergency';
+    isComplete?: boolean;
+    urgentFlag?: boolean;
   };
 }
 
@@ -38,6 +43,11 @@ interface ChatbotResponse {
     reasoning: string;
   }>;
   suggestedAction?: string;
+  interviewId?: string;
+  interviewStage?: string;
+  urgencyLevel?: 'low' | 'medium' | 'high' | 'emergency';
+  isComplete?: boolean;
+  urgentFlag?: boolean;
 }
 
 export default function FloatingChatbot() {
@@ -47,6 +57,7 @@ export default function FloatingChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
+  const [activeInterviewId, setActiveInterviewId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -66,29 +77,60 @@ export default function FloatingChatbot() {
     scrollToBottom();
   }, [messages]);
 
-  // AI Chat mutation
+  // Enhanced AI Chat mutation with structured clinical interview
   const chatMutation = useMutation({
     mutationFn: async (message: string): Promise<ChatbotResponse> => {
-      // Try diagnostic analysis first for clinical symptoms
-      if (message.toLowerCase().includes('dor') || 
-          message.toLowerCase().includes('sintoma') ||
-          message.toLowerCase().includes('sinto') ||
-          message.toLowerCase().includes('febre') ||
-          message.toLowerCase().includes('problema')) {
-        
+      // If we have an active interview, continue with it
+      if (activeInterviewId) {
         try {
-          const diagnosticResponse = await apiRequest('POST', '/api/ai/diagnostic-analysis', {
-            symptoms: message,
-            patientHistory: ''
+          const interviewResponse = await apiRequest('POST', `/api/clinical-interview/${activeInterviewId}/respond`, {
+            response: message
           }) as any;
           
           return {
-            response: diagnosticResponse?.analysis || 'Análise diagnóstica realizada com sucesso.',
+            response: interviewResponse.nextQuestion,
             isClinicalQuestion: true,
-            diagnosticHypotheses: diagnosticResponse?.hypotheses || []
+            interviewId: activeInterviewId,
+            interviewStage: interviewResponse.interview?.stage,
+            urgencyLevel: interviewResponse.interview?.urgencyLevel,
+            diagnosticHypotheses: interviewResponse.interview?.diagnosticHypotheses,
+            isComplete: interviewResponse.isComplete,
+            urgentFlag: interviewResponse.urgentFlag
           };
         } catch (error) {
-          // Fall back to general chat
+          console.error('Interview response error:', error);
+          // Reset interview on error
+          setActiveInterviewId(null);
+        }
+      }
+      
+      // Check if user wants to start clinical interview (symptoms mentioned)
+      const clinicalKeywords = [
+        'dor', 'sintoma', 'sinto', 'febre', 'problema', 'doente', 'mal', 
+        'dói', 'preocupado', 'ajuda', 'consulta', 'médico', 'saúde'
+      ];
+      
+      const hasClinicalContent = clinicalKeywords.some(keyword => 
+        message.toLowerCase().includes(keyword)
+      );
+      
+      if (hasClinicalContent && !activeInterviewId) {
+        try {
+          console.log('🔬 Starting clinical interview for message:', message);
+          const startResponse = await apiRequest('POST', '/api/clinical-interview/start', {}) as any;
+          console.log('✅ Clinical interview started:', startResponse);
+          setActiveInterviewId(startResponse.interviewId);
+          
+          return {
+            response: startResponse.currentQuestion,
+            isClinicalQuestion: true,
+            interviewId: startResponse.interviewId,
+            interviewStage: startResponse.stage,
+            urgencyLevel: startResponse.urgencyLevel
+          };
+        } catch (error) {
+          console.error('❌ Interview start error:', error);
+          // Fall back to diagnostic analysis
         }
       }
       
@@ -138,9 +180,28 @@ export default function FloatingChatbot() {
           isSchedulingRequest: data.isSchedulingRequest,
           isClinicalQuestion: data.isClinicalQuestion,
           diagnosticHypotheses: data.diagnosticHypotheses,
-          suggestedAction: data.suggestedAction
+          suggestedAction: data.suggestedAction,
+          interviewId: data.interviewId,
+          interviewStage: data.interviewStage,
+          urgencyLevel: data.urgencyLevel,
+          isComplete: data.isComplete,
+          urgentFlag: data.urgentFlag
         }
       };
+      
+      // Handle interview completion
+      if (data.isComplete) {
+        setActiveInterviewId(null);
+      }
+      
+      // Show urgent warning if needed
+      if (data.urgentFlag) {
+        toast({
+          title: "🚨 Atenção - Emergência Médica",
+          description: "Baseado nos sintomas, recomendamos atendimento médico urgente!",
+          variant: "destructive"
+        });
+      }
       
       setMessages(prev => [...prev, aiMessage]);
     },
@@ -206,10 +267,38 @@ export default function FloatingChatbot() {
   };
 
   const getMessageIcon = (metadata?: ChatMessage['metadata']) => {
+    if (metadata?.urgentFlag) return <span className="text-red-500">🚨</span>;
+    if (metadata?.urgencyLevel === 'emergency') return <span className="text-red-600">⚡</span>;
+    if (metadata?.urgencyLevel === 'high') return <span className="text-orange-500">⚠️</span>;
     if (metadata?.isClinicalQuestion) return <Stethoscope className="w-4 h-4" />;
     if (metadata?.isSchedulingRequest) return <Calendar className="w-4 h-4" />;
     if (metadata?.diagnosticHypotheses?.length) return <Brain className="w-4 h-4" />;
     return null;
+  };
+
+  const getUrgencyColor = (urgencyLevel?: string) => {
+    switch (urgencyLevel) {
+      case 'emergency': return 'bg-red-600';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      default: return 'bg-green-500';
+    }
+  };
+
+  const getInterviewProgress = () => {
+    const lastMessage = messages[messages.length - 1];
+    const metadata = lastMessage?.metadata;
+    if (!metadata?.interviewStage) return null;
+    
+    const stages = ['initial', 'duration', 'intensity', 'quality', 'factors', 'history', 'analysis'];
+    const currentIndex = stages.indexOf(metadata.interviewStage);
+    const progress = ((currentIndex + 1) / stages.length) * 100;
+    
+    return {
+      stage: metadata.interviewStage,
+      progress: Math.min(progress, 100),
+      urgency: metadata.urgencyLevel
+    };
   };
 
   if (!isOpen) {
@@ -353,7 +442,41 @@ export default function FloatingChatbot() {
               </div>
               
               {/* Quick Actions */}
+              {/* Clinical Interview Progress */}
+              {activeInterviewId && getInterviewProgress() && (
+                <div className="mt-2 p-2 bg-muted/50 rounded-lg">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Entrevista Clínica</span>
+                    <span className={`px-2 py-1 rounded text-white text-xs ${getUrgencyColor(getInterviewProgress()?.urgency)}`}>
+                      {getInterviewProgress()?.urgency?.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${getUrgencyColor(getInterviewProgress()?.urgency)}`}
+                      style={{ width: `${getInterviewProgress()?.progress}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Etapa: {getInterviewProgress()?.stage} ({Math.round(getInterviewProgress()?.progress || 0)}%)
+                  </div>
+                </div>
+              )}
+              
+              {/* Quick Actions */}
               <div className="flex flex-wrap gap-1 mt-2">
+                {!activeInterviewId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentMessage('Estou com alguns sintomas e gostaria de uma orientação médica')}
+                    className="text-xs"
+                    data-testid="button-start-clinical-interview"
+                  >
+                    <Stethoscope className="w-3 h-3 mr-1" />
+                    Consulta Clínica
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -367,17 +490,10 @@ export default function FloatingChatbot() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentMessage(t('chatbot.quick_symptoms'))}
-                  className="text-xs"
-                  data-testid="button-quick-symptoms"
-                >
-                  <Stethoscope className="w-3 h-3 mr-1" />
-                  {t('chatbot.symptoms')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearChat}
+                  onClick={() => {
+                    clearChat();
+                    setActiveInterviewId(null);
+                  }}
                   className="text-xs"
                   data-testid="button-clear-chat"
                 >

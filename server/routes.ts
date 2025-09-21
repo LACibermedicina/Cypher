@@ -7,6 +7,7 @@ import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
+import { clinicalInterviewService } from "./services/clinical-interview";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 import crypto from "crypto";
@@ -3658,6 +3659,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         suggestedAction: 'Tentar novamente mais tarde',
         requiresHumanIntervention: true
       });
+    }
+  });
+
+  // ===== CLINICAL INTERVIEW ENDPOINTS =====
+
+  // TEST ROUTE - No auth required
+  app.get('/api/test-no-auth', async (req, res) => {
+    res.json({ message: 'Test route working without auth', timestamp: new Date().toISOString() });
+  });
+
+  // Start Clinical Interview
+  app.post('/api/clinical-interview/start', requireAuth, async (req, res) => {
+    try {
+      const startSchema = z.object({
+        patientId: z.string().optional()
+      });
+      
+      const { patientId } = startSchema.parse(req.body);
+      const interview = clinicalInterviewService.startInterview(patientId);
+
+      res.json({
+        interviewId: interview.id,
+        currentQuestion: interview.currentQuestion,
+        stage: interview.stage,
+        urgencyLevel: interview.urgencyLevel
+      });
+    } catch (error) {
+      console.error('Clinical interview start error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ 
+        message: 'Erro interno do servidor ao iniciar entrevista clínica',
+        currentQuestion: 'Como posso ajudá-lo hoje?'
+      });
+    }
+  });
+
+  // Respond to Clinical Interview
+  app.post('/api/clinical-interview/:id/respond', requireAuth, async (req, res) => {
+    try {
+      const respondSchema = z.object({
+        response: z.string().min(1, 'Response is required')
+      });
+      
+      const { response } = respondSchema.parse(req.body);
+      const interviewId = req.params.id;
+
+      const result = await clinicalInterviewService.processResponse(interviewId, response);
+
+      res.json({
+        interview: {
+          id: result.interview.id,
+          stage: result.interview.stage,
+          urgencyLevel: result.interview.urgencyLevel,
+          diagnosticHypotheses: result.interview.diagnosticHypotheses,
+          symptomData: result.interview.symptomData
+        },
+        nextQuestion: result.nextQuestion,
+        isComplete: result.isComplete,
+        urgentFlag: result.urgentFlag || false
+      });
+    } catch (error) {
+      console.error('Clinical interview response error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ 
+        message: 'Erro interno do servidor ao processar resposta',
+        nextQuestion: 'Houve um erro. Por favor, tente novamente.',
+        isComplete: false
+      });
+    }
+  });
+
+  // Get Clinical Interview Status
+  app.get('/api/clinical-interview/:id', requireAuth, async (req, res) => {
+    try {
+      const interviewId = req.params.id;
+      const interview = clinicalInterviewService.getInterview(interviewId);
+
+      if (!interview) {
+        return res.status(404).json({ message: 'Interview not found' });
+      }
+
+      res.json({
+        id: interview.id,
+        stage: interview.stage,
+        currentQuestion: interview.currentQuestion,
+        urgencyLevel: interview.urgencyLevel,
+        isComplete: interview.stage === 'completed',
+        diagnosticHypotheses: interview.diagnosticHypotheses,
+        symptomData: interview.symptomData,
+        completedAt: interview.completedAt
+      });
+    } catch (error) {
+      console.error('Clinical interview status error:', error);
+      res.status(500).json({ message: 'Failed to get interview status' });
     }
   });
 
