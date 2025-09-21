@@ -14,6 +14,7 @@ import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
 import AdminPage from "@/pages/admin";
 import Login from "@/pages/login";
+import PatientJoin from "@/pages/patient-join";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 
@@ -24,6 +25,7 @@ function Router() {
       <Switch>
         {/* Public routes */}
         <Route path="/login" component={Login} />
+        <Route path="/join/:token" component={PatientJoin} />
         
         {/* Protected routes with different role requirements */}
         <Route path="/">

@@ -13,6 +13,7 @@ interface VideoConsultationProps {
   doctorId: string;
   patientName: string;
   onCallEnd?: () => void;
+  patientToken?: string; // Optional patient authentication token for patient-side joins
 }
 
 interface RTCConfiguration {
@@ -28,7 +29,8 @@ export default function VideoConsultation({
   patientId,
   doctorId,
   patientName,
-  onCallEnd
+  onCallEnd,
+  patientToken
 }: VideoConsultationProps) {
   // State management
   const [callStatus, setCallStatus] = useState<'pre-call' | 'initializing' | 'connecting' | 'connected' | 'ended'>('pre-call');

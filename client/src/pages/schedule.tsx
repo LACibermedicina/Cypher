@@ -27,6 +27,9 @@ export default function Schedule() {
   const [editNotes, setEditNotes] = useState<string>("");
   const [isVideoConsultationOpen, setIsVideoConsultationOpen] = useState(false);
   const [activeConsultationId, setActiveConsultationId] = useState<string | null>(null);
+  const [isJoinLinkModalOpen, setIsJoinLinkModalOpen] = useState(false);
+  const [generatedJoinLink, setGeneratedJoinLink] = useState<string | null>(null);
+  const [selectedAppointmentForLink, setSelectedAppointmentForLink] = useState<any>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [upcomingNotifications, setUpcomingNotifications] = useState<any[]>([]);
@@ -164,6 +167,86 @@ export default function Schedule() {
       createVideoConsultationMutation.mutate(consultationData);
     } catch (error) {
       console.error('Error starting consultation:', error);
+    }
+  };
+
+  const handleGenerateJoinLink = async (appointment: any) => {
+    if (!appointment) return;
+
+    try {
+      // First create or get existing video consultation
+      let consultationId = null;
+      
+      // Check if consultation already exists for this appointment
+      const existingConsultations = await fetch(`/api/video-consultations/appointment/${appointment.id}`);
+      if (existingConsultations.ok) {
+        const consultations = await existingConsultations.json();
+        if (consultations.length > 0) {
+          consultationId = consultations[0].id;
+        }
+      }
+      
+      // Create new consultation if none exists
+      if (!consultationId) {
+        const consultationResponse = await fetch('/api/video-consultations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            patientId: appointment.patientId,
+            doctorId: DEFAULT_DOCTOR_ID,
+            appointmentId: appointment.id,
+          }),
+        });
+        
+        if (!consultationResponse.ok) {
+          throw new Error('Falha ao criar sessão de consulta');
+        }
+        
+        const consultation = await consultationResponse.json();
+        consultationId = consultation.id;
+      }
+
+      // Generate patient join token
+      const tokenResponse = await fetch('/api/auth/patient-join-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          consultationId,
+          patientId: appointment.patientId,
+          patientName: appointment.patientName,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json();
+        throw new Error(errorData.message || 'Falha ao gerar token de acesso');
+      }
+
+      const { token } = await tokenResponse.json();
+      
+      // Create join link with base64 encoded token
+      const joinLink = `${window.location.origin}/join/${token}`;
+      
+      setGeneratedJoinLink(joinLink);
+      setSelectedAppointmentForLink(appointment);
+      setIsJoinLinkModalOpen(true);
+
+      toast({
+        title: "Link gerado com sucesso",
+        description: "Link de acesso criado para o paciente.",
+      });
+
+    } catch (error) {
+      console.error('Error generating join link:', error);
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Não foi possível gerar o link de acesso.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -530,6 +613,16 @@ export default function Schedule() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleGenerateJoinLink(appointment)}
+                          data-testid={`button-generate-link-${appointment.id}`}
+                        >
+                          <i className="fas fa-link mr-1"></i>
+                          Gerar Link
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
                           data-testid={`button-edit-appointment-${appointment.id}`}
                           onClick={() => handleEditAppointment(appointment)}
                         >
@@ -776,6 +869,91 @@ export default function Schedule() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Join Link Modal */}
+      <Dialog open={isJoinLinkModalOpen} onOpenChange={setIsJoinLinkModalOpen}>
+        <DialogContent className="max-w-md" data-testid="dialog-join-link">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <i className="fas fa-link text-blue-600"></i>
+              Link de Acesso para Paciente
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedAppointmentForLink && (
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="font-medium text-gray-800">{selectedAppointmentForLink.patientName}</p>
+                <p className="text-sm text-gray-600">
+                  {new Date(selectedAppointmentForLink.date + ' ' + selectedAppointmentForLink.time).toLocaleString('pt-BR')}
+                </p>
+              </div>
+            )}
+
+            {generatedJoinLink && (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-50 rounded-lg border">
+                  <p className="text-sm text-gray-600 mb-2">Link de acesso:</p>
+                  <p className="font-mono text-sm bg-white p-2 rounded border break-all">
+                    {generatedJoinLink}
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedJoinLink);
+                      toast({
+                        title: "Link copiado!",
+                        description: "O link foi copiado para a área de transferência.",
+                      });
+                    }}
+                    className="btn-medical-primary flex-1"
+                    data-testid="button-copy-link"
+                  >
+                    <i className="fas fa-copy mr-2"></i>
+                    Copiar Link
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      const message = `Olá! Seu link para a consulta médica: ${generatedJoinLink}`;
+                      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                      window.open(whatsappUrl, '_blank');
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                    data-testid="button-share-whatsapp"
+                  >
+                    <i className="fab fa-whatsapp mr-2 text-green-600"></i>
+                    WhatsApp
+                  </Button>
+                </div>
+
+                <div className="text-xs text-muted-foreground bg-amber-50 p-3 rounded-lg border border-amber-200">
+                  <i className="fas fa-info-circle text-amber-600 mr-2"></i>
+                  <strong>Instruções para o paciente:</strong> Este link é válido por 4 horas. 
+                  O paciente deve clicar no link na hora da consulta e permitir acesso à câmera e microfone.
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsJoinLinkModalOpen(false);
+                  setGeneratedJoinLink(null);
+                  setSelectedAppointmentForLink(null);
+                }}
+                data-testid="button-close-link-modal"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

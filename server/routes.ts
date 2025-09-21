@@ -3613,6 +3613,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate patient join token for video consultation (public endpoint with validation)
+  app.post('/api/auth/patient-join-token', async (req, res) => {
+    try {
+      const { consultationId, patientId, patientName } = req.body;
+      
+      // Validate required fields
+      if (!consultationId || !patientId) {
+        return res.status(400).json({ message: 'consultationId and patientId are required' });
+      }
+      
+      // Verify the consultation exists and is valid
+      const consultation = await storage.getVideoConsultation(consultationId);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+      
+      // Verify the patient is associated with this consultation
+      if (consultation.patientId !== patientId) {
+        return res.status(403).json({ message: 'Patient not authorized for this consultation' });
+      }
+      
+      // Require SESSION_SECRET
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (!jwtSecret) {
+        console.error('SESSION_SECRET not configured - cannot generate patient token');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
+      
+      // Generate patient JWT token for WebSocket authentication
+      const token = jwt.sign(
+        { 
+          patientId,
+          userId: patientId,
+          consultationId,
+          patientName: patientName || 'Paciente',
+          type: 'patient_auth'
+        },
+        jwtSecret,
+        { 
+          expiresIn: '4h', // Shorter expiry for patient tokens
+          issuer: 'healthcare-system',
+          audience: 'websocket',
+          algorithm: 'HS256'
+        }
+      );
+      
+      console.log(`Generated patient token for ${patientId} in consultation ${consultationId}`);
+      res.json({ 
+        token, 
+        consultationId, 
+        patientId,
+        patientName: patientName || 'Paciente'
+      });
+    } catch (error) {
+      console.error('Error generating patient join token:', error);
+      res.status(500).json({ message: 'Failed to generate patient join token' });
+    }
+  });
+
+  // Validate patient join token (public endpoint for patient join page)
+  app.post('/api/auth/validate-patient-token', async (req, res) => {
+    try {
+      const { token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ message: 'Token is required' });
+      }
+      
+      // Require SESSION_SECRET
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (!jwtSecret) {
+        console.error('SESSION_SECRET not configured - cannot validate token');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
+      
+      // Verify and decode the JWT token
+      const payload = jwt.verify(token, jwtSecret, {
+        issuer: 'healthcare-system',
+        audience: 'websocket',
+        algorithms: ['HS256']
+      }) as any;
+      
+      // Validate token type and required fields
+      if (payload.type !== 'patient_auth' || !payload.consultationId || !payload.patientId) {
+        return res.status(400).json({ message: 'Invalid patient token' });
+      }
+      
+      // Get consultation details
+      const consultation = await storage.getVideoConsultation(payload.consultationId);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Consultation not found' });
+      }
+      
+      // Verify patient authorization
+      if (consultation.patientId !== payload.patientId) {
+        return res.status(403).json({ message: 'Patient not authorized for this consultation' });
+      }
+      
+      // Return consultation details for patient join page
+      res.json({
+        consultationId: payload.consultationId,
+        patientId: payload.patientId,
+        patientName: payload.patientName || 'Paciente',
+        status: consultation.status || 'waiting',
+        doctorName: 'Dr. Silva', // TODO: Get from appointment/doctor data
+        appointmentTime: consultation.createdAt,
+        valid: true
+      });
+      
+    } catch (error) {
+      console.error('Error validating patient token:', error);
+      if (error instanceof jwt.JsonWebTokenError) {
+        return res.status(401).json({ message: 'Invalid or expired token' });
+      }
+      res.status(500).json({ message: 'Token validation failed' });
+    }
+  });
+
   // Get all hospital collaborators (Doctor-only)
   app.get('/api/hospitals', requireAuth, async (req, res) => {
     try {
