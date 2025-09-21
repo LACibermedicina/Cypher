@@ -200,5 +200,20 @@
   "footer": {
     "copyright": "© 2024 Telemed - Sistema de Telemedicina",
     "all_rights_reserved": "Todos os direitos reservados"
+  },
+  "chatbot": {
+    "title": "IA Médica",
+    "welcome_message": "Olá! Sou sua assistente médica virtual. Posso ajudar com diagnósticos, agendamentos e dúvidas clínicas. Como posso ajudá-lo hoje?",
+    "error_message": "Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.",
+    "error_title": "Erro no Chatbot",
+    "error_description": "Não foi possível processar sua mensagem.",
+    "typing": "Digitando...",
+    "input_placeholder": "Digite sua mensagem...",
+    "quick_scheduling": "Gostaria de agendar uma consulta",
+    "quick_symptoms": "Estou sentindo alguns sintomas",
+    "schedule": "Agendar",
+    "symptoms": "Sintomas",
+    "clear": "Limpar",
+    "diagnostic_hypotheses": "Hipóteses Diagnósticas"
   }
 }

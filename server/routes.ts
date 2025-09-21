@@ -546,6 +546,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // AI CHATBOT ENDPOINTS
+  // ============================================================================
+  
+  // AI Diagnostic Analysis for Chatbot
+  app.post('/api/ai/diagnostic-analysis', requireAuth, async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const diagnosticSchema = z.object({
+        symptoms: z.string().min(1, 'Symptoms are required'),
+        patientHistory: z.string().optional().default('')
+      });
+      
+      const { symptoms, patientHistory } = diagnosticSchema.parse(req.body);
+
+      // Use existing OpenAI service for diagnostic analysis
+      const hypotheses = await openAIService.generateDiagnosticHypotheses(
+        symptoms,
+        patientHistory || ''
+      );
+
+      res.json({
+        analysis: 'Análise diagnóstica realizada com sucesso. Foram identificadas possíveis hipóteses diagnósticas.',
+        hypotheses: hypotheses || []
+      });
+    } catch (error) {
+      console.error('AI diagnostic analysis error:', error);
+      res.status(500).json({ 
+        message: 'Erro ao processar análise diagnóstica',
+        analysis: 'Desculpe, houve um erro ao analisar os sintomas. Tente novamente.'
+      });
+    }
+  });
+
+  // AI Scheduling Analysis for Chatbot
+  app.post('/api/ai/scheduling-analysis', requireAuth, async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const schedulingSchema = z.object({
+        message: z.string().min(1, 'Message is required'),
+        availableSlots: z.array(z.string()).optional().default(['09:00', '14:00', '16:00'])
+      });
+      
+      const { message, availableSlots } = schedulingSchema.parse(req.body);
+
+      // Use existing OpenAI service for scheduling
+      const analysis = await openAIService.processSchedulingRequest(
+        message,
+        availableSlots || ['09:00', '14:00', '16:00']
+      );
+
+      res.json({
+        response: analysis.response || 'Posso ajudar com o agendamento. Que horário prefere?',
+        isSchedulingRequest: analysis.isSchedulingRequest,
+        suggestedAppointment: analysis.suggestedAppointment,
+        suggestedAction: analysis.requiresHumanIntervention ? 
+          'human_intervention' : 'auto_schedule'
+      });
+    } catch (error) {
+      console.error('AI scheduling analysis error:', error);
+      res.status(500).json({ 
+        message: 'Erro ao processar solicitação de agendamento',
+        response: 'Posso ajudar com o agendamento. Que horário prefere?'
+      });
+    }
+  });
+
+  // AI WhatsApp-style Chat Analysis for Chatbot
+  app.post('/api/ai/whatsapp-analysis', requireAuth, async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const chatSchema = z.object({
+        message: z.string().min(1, 'Message is required'),
+        patientHistory: z.string().optional().default('')
+      });
+      
+      const { message, patientHistory } = chatSchema.parse(req.body);
+
+      // Use existing OpenAI service for WhatsApp analysis
+      const analysis = await openAIService.analyzeWhatsappMessage(
+        message,
+        patientHistory || ''
+      );
+
+      res.json({
+        response: analysis.response || 'Como posso ajudá-lo hoje?',
+        isSchedulingRequest: analysis.isSchedulingRequest,
+        isClinicalQuestion: analysis.isClinicalQuestion,
+        suggestedAction: analysis.suggestedAction
+      });
+    } catch (error) {
+      console.error('AI chat analysis error:', error);
+      res.status(500).json({ 
+        message: 'Erro ao processar mensagem',
+        response: 'Desculpe, houve um erro ao processar sua mensagem. Como posso ajudá-lo?'
+      });
+    }
+  });
+
+  // ============================================================================
+  // WEBHOOK ENDPOINTS
+  // ============================================================================
+
   // WhatsApp webhook handler
   app.post('/api/whatsapp/webhook', async (req, res) => {
     try {

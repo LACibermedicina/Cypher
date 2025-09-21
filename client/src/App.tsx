@@ -17,6 +17,7 @@ import Login from "@/pages/login";
 import PatientJoin from "@/pages/patient-join";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
+import FloatingChatbot from "@/components/ui/floating-chatbot";
 
 function Router() {
   const { t } = useTranslation();
@@ -114,6 +115,9 @@ function Router() {
           </div>
         </div>
       </footer>
+      
+      {/* Floating AI Chatbot - Available on all pages */}
+      <FloatingChatbot />
     </div>
   );
 }

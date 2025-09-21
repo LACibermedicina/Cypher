@@ -200,5 +200,20 @@
   "footer": {
     "copyright": "© 2024 Telemed - Telemedicine System",
     "all_rights_reserved": "All rights reserved"
+  },
+  "chatbot": {
+    "title": "Medical AI",
+    "welcome_message": "Hello! I'm your virtual medical assistant. I can help with diagnoses, scheduling, and clinical questions. How can I help you today?",
+    "error_message": "Sorry, there was an error processing your message. Please try again.",
+    "error_title": "Chatbot Error",
+    "error_description": "Could not process your message.",
+    "typing": "Typing...",
+    "input_placeholder": "Type your message...",
+    "quick_scheduling": "I would like to schedule an appointment",
+    "quick_symptoms": "I'm experiencing some symptoms",
+    "schedule": "Schedule",
+    "symptoms": "Symptoms",
+    "clear": "Clear",
+    "diagnostic_hypotheses": "Diagnostic Hypotheses"
   }
 }
