@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +7,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay, isToday, addMinutes, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Clock, Calendar as CalendarIcon, Users, AlertCircle, Bell, CheckCircle2, Video, Plus, MoreHorizontal } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import VideoConsultation from "@/components/video-consultation/VideoConsultation";
@@ -22,6 +23,9 @@ export default function Schedule() {
   const [isVideoConsultationOpen, setIsVideoConsultationOpen] = useState(false);
   const [activeConsultationId, setActiveConsultationId] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [upcomingNotifications, setUpcomingNotifications] = useState<any[]>([]);
+  const [quickBookMode, setQuickBookMode] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -29,6 +33,33 @@ export default function Schedule() {
   const { data: appointments, isLoading } = useQuery<any[]>({
     queryKey: ['/api/appointments/doctor', DEFAULT_DOCTOR_ID, selectedDate.toISOString()],
   });
+
+  // Real-time notification system with interval updates
+  useEffect(() => {
+    const updateNotifications = () => {
+      const now = new Date();
+      let upcoming: any[] = [];
+      
+      if (appointments && appointments.length > 0) {
+        upcoming = appointments.filter((apt: any) => {
+          const aptTime = new Date(apt.scheduledAt);
+          const minutesUntil = differenceInMinutes(aptTime, now);
+          return minutesUntil > 0 && minutesUntil <= 30; // Next 30 minutes
+        });
+      }
+      
+      // Always update notifications, even if empty
+      setUpcomingNotifications(upcoming);
+    };
+
+    // Initial update
+    updateNotifications();
+
+    // Update every minute for real-time notifications
+    const notificationInterval = setInterval(updateNotifications, 60000);
+
+    return () => clearInterval(notificationInterval);
+  }, [appointments]);
 
   // Fetch available slots for appointment creation
   const { data: availableSlots, isLoading: slotsLoading } = useQuery<any[]>({
@@ -73,7 +104,7 @@ export default function Schedule() {
   // Create video consultation mutation
   const createVideoConsultationMutation = useMutation({
     mutationFn: (consultationData: any) => apiRequest('POST', '/api/video-consultations', consultationData),
-    onSuccess: (consultation) => {
+    onSuccess: (consultation: any) => {
       toast({
         title: "Videochamada iniciada",
         description: "A videochamada foi iniciada com sucesso.",
@@ -146,14 +177,31 @@ export default function Schedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 dark:from-blue-900/30 dark:to-cyan-900/30 dark:text-blue-300';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 dark:from-green-900/30 dark:to-emerald-900/30 dark:text-green-300';
       case 'cancelled':
-        return 'bg-red-100 text-red-800';
+        return 'bg-gradient-to-r from-red-100 to-rose-100 text-red-800 dark:from-red-900/30 dark:to-rose-900/30 dark:text-red-300';
+      case 'in-progress':
+        return 'bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 dark:from-orange-900/30 dark:to-amber-900/30 dark:text-orange-300';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 dark:from-gray-900/30 dark:to-slate-900/30 dark:text-gray-300';
     }
+  };
+
+  const getTimeBasedStyling = (scheduledAt: string) => {
+    const now = new Date();
+    const aptTime = new Date(scheduledAt);
+    const minutesUntil = differenceInMinutes(aptTime, now);
+    
+    if (minutesUntil <= 0) {
+      return 'border-l-4 border-orange-500 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20';
+    } else if (minutesUntil <= 30) {
+      return 'border-l-4 border-yellow-500 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 animate-pulse';
+    } else if (isToday(aptTime)) {
+      return 'border-l-4 border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20';
+    }
+    return 'border-l-4 border-gray-300 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-950/20 dark:to-slate-950/20';
   };
 
   const getTypeIcon = (type: string, aiScheduled: boolean) => {
@@ -172,79 +220,177 @@ export default function Schedule() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-black dark:to-purple-950">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-32 w-32 border-4 border-primary/20 border-t-primary mx-auto"></div>
+          <p className="text-lg font-medium text-muted-foreground">Carregando agenda...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Agenda Médica</h1>
-          <p className="text-muted-foreground">
-            Gerencie seus horários e consultas - {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </p>
-        </div>
-        <Button 
-          onClick={() => setIsCreateModalOpen(true)}
-          data-testid="button-new-appointment"
-        >
-          <i className="fas fa-plus mr-2"></i>
-          Nova Consulta
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Calendar Sidebar */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Calendário</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => date && setSelectedDate(date)}
-                locale={ptBR}
-                className="w-full"
-                data-testid="calendar-schedule"
-              />
-              <div className="mt-4 space-y-2">
-                <div className="text-sm text-muted-foreground">Legenda:</div>
-                <div className="flex items-center space-x-2 text-xs">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span>Consultas</span>
-                </div>
-                <div className="flex items-center space-x-2 text-xs">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <span>Agendamentos IA</span>
-                </div>
-                <div className="flex items-center space-x-2 text-xs">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>Retornos</span>
-                </div>
+    <div 
+      className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-black dark:to-purple-950"
+      data-testid="schedule-page-background"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Modern Header with Notifications */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                <CalendarIcon className="h-6 w-6" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Agenda Telemed
+                </h1>
+                <p className="text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Notification Badge & Actions */}
+          <div className="flex items-center gap-3">
+            {upcomingNotifications.length > 0 && (
+              <div className="relative" data-testid="notification-badge">
+                <Button variant="outline" size="sm" className="relative backdrop-blur-lg bg-white/20 border-orange-200 hover:bg-orange-50 dark:bg-black/20 dark:border-orange-800 dark:hover:bg-orange-950/20">
+                  <Bell className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
+                </Button>
+                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1 min-w-[1rem] h-5 flex items-center justify-center">
+                  {upcomingNotifications.length}
+                </Badge>
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <Button 
+                variant={viewMode === 'day' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setViewMode('day');
+                  // Refresh appointments for current day
+                  queryClient.invalidateQueries({ queryKey: ['/api/appointments/doctor'] });
+                }}
+                data-testid="button-view-day"
+                className={`backdrop-blur-lg border-white/20 hover:bg-white/20 dark:border-white/10 dark:hover:bg-black/20 ${
+                  viewMode === 'day' 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
+                    : 'bg-white/10 dark:bg-black/10'
+                }`}
+              >
+                Dia
+              </Button>
+              <Button 
+                variant={viewMode === 'week' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => {
+                  setViewMode('week');
+                  // Future: implement week view logic
+                  toast({ title: 'Visualização Semanal', description: 'Em breve - visualização semanal completa' });
+                }}
+                data-testid="button-view-week"
+                className={`backdrop-blur-lg border-white/20 hover:bg-white/20 dark:border-white/10 dark:hover:bg-black/20 ${
+                  viewMode === 'week' 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white' 
+                    : 'bg-white/10 dark:bg-black/10'
+                }`}
+              >
+                Semana
+              </Button>
+            </div>
+            
+            <Button 
+              onClick={() => setIsCreateModalOpen(true)}
+              data-testid="button-new-appointment"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Consulta
+            </Button>
+          </div>
         </div>
 
-        {/* Appointments List */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Consultas do Dia</span>
-                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                  <i className="fas fa-calendar text-primary"></i>
-                  <span data-testid="text-appointment-count">
-                    {(appointments || []).length} consultas agendadas
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Enhanced Calendar Sidebar */}
+          <div className="lg:col-span-1">
+            <Card className="backdrop-blur-xl bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10 shadow-xl">
+              <CardHeader className="border-b border-white/10 dark:border-white/5">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  Calendário
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  locale={ptBR}
+                  className="w-full backdrop-blur-sm bg-white/50 dark:bg-black/20 rounded-lg p-2"
+                  data-testid="calendar-schedule"
+                />
+                
+                {/* Enhanced Legend with Modern Styling */}
+                <div className="mt-6 space-y-3">
+                  <div className="text-sm font-medium text-muted-foreground">Status dos Agendamentos</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-3 text-xs">
+                      <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full shadow-sm"></div>
+                      <span className="text-muted-foreground">Consultas agendadas</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-xs">
+                      <div className="w-3 h-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full shadow-sm animate-pulse"></div>
+                      <span className="text-muted-foreground">Agendamentos IA</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-xs">
+                      <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-sm"></div>
+                      <span className="text-muted-foreground">Retornos</span>
+                    </div>
+                    <div className="flex items-center space-x-3 text-xs">
+                      <div className="w-3 h-3 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-sm"></div>
+                      <span className="text-muted-foreground">Em andamento</span>
+                    </div>
+                  </div>
                 </div>
-              </CardTitle>
-            </CardHeader>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Enhanced Appointments List */}
+          <div className="lg:col-span-3">
+            <Card className="backdrop-blur-xl bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10 shadow-xl">
+              <CardHeader className="border-b border-white/10 dark:border-white/5">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 text-white">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <span>Consultas do Dia</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    {upcomingNotifications.length > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 text-orange-800 dark:text-orange-200">
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          {upcomingNotifications.length} próxima{upcomingNotifications.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <CalendarIcon className="h-4 w-4 text-primary" />
+                      <span data-testid="text-appointment-count">
+                        {(appointments || []).length} consultas agendadas
+                      </span>
+                    </div>
+                  </div>
+                </CardTitle>
+              </CardHeader>
             <CardContent>
               {!(appointments || []).length ? (
                 <div className="text-center py-12">
@@ -269,7 +415,7 @@ export default function Schedule() {
                   {(appointments || []).map((appointment: any) => (
                     <div
                       key={appointment.id}
-                      className="flex items-center space-x-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                      className={`flex items-center space-x-4 p-6 rounded-2xl transition-all duration-300 hover:shadow-lg backdrop-blur-sm ${getTimeBasedStyling(appointment.scheduledAt)}`}
                       data-testid={`card-appointment-${appointment.id}`}
                     >
                       <div className="flex-shrink-0">
@@ -498,11 +644,13 @@ export default function Schedule() {
               Videochamada - {selectedAppointment?.patientName || 'Consulta'}
             </DialogTitle>
           </DialogHeader>
-          {activeConsultationId && (
+          {activeConsultationId && selectedAppointment && (
             <VideoConsultation
-              consultationId={activeConsultationId}
-              patientName={selectedAppointment?.patientName || 'Paciente'}
-              onEndConsultation={() => {
+              appointmentId={selectedAppointment.id}
+              patientId={selectedAppointment.patientId}
+              doctorId={DEFAULT_DOCTOR_ID}
+              patientName={selectedAppointment.patientName || 'Paciente'}
+              onCallEnd={() => {
                 setIsVideoConsultationOpen(false);
                 setActiveConsultationId(null);
                 setSelectedAppointment(null);
@@ -511,6 +659,51 @@ export default function Schedule() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Quick Actions Cards - Only show on main page */}
+      {!isCreateModalOpen && !isVideoConsultationOpen && (
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6" data-testid="quick-actions-grid">
+          <Card 
+            className="hover:shadow-lg transition-all duration-300 backdrop-blur-xl bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10 cursor-pointer group" 
+            data-testid="quick-action-schedule"
+          >
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="font-semibold mb-2">Horários Disponíveis</h3>
+              <p className="text-sm text-muted-foreground">Configure seus horários de atendimento</p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="hover:shadow-lg transition-all duration-300 backdrop-blur-xl bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10 cursor-pointer group" 
+            data-testid="quick-action-ai"
+          >
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i className="fas fa-robot text-white"></i>
+              </div>
+              <h3 className="font-semibold mb-2">Agendamentos IA</h3>
+              <p className="text-sm text-muted-foreground">Configurações do agendamento automático</p>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="hover:shadow-lg transition-all duration-300 backdrop-blur-xl bg-white/80 dark:bg-black/40 border-white/20 dark:border-white/10 cursor-pointer group" 
+            data-testid="quick-action-reports"
+          >
+            <CardContent className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <i className="fas fa-chart-bar text-white"></i>
+              </div>
+              <h3 className="font-semibold mb-2">Relatórios</h3>
+              <p className="text-sm text-muted-foreground">Visualize estatísticas de atendimento</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      </div>
     </div>
   );
 }
