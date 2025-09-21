@@ -21,60 +21,60 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      {/* Quick Stats Section */}
+      {/* Quick Stats Section - Enhanced Healthcare Design */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-card rounded-lg border border-border p-6 shadow-sm" data-testid="card-today-consultations">
+        <div className="medical-card p-6" data-testid="card-today-consultations">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Consultas Hoje</p>
-              <p className="text-2xl font-bold text-primary" data-testid="text-today-consultations">
+              <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-today-consultations">
                 {stats?.todayConsultations || 0}
               </p>
             </div>
-            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <i className="fas fa-calendar-day text-primary text-lg"></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(210, 85%, 95%)' }}>
+              <i className="fas fa-calendar-day text-lg" style={{ color: 'var(--medical-primary)' }}></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-6 shadow-sm" data-testid="card-whatsapp-messages">
+        <div className="medical-card p-6" data-testid="card-whatsapp-messages">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Mensagens WhatsApp</p>
-              <p className="text-2xl font-bold text-accent" data-testid="text-whatsapp-messages">
+              <p className="text-2xl font-bold" style={{ color: 'var(--medical-accent)' }} data-testid="text-whatsapp-messages">
                 {stats?.whatsappMessages || 0}
               </p>
             </div>
-            <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-              <i className="fab fa-whatsapp text-accent text-lg"></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(145, 50%, 95%)' }}>
+              <i className="fab fa-whatsapp text-lg" style={{ color: 'var(--medical-accent)' }}></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-6 shadow-sm" data-testid="card-ai-scheduling">
+        <div className="medical-card p-6" data-testid="card-ai-scheduling">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Agendamentos IA</p>
-              <p className="text-2xl font-bold text-secondary" data-testid="text-ai-scheduling">
+              <p className="text-2xl font-bold" style={{ color: 'var(--medical-secondary)' }} data-testid="text-ai-scheduling">
                 {stats?.aiScheduling || 0}
               </p>
             </div>
-            <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-              <i className="fas fa-robot text-secondary text-lg"></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(175, 45%, 95%)' }}>
+              <i className="fas fa-robot text-lg" style={{ color: 'var(--medical-secondary)' }}></i>
             </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-6 shadow-sm" data-testid="card-secure-records">
+        <div className="medical-card p-6" data-testid="card-secure-records">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Prontuários Seguros</p>
-              <p className="text-2xl font-bold text-primary" data-testid="text-secure-records">
+              <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-secure-records">
                 {stats?.secureRecords || 0}
               </p>
             </div>
-            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <i className="fas fa-file-medical text-primary text-lg"></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(210, 85%, 95%)' }}>
+              <i className="fas fa-shield-alt text-lg" style={{ color: 'var(--medical-primary)' }}></i>
             </div>
           </div>
         </div>

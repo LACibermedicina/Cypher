@@ -167,7 +167,7 @@ export default function Patients() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-new-patient">
+            <Button className="btn-medical-primary" data-testid="button-new-patient">
               <i className="fas fa-plus mr-2"></i>
               Novo Paciente
             </Button>
@@ -415,11 +415,11 @@ export default function Patients() {
           </div>
         ) : (
           filteredPatients.map((patient: any) => (
-            <Card key={patient.id} className="hover:shadow-md transition-shadow" data-testid={`card-patient-${patient.id}`}>
+            <Card key={patient.id} className="patient-card" data-testid={`card-patient-${patient.id}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <i className="fas fa-user text-primary"></i>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: 'hsl(210, 85%, 95%)' }}>
+                    <i className="fas fa-user text-lg" style={{ color: 'var(--medical-primary)' }}></i>
                   </div>
                   <div>
                     <CardTitle className="text-lg" data-testid={`text-patient-name-${patient.id}`}>{patient.name}</CardTitle>

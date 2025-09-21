@@ -358,7 +358,7 @@ export default function Schedule() {
             <Button 
               onClick={() => setIsCreateModalOpen(true)}
               data-testid="button-new-appointment"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              className="btn-medical-primary"
             >
               <Plus className="h-4 w-4 mr-2" />
               Nova Consulta

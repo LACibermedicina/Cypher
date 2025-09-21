@@ -4,39 +4,39 @@
 @tailwind utilities;
 
 :root {
-  /* Modern Telemed Color Palette */
-  --background: hsl(240, 10%, 98%);
-  --foreground: hsl(224, 71%, 4%);
+  /* Light Healthcare Color Palette - Calming & Professional */
+  --background: hsl(210, 40%, 99%);
+  --foreground: hsl(210, 10%, 15%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(224, 71%, 4%);
+  --card-foreground: hsl(210, 10%, 15%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(224, 71%, 4%);
+  --popover-foreground: hsl(210, 10%, 15%);
   
-  /* Modern gradient primary - Purple to Blue */
-  --primary: hsl(239, 84%, 67%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --primary-gradient: linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%);
+  /* Soft medical blue - calming and trustworthy */
+  --primary: hsl(210, 85%, 75%);
+  --primary-foreground: hsl(210, 10%, 15%);
+  --primary-gradient: linear-gradient(135deg, hsl(210, 85%, 75%) 0%, hsl(200, 85%, 70%) 100%);
   
-  /* Teal secondary for medical context */
-  --secondary: hsl(173, 58%, 39%);
-  --secondary-foreground: hsl(0, 0%, 100%);
+  /* Light teal for medical context - soothing */
+  --secondary: hsl(175, 45%, 75%);
+  --secondary-foreground: hsl(210, 10%, 15%);
   
-  /* Subtle grays with warmth */
-  --muted: hsl(240, 4%, 96%);
-  --muted-foreground: hsl(240, 3%, 46%);
+  /* Very light grays for calm interface */
+  --muted: hsl(210, 15%, 97%);
+  --muted-foreground: hsl(210, 8%, 55%);
   
-  /* Vibrant accent - Modern green */
-  --accent: hsl(142, 76%, 36%);
-  --accent-foreground: hsl(0, 0%, 100%);
+  /* Soft healthcare green - healing and positive */
+  --accent: hsl(145, 50%, 70%);
+  --accent-foreground: hsl(210, 10%, 15%);
   
-  /* Modern destructive - Coral red */
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
+  /* Gentle warning red - medical alerts */
+  --destructive: hsl(0, 70%, 75%);
+  --destructive-foreground: hsl(210, 10%, 15%);
   
-  /* Refined borders and inputs */
-  --border: hsl(240, 6%, 90%);
-  --input: hsl(240, 6%, 90%);
-  --ring: hsl(239, 84%, 67%);
+  /* Softer borders for gentle appearance */
+  --border: hsl(210, 15%, 92%);
+  --input: hsl(210, 15%, 95%);
+  --ring: hsl(210, 85%, 75%);
   
   /* Modern Design System */
   --radius: 0.75rem;
@@ -50,14 +50,17 @@
   --font-serif: ui-serif, Georgia, Cambria, serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', monospace;
   
-  /* Medical & Tech Specific Colors */
-  --medical-primary: hsl(213, 93%, 68%);
-  --medical-secondary: hsl(173, 58%, 39%);
-  --medical-accent: hsl(142, 76%, 36%);
-  --whatsapp-green: hsl(142, 70%, 49%);
-  --ai-gradient: linear-gradient(135deg, hsl(258, 79%, 61%) 0%, hsl(239, 84%, 67%) 100%);
-  --security-gradient: linear-gradient(135deg, hsl(158, 64%, 52%) 0%, hsl(142, 76%, 36%) 100%);
-  --success-gradient: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(158, 64%, 52%) 100%);
+  /* Light Healthcare-Specific Colors */
+  --medical-primary: hsl(210, 85%, 75%);
+  --medical-secondary: hsl(175, 45%, 75%);
+  --medical-accent: hsl(145, 50%, 70%);
+  --medical-success: hsl(145, 50%, 80%);
+  --medical-warning: hsl(45, 90%, 80%);
+  --medical-emergency: hsl(0, 70%, 80%);
+  --whatsapp-green: hsl(142, 50%, 65%);
+  --ai-gradient: linear-gradient(135deg, hsl(210, 85%, 80%) 0%, hsl(200, 85%, 75%) 100%);
+  --security-gradient: linear-gradient(135deg, hsl(145, 50%, 75%) 0%, hsl(155, 50%, 70%) 100%);
+  --success-gradient: linear-gradient(135deg, hsl(145, 50%, 80%) 0%, hsl(155, 50%, 75%) 100%);
 }
 
 .dark {
@@ -123,6 +126,75 @@
 }
 
 @layer components {
+  /* Healthcare Button Styles - Improved & Medical-Focused */
+  .btn-medical-primary {
+    background: var(--medical-primary);
+    color: var(--primary-foreground);
+    border: 1px solid hsl(210, 85%, 70%);
+    border-radius: var(--radius);
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px hsl(210, 85%, 75% / 0.15);
+    transition: all 0.2s ease;
+  }
+  
+  .btn-medical-primary:hover {
+    background: hsl(210, 85%, 70%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px hsl(210, 85%, 75% / 0.25);
+  }
+  
+  .btn-medical-secondary {
+    background: var(--medical-secondary);
+    color: var(--secondary-foreground);
+    border: 1px solid hsl(175, 45%, 70%);
+    border-radius: var(--radius);
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px hsl(175, 45%, 75% / 0.15);
+    transition: all 0.2s ease;
+  }
+  
+  .btn-medical-secondary:hover {
+    background: hsl(175, 45%, 70%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px hsl(175, 45%, 75% / 0.25);
+  }
+  
+  .btn-medical-success {
+    background: var(--medical-success);
+    color: var(--accent-foreground);
+    border: 1px solid hsl(145, 50%, 75%);
+    border-radius: var(--radius);
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px hsl(145, 50%, 80% / 0.15);
+    transition: all 0.2s ease;
+  }
+  
+  .btn-medical-success:hover {
+    background: hsl(145, 50%, 75%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px hsl(145, 50%, 80% / 0.25);
+  }
+  
+  .btn-medical-emergency {
+    background: var(--medical-emergency);
+    color: var(--destructive-foreground);
+    border: 1px solid hsl(0, 70%, 75%);
+    border-radius: var(--radius);
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px hsl(0, 70%, 80% / 0.15);
+    transition: all 0.2s ease;
+  }
+  
+  .btn-medical-emergency:hover {
+    background: hsl(0, 70%, 75%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px hsl(0, 70%, 80% / 0.25);
+  }
+
   /* Modern Security Badge with Gradient */
   .security-badge {
     background: var(--security-gradient);
@@ -147,6 +219,54 @@
     box-shadow: var(--shadow-md);
   }
   
+  /* Healthcare Card Enhancements */
+  .medical-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: 0 2px 4px hsl(210, 15%, 92% / 0.3);
+    transition: all 0.2s ease;
+  }
+  
+  .medical-card:hover {
+    box-shadow: 0 4px 8px hsl(210, 15%, 92% / 0.4);
+    transform: translateY(-1px);
+  }
+  
+  .patient-card {
+    background: linear-gradient(135deg, hsl(210, 40%, 99%) 0%, hsl(210, 30%, 98%) 100%);
+    border: 1px solid hsl(210, 25%, 90%);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 6px hsl(210, 15%, 85% / 0.2);
+    transition: all 0.2s ease;
+  }
+  
+  .patient-card:hover {
+    box-shadow: 0 4px 12px hsl(210, 15%, 85% / 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .appointment-card {
+    background: linear-gradient(135deg, hsl(175, 50%, 98%) 0%, hsl(175, 40%, 97%) 100%);
+    border: 1px solid hsl(175, 25%, 88%);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 6px hsl(175, 20%, 85% / 0.2);
+    transition: all 0.2s ease;
+  }
+  
+  .appointment-card:hover {
+    box-shadow: 0 4px 12px hsl(175, 20%, 85% / 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .urgent-card {
+    background: linear-gradient(135deg, hsl(0, 70%, 98%) 0%, hsl(0, 60%, 97%) 100%);
+    border: 1px solid hsl(0, 50%, 85%);
+    border-left: 4px solid var(--medical-emergency);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 6px hsl(0, 50%, 85% / 0.2);
+  }
+
   /* Modern Card Enhancements */
   .modern-card {
     background: hsl(var(--card));
