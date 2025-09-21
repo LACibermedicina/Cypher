@@ -1050,12 +1050,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Prescription Digital Signature API - Demo Implementation
+  // Prescription Digital Signature API - Enhanced Implementation
   app.post('/api/medical-records/:id/sign-prescription', async (req, res) => {
     try {
       const medicalRecordId = req.params.id;
-      // TODO: Get doctorId from authenticated session instead of client request
-      const doctorId = DEFAULT_DOCTOR_ID; // Fixed doctor for demo
+      // Use authenticated doctor ID or fallback to default for demo
+      const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
 
       // Get medical record with prescription
       const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
@@ -1067,9 +1067,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'No prescription to sign in this medical record' });
       }
 
-      // Generate key pair and store for verification (in production, use persistent key management)
+      // Generate secure key pair for signature (production should use HSM or secure key storage)
       const { privateKey, publicKey } = await cryptoService.generateKeyPair();
-      const certificateInfo = cryptoService.createMockCertificateInfo(doctorId);
+      const certificateInfo = cryptoService.createCertificateInfo(doctorId);
 
       // Create digital signature
       const signatureResult = await cryptoService.signPrescription(
@@ -1143,12 +1143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'No digital signature found for this prescription' });
       }
 
-      // TODO: Implement storage.getSignatureByDocument() method
-      // For now, search all signatures by document ID
-      const allSignatures = await storage.getPendingSignatures(medicalRecord.doctorId);
-      const prescriptionSignature = allSignatures.find(
-        sig => sig.documentId === medicalRecordId && sig.documentType === 'prescription'
-      );
+      // Use efficient signature lookup method
+      const prescriptionSignature = await storage.getSignatureByDocument(medicalRecordId, 'prescription');
 
       if (!prescriptionSignature) {
         return res.status(404).json({ message: 'Digital signature record not found' });

@@ -350,6 +350,18 @@ export class DatabaseStorage implements IStorage {
     return signature || undefined;
   }
 
+  // Enhanced method for efficient signature lookup by document
+  async getSignatureByDocument(documentId: string, documentType: string): Promise<DigitalSignature | undefined> {
+    const [signature] = await db.select().from(digitalSignatures)
+      .where(and(
+        eq(digitalSignatures.documentId, documentId),
+        eq(digitalSignatures.documentType, documentType)
+      ))
+      .orderBy(desc(digitalSignatures.createdAt))
+      .limit(1);
+    return signature || undefined;
+  }
+
   // Video Consultations
   async getVideoConsultation(id: string): Promise<VideoConsultation | undefined> {
     const [consultation] = await db.select().from(videoConsultations).where(eq(videoConsultations.id, id));

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +32,267 @@ const createRegisterSchema = (t: any) => z.object({
 type LoginForm = z.infer<ReturnType<typeof createLoginSchema>>;
 type RegisterForm = z.infer<ReturnType<typeof createRegisterSchema>>;
 
+// Subcomponent for login form with its own useForm hook
+function LoginFormSection({ defaultValues, onSubmit, isSubmitting, formRef }: {
+  defaultValues: LoginForm;
+  onSubmit: (data: LoginForm) => void;
+  isSubmitting: boolean;
+  formRef: React.MutableRefObject<{ getValues: () => LoginForm } | null>;
+}) {
+  const { t } = useTranslation();
+  const loginSchema = createLoginSchema(t);
+  
+  const form = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues,
+  });
+  
+  // Expose getValues to parent via ref
+  useEffect(() => {
+    formRef.current = { getValues: form.getValues };
+  }, [form.getValues, formRef]);
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="space-y-4">
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.username")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder={t("ui.username_placeholder")}
+                    data-testid="input-login-username"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.password")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="password"
+                    placeholder={t("ui.password_placeholder")}
+                    data-testid="input-login-password"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter>
+          <Button
+            type="submit"
+            className="w-full mobile-touch-optimized bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+            disabled={isSubmitting}
+            data-testid="button-login-submit"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                {t("ui.logging_in")}
+              </>
+            ) : (
+              t("ui.login_button")
+            )}
+          </Button>
+        </CardFooter>
+      </form>
+    </Form>
+  );
+}
+
+// Subcomponent for register form with its own useForm hook
+function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIcon, formRef }: {
+  defaultValues: RegisterForm;
+  onSubmit: (data: RegisterForm) => void;
+  isSubmitting: boolean;
+  getRoleIcon: (role: string) => JSX.Element;
+  formRef: React.MutableRefObject<{ getValues: () => RegisterForm } | null>;
+}) {
+  const { t } = useTranslation();
+  const registerSchema = createRegisterSchema(t);
+  
+  const form = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues,
+  });
+  
+  // Expose getValues to parent via ref
+  useEffect(() => {
+    formRef.current = { getValues: form.getValues };
+  }, [form.getValues, formRef]);
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.full_name")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder={t("ui.fullname_placeholder")}
+                    data-testid="input-register-name"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.username")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder={t("ui.username_register_placeholder")}
+                    data-testid="input-register-username"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.password")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="password"
+                    placeholder={t("ui.password_register_placeholder")}
+                    data-testid="input-register-password"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.user_type")}</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-register-role" className="mobile-input-enhanced">
+                      <SelectValue placeholder={t("ui.user_type_placeholder")} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="patient" data-testid="option-role-patient">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("patient")}
+                        {t("roles.patient")}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="doctor" data-testid="option-role-doctor">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("doctor")}
+                        {t("roles.doctor")}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin" data-testid="option-role-admin">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("admin")}
+                        {t("roles.admin")}
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.email_optional")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    type="email"
+                    placeholder={t("ui.email_placeholder")}
+                    data-testid="input-register-email"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.phone_optional")}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    placeholder={t("ui.phone_placeholder")}
+                    data-testid="input-register-phone"
+                    className="mobile-input-enhanced"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter>
+          <Button
+            type="submit"
+            className="w-full mobile-touch-optimized bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+            disabled={isSubmitting}
+            data-testid="button-register-submit"
+          >
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                {t("ui.creating_account")}
+              </>
+            ) : (
+              t("ui.register_button")
+            )}
+          </Button>
+        </CardFooter>
+      </form>
+    </Form>
+  );
+}
+
 export default function Login() {
   const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
@@ -40,65 +301,38 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    setLocation("/");
-    return null;
-  }
-
-  // Create schemas with translations
-  const loginSchema = createLoginSchema(t);
-  const registerSchema = createRegisterSchema(t);
-
-  const loginForm = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
-  });
-
-  const registerForm = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-      name: "",
-      role: "patient",
-      email: "",
-      phone: "",
-    },
-  });
-
-  // Update form resolvers when language changes
   useEffect(() => {
-    const newLoginSchema = createLoginSchema(t);
-    const newRegisterSchema = createRegisterSchema(t);
-    
-    // Update resolvers with new schemas
-    loginForm.clearErrors();
-    registerForm.clearErrors();
-    
-    // Reset and update the resolver
-    loginForm.reset(loginForm.getValues(), {
-      keepDirty: true,
-      keepTouched: true
-    });
-    registerForm.reset(registerForm.getValues(), {
-      keepDirty: true,
-      keepTouched: true
-    });
-    
-    // Force re-validation with new schema
-    setTimeout(() => {
-      if (loginForm.formState.isSubmitted) {
-        loginForm.trigger();
-      }
-      if (registerForm.formState.isSubmitted) {
-        registerForm.trigger();
-      }
-    }, 50);
-  }, [i18n.language, t]);
+    if (isAuthenticated) {
+      setLocation("/");
+    }
+  }, [isAuthenticated, setLocation]);
 
+  // Form state hoisted to parent to preserve across language changes
+  const [loginValues, setLoginValues] = useState<LoginForm>({ username: "", password: "" });
+  const [registerValues, setRegisterValues] = useState<RegisterForm>({
+    username: "", password: "", name: "", role: "patient", email: "", phone: ""
+  });
+  
+  // Refs to access current form values before remount
+  const loginFormRef = useRef<{ getValues: () => LoginForm } | null>(null);
+  const registerFormRef = useRef<{ getValues: () => RegisterForm } | null>(null);
+  
+  // Capture form values before language change remount
+  useEffect(() => {
+    const captureFormValues = () => {
+      if (loginFormRef.current) {
+        setLoginValues(loginFormRef.current.getValues());
+      }
+      if (registerFormRef.current) {
+        setRegisterValues(registerFormRef.current.getValues());
+      }
+    };
+    
+    // Capture values before language change
+    captureFormValues();
+  }, [i18n.language]);
+
+  // Form submission handlers
   const handleLogin = async (data: LoginForm) => {
     setIsSubmitting(true);
     try {
@@ -107,7 +341,6 @@ export default function Login() {
         title: t("auth.login_success"),
         description: t("auth.login_success_desc"),
       });
-      setLocation("/");
     } catch (error: any) {
       toast({
         title: t("auth.login_error"),
@@ -132,7 +365,6 @@ export default function Login() {
         title: t("auth.register_success"),
         description: t("auth.register_success_desc"),
       });
-      setLocation("/");
     } catch (error: any) {
       toast({
         title: t("auth.register_error"),
@@ -143,6 +375,7 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
+
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -155,8 +388,12 @@ export default function Login() {
     }
   };
 
+  if (isAuthenticated) {
+    return null;
+  }
+
   return (
-    <div key={i18n.language} className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
@@ -165,7 +402,7 @@ export default function Login() {
             </div>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Telemed
+            {t("ui.app_title")}
           </h1>
           <p className="text-muted-foreground mt-2">
             {t("ui.app_subtitle")}
@@ -173,7 +410,7 @@ export default function Login() {
         </div>
 
         <Card className="shadow-xl border-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm">
-          <Tabs key={i18n.language} defaultValue="login" className="w-full">
+          <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login" data-testid="tab-login">
                 {t("ui.login_tab")}
@@ -190,66 +427,13 @@ export default function Login() {
                   {t("ui.login_description")}
                 </CardDescription>
               </CardHeader>
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)}>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={loginForm.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.username")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Digite seu usuário"
-                              data-testid="input-login-username"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={loginForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.password")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="password"
-                              placeholder="Digite sua senha"
-                              data-testid="input-login-password"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                  <CardFooter>
-                    <Button
-                      type="submit"
-                      className="w-full mobile-touch-optimized bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
-                      disabled={isSubmitting}
-                      data-testid="button-login-submit"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                          Entrando...
-                        </>
-                      ) : (
-                        "Entrar"
-                      )}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Form>
+              <LoginFormSection 
+                key={i18n.language}
+                defaultValues={loginValues}
+                onSubmit={handleLogin}
+                isSubmitting={isSubmitting}
+                formRef={loginFormRef}
+              />
             </TabsContent>
 
             <TabsContent value="register">
@@ -259,166 +443,22 @@ export default function Login() {
                   {t("ui.register_description")}
                 </CardDescription>
               </CardHeader>
-              <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)}>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={registerForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.full_name")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Digite seu nome completo"
-                              data-testid="input-register-name"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.username")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Escolha um nome de usuário"
-                              data-testid="input-register-username"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.password")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="password"
-                              placeholder="Crie uma senha (mín. 6 caracteres)"
-                              data-testid="input-register-password"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="role"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.user_type")}</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-register-role" className="mobile-input-enhanced">
-                                <SelectValue placeholder="Selecione o tipo de usuário" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="patient" data-testid="option-role-patient">
-                                <div className="flex items-center gap-2">
-                                  {getRoleIcon("patient")}
-                                  Paciente
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="doctor" data-testid="option-role-doctor">
-                                <div className="flex items-center gap-2">
-                                  {getRoleIcon("doctor")}
-                                  Médico
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="admin" data-testid="option-role-admin">
-                                <div className="flex items-center gap-2">
-                                  {getRoleIcon("admin")}
-                                  Administrador
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t("ui.email_optional")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="email"
-                              placeholder="seu@email.com"
-                              data-testid="input-register-email"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone (opcional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="(11) 99999-9999"
-                              data-testid="input-register-phone"
-                              className="mobile-input-enhanced"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                  <CardFooter>
-                    <Button
-                      type="submit"
-                      className="w-full mobile-touch-optimized bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
-                      disabled={isSubmitting}
-                      data-testid="button-register-submit"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                          Criando conta...
-                        </>
-                      ) : (
-                        "Criar conta"
-                      )}
-                    </Button>
-                  </CardFooter>
-                </form>
-              </Form>
+              <RegisterFormSection 
+                key={i18n.language}
+                defaultValues={registerValues}
+                onSubmit={handleRegister}
+                isSubmitting={isSubmitting}
+                getRoleIcon={getRoleIcon}
+                formRef={registerFormRef}
+              />
             </TabsContent>
           </Tabs>
         </Card>
 
         <div className="text-center mt-6 text-sm text-muted-foreground">
           <p>
-            Para demonstração, use:<br />
-            <strong>Usuário:</strong> doctor | <strong>{t("ui.password")}:</strong> doctor123
+            {t("ui.demo_text")}<br />
+            <strong>{t("ui.demo_user")}</strong> doctor | <strong>{t("ui.demo_password")}</strong> doctor123
           </p>
         </div>
       </div>
