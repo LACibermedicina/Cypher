@@ -31,8 +31,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket server for real-time updates with authentication
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
-  // Store authenticated WebSocket connections by doctor ID
+  // Store authenticated WebSocket connections by doctor ID and consultation rooms
   const authenticatedClients = new Map<string, WebSocket[]>();
+  
+  // Store consultation rooms: consultationId -> { doctor: WebSocket[], patient: WebSocket[] }
+  const consultationRooms = new Map<string, { doctor: WebSocket[], patient: WebSocket[] }>();
   
   wss.on('connection', (ws: WebSocket, req) => {
     console.log('Client connected to WebSocket');
@@ -47,8 +50,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Verify JWT token and extract doctorId with proper signature verification
-    let doctorId: string;
+    // Verify JWT token and extract user info with proper signature verification
+    let userId: string;
+    let userType: 'doctor' | 'patient';
+    let consultationId: string | undefined;
+    
     try {
       // Require SESSION_SECRET - fail if not set
       const jwtSecret = process.env.SESSION_SECRET;
@@ -65,17 +71,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         algorithms: ['HS256']
       }) as any;
       
-      doctorId = payload.doctorId;
-      
-      // Verify doctorId exists in payload
-      if (!doctorId) {
-        console.log('WebSocket connection denied: Invalid JWT payload - missing doctorId');
-        ws.close(1008, 'Invalid token payload');
-        return;
-      }
-      
-      // Additional security checks
-      if (payload.type !== 'doctor_auth') {
+      // Support both doctor and patient authentication
+      if (payload.type === 'doctor_auth') {
+        userId = payload.doctorId;
+        userType = 'doctor';
+        if (!userId) {
+          console.log('WebSocket connection denied: Invalid JWT payload - missing doctorId');
+          ws.close(1008, 'Invalid token payload');
+          return;
+        }
+      } else if (payload.type === 'patient_auth') {
+        userId = payload.patientId;
+        userType = 'patient';
+        consultationId = payload.consultationId; // Required for patient tokens
+        if (!userId || !consultationId) {
+          console.log('WebSocket connection denied: Invalid JWT payload - missing patientId or consultationId');
+          ws.close(1008, 'Invalid token payload');
+          return;
+        }
+      } else {
         console.log('WebSocket connection denied: Invalid token type');
         ws.close(1008, 'Invalid token type');
         return;
@@ -87,31 +101,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     
-    // Store authenticated connection
-    if (!authenticatedClients.has(doctorId)) {
-      authenticatedClients.set(doctorId, []);
+    // Store authenticated connection by user type
+    if (userType === 'doctor') {
+      if (!authenticatedClients.has(userId)) {
+        authenticatedClients.set(userId, []);
+      }
+      authenticatedClients.get(userId)?.push(ws);
+      console.log(`Doctor ${userId} connected to WebSocket`);
     }
-    authenticatedClients.get(doctorId)?.push(ws);
     
-    console.log(`Doctor ${doctorId} connected to WebSocket`);
+    // Store in consultation room if patient with consultationId
+    if (userType === 'patient' && consultationId) {
+      if (!consultationRooms.has(consultationId)) {
+        consultationRooms.set(consultationId, { doctor: [], patient: [] });
+      }
+      consultationRooms.get(consultationId)?.patient.push(ws);
+      console.log(`Patient ${userId} connected to consultation ${consultationId}`);
+    }
     
     ws.on('close', () => {
-      console.log(`Doctor ${doctorId} disconnected from WebSocket`);
-      // Remove from authenticated clients
-      const clients = authenticatedClients.get(doctorId);
-      if (clients) {
-        const index = clients.indexOf(ws);
-        if (index > -1) {
-          clients.splice(index, 1);
+      console.log(`${userType} ${userId} disconnected from WebSocket`);
+      
+      // Remove from authenticated clients (doctors)
+      if (userType === 'doctor') {
+        const clients = authenticatedClients.get(userId);
+        if (clients) {
+          const index = clients.indexOf(ws);
+          if (index > -1) {
+            clients.splice(index, 1);
+          }
+          if (clients.length === 0) {
+            authenticatedClients.delete(userId);
+          }
         }
-        if (clients.length === 0) {
-          authenticatedClients.delete(doctorId);
+        
+        // Remove doctor from all consultation rooms
+        consultationRooms.forEach((room, roomConsultationId) => {
+          const doctorIndex = room.doctor.indexOf(ws);
+          if (doctorIndex > -1) {
+            room.doctor.splice(doctorIndex, 1);
+            console.log(`Removed doctor ${userId} from consultation room ${roomConsultationId}`);
+            
+            // Clean up empty rooms
+            if (room.doctor.length === 0 && room.patient.length === 0) {
+              consultationRooms.delete(roomConsultationId);
+              console.log(`Deleted empty consultation room ${roomConsultationId}`);
+            }
+          }
+        });
+      }
+      
+      // Remove from consultation room (patients)
+      if (userType === 'patient' && consultationId) {
+        const room = consultationRooms.get(consultationId);
+        if (room) {
+          const index = room.patient.indexOf(ws);
+          if (index > -1) {
+            room.patient.splice(index, 1);
+          }
+          // Clean up empty rooms
+          if (room.doctor.length === 0 && room.patient.length === 0) {
+            consultationRooms.delete(consultationId);
+          }
         }
       }
     });
     
     ws.on('error', (error) => {
       console.error('WebSocket error:', error);
+    });
+    
+    // Handle WebRTC signaling messages
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        console.log(`Received message from ${userType} ${userId}:`, message.type);
+        
+        // Validate message structure - allow join-room with JWT consultationId
+        if (!message.type) {
+          console.log('Invalid message: missing type');
+          return;
+        }
+        
+        // For join-room, allow consultationId from JWT or message
+        if (message.type === 'join-room' && !(message.consultationId || consultationId)) {
+          console.log('Invalid join-room message: missing consultationId');
+          return;
+        }
+        
+        // For signaling messages, require consultationId in message
+        if (['offer', 'answer', 'ice-candidate', 'call-status'].includes(message.type) && !message.consultationId) {
+          console.log('Invalid signaling message: missing consultationId');
+          return;
+        }
+        
+        // Handle different message types for WebRTC signaling
+        switch (message.type) {
+          case 'join-room':
+            handleJoinRoom(message, ws, userType, userId, consultationId);
+            break;
+            
+          case 'offer':
+          case 'answer':
+          case 'ice-candidate':
+            relaySignalingMessage(message, userType, userId);
+            break;
+            
+          case 'call-status':
+            broadcastCallStatus(message, userType, userId);
+            break;
+            
+          default:
+            console.log(`Unknown message type: ${message.type}`);
+        }
+        
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
     });
   });
 
@@ -125,6 +231,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     }
+  };
+  
+  // WebRTC signaling helper functions
+  
+  // Handle room joining for video consultations
+  const handleJoinRoom = (message: any, ws: WebSocket, userType: 'doctor' | 'patient', userId: string, consultationId?: string) => {
+    const targetConsultationId = consultationId || message.consultationId;
+    
+    if (!targetConsultationId) {
+      console.log('Cannot join room: missing consultationId');
+      return;
+    }
+    
+    // Ensure room exists
+    if (!consultationRooms.has(targetConsultationId)) {
+      consultationRooms.set(targetConsultationId, { doctor: [], patient: [] });
+    }
+    
+    const room = consultationRooms.get(targetConsultationId)!;
+    
+    // Add user to appropriate room section
+    if (userType === 'doctor' && !room.doctor.includes(ws)) {
+      room.doctor.push(ws);
+      console.log(`Doctor ${userId} joined consultation room ${targetConsultationId}`);
+    } else if (userType === 'patient' && !room.patient.includes(ws)) {
+      room.patient.push(ws);
+      console.log(`Patient ${userId} joined consultation room ${targetConsultationId}`);
+    }
+    
+    // Notify all participants in the room about the new joiner
+    const joinNotification = {
+      type: 'user-joined',
+      consultationId: targetConsultationId,
+      userType,
+      userId,
+      timestamp: new Date().toISOString()
+    };
+    
+    broadcastToRoom(targetConsultationId, joinNotification, ws); // Exclude sender
+  };
+  
+  // Relay WebRTC signaling messages between doctor and patient
+  const relaySignalingMessage = (message: any, senderType: 'doctor' | 'patient', senderId: string) => {
+    const { consultationId } = message;
+    const room = consultationRooms.get(consultationId);
+    
+    if (!room) {
+      console.log(`Cannot relay message: consultation room ${consultationId} not found`);
+      return;
+    }
+    
+    // Relay message to the other participant type
+    const targetSockets = senderType === 'doctor' ? room.patient : room.doctor;
+    
+    const relayedMessage = {
+      ...message,
+      from: senderType,
+      fromId: senderId,
+      timestamp: new Date().toISOString()
+    };
+    
+    targetSockets.forEach(socket => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(relayedMessage));
+      }
+    });
+    
+    console.log(`Relayed ${message.type} from ${senderType} ${senderId} to ${targetSockets.length} recipients`);
+  };
+  
+  // Broadcast call status updates to all participants in a room
+  const broadcastCallStatus = (message: any, senderType: 'doctor' | 'patient', senderId: string) => {
+    const { consultationId } = message;
+    
+    const statusMessage = {
+      ...message,
+      from: senderType,
+      fromId: senderId,
+      timestamp: new Date().toISOString()
+    };
+    
+    broadcastToRoom(consultationId, statusMessage);
+    console.log(`Broadcasted call status from ${senderType} ${senderId} to consultation ${consultationId}`);
+  };
+  
+  // Broadcast message to all participants in a consultation room
+  const broadcastToRoom = (consultationId: string, message: any, excludeSocket?: WebSocket) => {
+    const room = consultationRooms.get(consultationId);
+    if (!room) return;
+    
+    const allSockets = [...room.doctor, ...room.patient];
+    allSockets.forEach(socket => {
+      if (socket !== excludeSocket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+      }
+    });
   };
 
   // Legacy broadcast function removed for security - use broadcastToDoctor exclusively
