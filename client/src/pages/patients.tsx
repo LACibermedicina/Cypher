@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertPatientSchema } from "@shared/schema";
+import { insertPatientSchema, type Patient } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -22,12 +22,14 @@ type PatientFormData = z.infer<typeof patientFormSchema>;
 
 export default function Patients() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  const { data: patients, isLoading } = useQuery({
+  const { data: patients, isLoading } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
   });
 
@@ -63,11 +65,87 @@ export default function Patients() {
     },
   });
 
+  const updatePatientMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: PatientFormData }) => apiRequest('PUT', `/api/patients/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      toast({
+        title: "Sucesso",
+        description: "Paciente atualizado com sucesso!",
+      });
+      setIsEditDialogOpen(false);
+      setEditingPatient(null);
+      editForm.reset();
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao atualizar paciente. Tente novamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePatientMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/patients/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/patients'] });
+      toast({
+        title: "Sucesso",
+        description: "Paciente removido com sucesso!",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Erro ao remover paciente. Tente novamente.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const editForm = useForm<PatientFormData>({
+    resolver: zodResolver(patientFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      gender: "",
+      bloodType: "",
+      allergies: "",
+    },
+  });
+
   const onSubmit = (data: PatientFormData) => {
     createPatientMutation.mutate(data);
   };
 
-  const filteredPatients = (patients || []).filter((patient: any) =>
+  const onEditSubmit = (data: PatientFormData) => {
+    if (editingPatient) {
+      updatePatientMutation.mutate({ id: editingPatient.id, data });
+    }
+  };
+
+  const handleEditPatient = (patient: Patient) => {
+    setEditingPatient(patient);
+    editForm.reset({
+      name: patient.name,
+      email: patient.email || "",
+      phone: patient.phone,
+      gender: patient.gender || "",
+      bloodType: patient.bloodType || "",
+      allergies: patient.allergies || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeletePatient = (patient: Patient) => {
+    if (confirm(`Tem certeza que deseja remover o paciente ${patient.name}? Esta ação não pode ser desfeita.`)) {
+      deletePatientMutation.mutate(patient.id);
+    }
+  };
+
+  const filteredPatients = (patients || []).filter((patient: Patient) =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.phone.includes(searchTerm)
   );
@@ -201,6 +279,119 @@ export default function Patients() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Patient Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Paciente</DialogTitle>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome Completo</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Digite o nome completo" {...field} value={field.value || ""} data-testid="input-edit-patient-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="(11) 99999-9999" {...field} data-testid="input-edit-patient-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="email@exemplo.com" {...field} value={field.value || ""} data-testid="input-edit-patient-email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gênero</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Masculino/Feminino" {...field} value={field.value || ""} data-testid="input-edit-patient-gender" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="bloodType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Sanguíneo</FormLabel>
+                        <FormControl>
+                          <Input placeholder="O+, A-, etc." {...field} value={field.value || ""} data-testid="input-edit-patient-blood-type" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={editForm.control}
+                  name="allergies"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alergias</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Liste as alergias conhecidas" {...field} value={field.value || ""} data-testid="input-edit-patient-allergies" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsEditDialogOpen(false);
+                      setEditingPatient(null);
+                    }}
+                    data-testid="button-cancel-edit-patient"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={updatePatientMutation.isPending}
+                    data-testid="button-save-edit-patient"
+                  >
+                    {updatePatientMutation.isPending ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="mb-6">
@@ -273,9 +464,24 @@ export default function Patients() {
                     <i className="fas fa-eye mr-2"></i>
                     Ver Detalhes
                   </Button>
-                  <Button variant="outline" size="sm" data-testid={`button-schedule-patient-${patient.id}`}>
-                    <i className="fas fa-calendar-plus mr-2"></i>
-                    Agendar
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleEditPatient(patient)}
+                    data-testid={`button-edit-patient-${patient.id}`}
+                  >
+                    <i className="fas fa-edit mr-2"></i>
+                    Editar
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDeletePatient(patient)}
+                    className="text-destructive hover:text-destructive"
+                    data-testid={`button-delete-patient-${patient.id}`}
+                  >
+                    <i className="fas fa-trash mr-2"></i>
+                    Remover
                   </Button>
                 </div>
               </CardContent>

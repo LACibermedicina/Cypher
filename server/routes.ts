@@ -522,6 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
   // Appointments API
   app.get('/api/appointments/today/:doctorId', async (req, res) => {
     try {
@@ -3340,6 +3341,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Session check error:', error);
       res.status(500).json({ message: 'Session check failed' });
+    }
+  });
+
+  // ===== PATIENT MANAGEMENT ENDPOINTS =====
+
+  // Update patient (requires authentication)
+  app.put('/api/patients/:id', requireAuth, async (req, res) => {
+    try {
+      const validatedData = insertPatientSchema.parse(req.body);
+      const patient = await storage.updatePatient(req.params.id, validatedData);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+      res.json(patient);
+    } catch (error) {
+      res.status(400).json({ message: 'Invalid patient data', error });
+    }
+  });
+
+  // Delete patient (requires authentication)
+  app.delete('/api/patients/:id', requireAuth, async (req, res) => {
+    try {
+      const success = await storage.deletePatient(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete patient' });
     }
   });
 

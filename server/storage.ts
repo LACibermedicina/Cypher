@@ -26,6 +26,7 @@ export interface IStorage {
   getPatientByWhatsapp(whatsappNumber: string): Promise<Patient | undefined>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: string, patient: Partial<InsertPatient>): Promise<Patient | undefined>;
+  deletePatient(id: string): Promise<boolean>;
   getAllPatients(): Promise<Patient[]>;
 
   // Appointments
@@ -165,6 +166,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(patients.id, id))
       .returning();
     return patient || undefined;
+  }
+
+  async deletePatient(id: string): Promise<boolean> {
+    const result = await db.delete(patients)
+      .where(eq(patients.id, id))
+      .returning({ id: patients.id });
+    return result.length > 0;
   }
 
   async getAllPatients(): Promise<Patient[]> {
@@ -803,17 +811,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  private isValidCNPJ(cnpj: string): boolean {
-    if (!cnpj) return false;
-    const cleanCNPJ = cnpj.replace(/[^\d]/g, '');
-    return cleanCNPJ.length === 14; // Simplified validation
-  }
-
-  private isValidCNES(cnes: string): boolean {
-    if (!cnes) return false;
-    const cleanCNES = cnes.replace(/[^\d]/g, '');
-    return cleanCNES.length === 7; // Simplified validation
-  }
 
   private calculateComplianceScore(validations: any[]): number {
     const passedValidations = validations.filter(v => v.status === 'success').length;
@@ -889,7 +886,7 @@ export class DatabaseStorage implements IStorage {
       address: 'Sistema Interno',
       cnpj: '00.000.000/0000-00',
       cnes: '0000000',
-      specialization: ['system_monitoring', 'compliance_auditing'],
+      specialization: 'system_monitoring,compliance_auditing',
       isActive: true
     }).returning();
 

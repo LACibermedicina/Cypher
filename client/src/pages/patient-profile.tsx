@@ -12,7 +12,7 @@ import { ptBR } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_DOCTOR_ID } from "@shared/schema";
-import type { Patient, Appointment, MedicalRecord } from "@shared/schema";
+import type { Patient, Appointment, MedicalRecord, VideoConsultation as VideoConsultationType } from "@shared/schema";
 import VideoConsultation from "@/components/video-consultation/VideoConsultation";
 
 export default function PatientProfile() {
@@ -37,8 +37,11 @@ export default function PatientProfile() {
 
   // Create video consultation mutation
   const createVideoConsultationMutation = useMutation({
-    mutationFn: (consultationData: any) => apiRequest('POST', '/api/video-consultations', consultationData),
-    onSuccess: (consultation) => {
+    mutationFn: async (consultationData: any) => {
+      const response = await apiRequest('POST', '/api/video-consultations', consultationData);
+      return response.json();
+    },
+    onSuccess: (consultation: VideoConsultationType) => {
       toast({
         title: "Videochamada iniciada",
         description: "A videochamada foi iniciada com sucesso.",
@@ -338,9 +341,11 @@ export default function PatientProfile() {
           </DialogHeader>
           {activeConsultationId && (
             <VideoConsultation
-              consultationId={activeConsultationId}
+              appointmentId={activeConsultationId}
+              patientId={patient.id}
+              doctorId={DEFAULT_DOCTOR_ID}
               patientName={patient?.name || 'Paciente'}
-              onEndConsultation={() => {
+              onCallEnd={() => {
                 setIsVideoConsultationOpen(false);
                 setActiveConsultationId(null);
               }}
