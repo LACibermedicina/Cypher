@@ -2,6 +2,7 @@ import {
   users, patients, appointments, medicalRecords, whatsappMessages, 
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
+  tmcTransactions, tmcConfig,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -11,6 +12,19 @@ import {
   type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
   type CollaboratorApiKey, type InsertCollaboratorApiKey
 } from "@shared/schema";
+
+// Import TMC types from schema
+import { createInsertSchema } from "drizzle-zod";
+import type { z } from "zod";
+
+const insertTmcTransactionSchema = createInsertSchema(tmcTransactions);
+const insertTmcConfigSchema = createInsertSchema(tmcConfig);
+
+export type TmcTransaction = typeof tmcTransactions.$inferSelect;
+export type InsertTmcTransaction = z.infer<typeof insertTmcTransactionSchema>;
+export type TmcConfig = typeof tmcConfig.$inferSelect;
+export type InsertTmcConfig = z.infer<typeof insertTmcConfigSchema>;
+
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 
@@ -120,6 +134,25 @@ export interface IStorage {
   runComplianceChecks(): Promise<any>;
   getDetailedAuditTrail(entityId: string, integrationType?: string, limit?: number): Promise<CollaboratorIntegration[]>;
   validateBrazilianHealthcareCompliance(): Promise<any>;
+
+  // TMC Credit System
+  createTmcTransaction(transaction: InsertTmcTransaction): Promise<TmcTransaction>;
+  getTmcTransactionsByUser(userId: string, limit?: number): Promise<TmcTransaction[]>;
+  getTmcTransaction(id: string): Promise<TmcTransaction | undefined>;
+  processCredit(userId: string, amount: number, reason: string, functionUsed?: string, relatedUserId?: string, appointmentId?: string, medicalRecordId?: string): Promise<TmcTransaction>;
+  processDebit(userId: string, amount: number, reason: string, functionUsed?: string, relatedUserId?: string, appointmentId?: string, medicalRecordId?: string): Promise<TmcTransaction | null>;
+  transferCredits(fromUserId: string, toUserId: string, amount: number, reason: string): Promise<TmcTransaction[]>;
+  processHierarchicalCommission(doctorId: string, amount: number, functionUsed: string, appointmentId?: string): Promise<TmcTransaction[]>;
+  rechargeCredits(userId: string, amount: number, method: string): Promise<TmcTransaction>;
+  getUserBalance(userId: string): Promise<number>;
+  
+  // TMC Configuration
+  getTmcConfig(): Promise<TmcConfig[]>;
+  getTmcConfigByFunction(functionName: string): Promise<TmcConfig | undefined>;
+  createTmcConfig(config: InsertTmcConfig): Promise<TmcConfig>;
+  updateTmcConfig(id: string, config: Partial<InsertTmcConfig>): Promise<TmcConfig | undefined>;
+  getFunctionCost(functionName: string): Promise<number>;
+  validateSufficientCredits(userId: string, functionName: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -948,6 +981,289 @@ export class DatabaseStorage implements IStorage {
     if (/^(\d)\1{6}$/.test(cleanCNES)) return false;
     
     return true;
+  }
+
+  // TMC Credit System Implementation
+  async createTmcTransaction(insertTransaction: InsertTmcTransaction): Promise<TmcTransaction> {
+    const [transaction] = await db.insert(tmcTransactions).values(insertTransaction).returning();
+    return transaction;
+  }
+
+  async getTmcTransactionsByUser(userId: string, limit: number = 50): Promise<TmcTransaction[]> {
+    return await db.select().from(tmcTransactions)
+      .where(eq(tmcTransactions.userId, userId))
+      .orderBy(desc(tmcTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async getTmcTransaction(id: string): Promise<TmcTransaction | undefined> {
+    const [transaction] = await db.select().from(tmcTransactions).where(eq(tmcTransactions.id, id));
+    return transaction || undefined;
+  }
+
+  async getUserBalance(userId: string): Promise<number> {
+    const [user] = await db.select({ tmcCredits: users.tmcCredits }).from(users).where(eq(users.id, userId));
+    return user?.tmcCredits || 0;
+  }
+
+  async processCredit(userId: string, amount: number, reason: string, functionUsed?: string, relatedUserId?: string, appointmentId?: string, medicalRecordId?: string): Promise<TmcTransaction> {
+    // Use database transaction for atomic operation with row locking
+    return await db.transaction(async (tx) => {
+      // Lock user's row for balance update to prevent concurrent modifications
+      const [user] = await tx.select({ tmcCredits: users.tmcCredits })
+        .from(users)
+        .where(eq(users.id, userId))
+        .for('update');
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      const balanceBefore = user.tmcCredits;
+      const balanceAfter = balanceBefore + amount;
+      
+      // Update user balance atomically
+      await tx.update(users)
+        .set({ tmcCredits: balanceAfter })
+        .where(eq(users.id, userId));
+
+      // Record transaction
+      const [transaction] = await tx.insert(tmcTransactions).values({
+        userId,
+        type: 'credit',
+        amount,
+        reason,
+        functionUsed,
+        relatedUserId,
+        balanceBefore,
+        balanceAfter,
+        appointmentId,
+        medicalRecordId
+      }).returning();
+
+      return transaction;
+    });
+  }
+
+  async processDebit(userId: string, amount: number, reason: string, functionUsed?: string, relatedUserId?: string, appointmentId?: string, medicalRecordId?: string): Promise<TmcTransaction | null> {
+    // Use database transaction for atomic operation with row locking
+    return await db.transaction(async (tx) => {
+      // Lock user's row for balance check to prevent concurrent modifications
+      const [user] = await tx.select({ tmcCredits: users.tmcCredits })
+        .from(users)
+        .where(eq(users.id, userId))
+        .for('update');
+      
+      if (!user || user.tmcCredits < amount) {
+        return null; // Insufficient balance
+      }
+      
+      const balanceBefore = user.tmcCredits;
+      const balanceAfter = balanceBefore - amount;
+      
+      // Update user balance atomically
+      await tx.update(users)
+        .set({ tmcCredits: balanceAfter })
+        .where(eq(users.id, userId));
+
+      // Record transaction
+      const [transaction] = await tx.insert(tmcTransactions).values({
+        userId,
+        type: 'debit',
+        amount: -amount, // Negative for debits
+        reason,
+        functionUsed,
+        relatedUserId,
+        balanceBefore,
+        balanceAfter,
+        appointmentId,
+        medicalRecordId
+      }).returning();
+
+      return transaction;
+    });
+  }
+
+  async transferCredits(fromUserId: string, toUserId: string, amount: number, reason: string): Promise<TmcTransaction[]> {
+    // Use database transaction for atomic operation
+    return await db.transaction(async (tx) => {
+      // Lock sender's row for balance check
+      const [sender] = await tx.select({ tmcCredits: users.tmcCredits })
+        .from(users)
+        .where(eq(users.id, fromUserId))
+        .for('update');
+      
+      if (!sender || sender.tmcCredits < amount) {
+        throw new Error('Insufficient balance for transfer');
+      }
+
+      // Atomically update both balances
+      const fromBalanceBefore = sender.tmcCredits;
+      const fromBalanceAfter = fromBalanceBefore - amount;
+      
+      const [recipient] = await tx.select({ tmcCredits: users.tmcCredits })
+        .from(users)
+        .where(eq(users.id, toUserId))
+        .for('update');
+      
+      if (!recipient) {
+        throw new Error('Recipient not found');
+      }
+      
+      const toBalanceBefore = recipient.tmcCredits;
+      const toBalanceAfter = toBalanceBefore + amount;
+
+      // Update balances atomically
+      await tx.update(users)
+        .set({ tmcCredits: fromBalanceAfter })
+        .where(eq(users.id, fromUserId));
+        
+      await tx.update(users)
+        .set({ tmcCredits: toBalanceAfter })
+        .where(eq(users.id, toUserId));
+
+      // Record both transactions
+      const [debitTransaction] = await tx.insert(tmcTransactions).values({
+        userId: fromUserId,
+        type: 'transfer',
+        amount: -amount,
+        reason: `Transfer to user - ${reason}`,
+        functionUsed: 'transfer',
+        relatedUserId: toUserId,
+        balanceBefore: fromBalanceBefore,
+        balanceAfter: fromBalanceAfter
+      }).returning();
+
+      const [creditTransaction] = await tx.insert(tmcTransactions).values({
+        userId: toUserId,
+        type: 'transfer',
+        amount: amount,
+        reason: `Transfer from user - ${reason}`,
+        functionUsed: 'transfer',
+        relatedUserId: fromUserId,
+        balanceBefore: toBalanceBefore,
+        balanceAfter: toBalanceAfter
+      }).returning();
+
+      return [debitTransaction, creditTransaction];
+    });
+  }
+
+  async processHierarchicalCommission(doctorId: string, amount: number, functionUsed: string, appointmentId?: string): Promise<TmcTransaction[]> {
+    // Use database transaction for atomic commission processing across hierarchy
+    return await db.transaction(async (tx) => {
+      const transactions: TmcTransaction[] = [];
+      
+      // Build complete hierarchy first to avoid recursive transactions
+      const hierarchy: Array<{id: string, superiorId: string, percentage: number, level: number}> = [];
+      let currentDoctorId = doctorId;
+      let level = 0;
+      
+      while (currentDoctorId && level < 3) {
+        const [doctor] = await tx.select({
+          id: users.id,
+          superiorDoctorId: users.superiorDoctorId,
+          percentageFromInferiors: users.percentageFromInferiors,
+          hierarchyLevel: users.hierarchyLevel
+        }).from(users).where(eq(users.id, currentDoctorId));
+
+        if (!doctor || !doctor.superiorDoctorId) break;
+
+        hierarchy.push({
+          id: doctor.superiorDoctorId,
+          superiorId: doctor.id,
+          percentage: doctor.percentageFromInferiors || 10,
+          level: level + 1
+        });
+
+        currentDoctorId = doctor.superiorDoctorId;
+        level++;
+      }
+
+      // Process all commissions atomically
+      let currentAmount = amount;
+      for (const hierItem of hierarchy) {
+        const commissionAmount = Math.floor((currentAmount * hierItem.percentage) / 100);
+        
+        if (commissionAmount > 0) {
+          // Lock user's row for balance update
+          const [user] = await tx.select({ tmcCredits: users.tmcCredits })
+            .from(users)
+            .where(eq(users.id, hierItem.id))
+            .for('update');
+          
+          if (user) {
+            const balanceBefore = user.tmcCredits;
+            const balanceAfter = balanceBefore + commissionAmount;
+            
+            // Update balance atomically
+            await tx.update(users)
+              .set({ tmcCredits: balanceAfter })
+              .where(eq(users.id, hierItem.id));
+
+            // Record transaction
+            const [transaction] = await tx.insert(tmcTransactions).values({
+              userId: hierItem.id,
+              type: 'credit',
+              amount: commissionAmount,
+              reason: `Level ${hierItem.level} commission from doctor hierarchy - ${functionUsed}`,
+              functionUsed,
+              relatedUserId: doctorId,
+              balanceBefore,
+              balanceAfter,
+              appointmentId
+            }).returning();
+
+            transactions.push(transaction);
+            currentAmount = commissionAmount; // Next level gets percentage of this commission
+          }
+        }
+      }
+
+      return transactions;
+    });
+  }
+
+  async rechargeCredits(userId: string, amount: number, method: string): Promise<TmcTransaction> {
+    // Use atomic processCredit which already has transaction support
+    return await this.processCredit(userId, amount, `Credit recharge via ${method}`, 'recharge');
+  }
+
+  // TMC Configuration Implementation
+  async getTmcConfig(): Promise<TmcConfig[]> {
+    return await db.select().from(tmcConfig)
+      .where(eq(tmcConfig.isActive, true))
+      .orderBy(tmcConfig.category, tmcConfig.functionName);
+  }
+
+  async getTmcConfigByFunction(functionName: string): Promise<TmcConfig | undefined> {
+    const [config] = await db.select().from(tmcConfig)
+      .where(and(eq(tmcConfig.functionName, functionName), eq(tmcConfig.isActive, true)));
+    return config || undefined;
+  }
+
+  async createTmcConfig(insertConfig: InsertTmcConfig): Promise<TmcConfig> {
+    const [config] = await db.insert(tmcConfig).values(insertConfig).returning();
+    return config;
+  }
+
+  async updateTmcConfig(id: string, updateConfig: Partial<InsertTmcConfig>): Promise<TmcConfig | undefined> {
+    const [config] = await db.update(tmcConfig)
+      .set({ ...updateConfig, updatedAt: sql`now()` })
+      .where(eq(tmcConfig.id, id))
+      .returning();
+    return config || undefined;
+  }
+
+  async getFunctionCost(functionName: string): Promise<number> {
+    const config = await this.getTmcConfigByFunction(functionName);
+    return config?.costInCredits || 0;
+  }
+
+  async validateSufficientCredits(userId: string, functionName: string): Promise<boolean> {
+    const userBalance = await this.getUserBalance(userId);
+    const functionCost = await this.getFunctionCost(functionName);
+    return userBalance >= functionCost;
   }
 }
 

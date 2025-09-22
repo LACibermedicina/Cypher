@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
+import { TmcSystem } from "@/components/tmc-system"
 
 interface Patient {
   id: string;
@@ -346,6 +347,14 @@ export function DesktopDoctorDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
+
+        {/* TMC Credit System */}
+        <div className="mb-6">
+          <TmcSystem 
+            userRole={user?.role as any || 'doctor'} 
+            showAdminFeatures={user?.role === 'admin' || user?.role === 'doctor'} 
+          />
         </div>
 
         {/* Patient Records & Security */}

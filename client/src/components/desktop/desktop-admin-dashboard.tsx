@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
+import { TmcSystem } from "@/components/tmc-system"
 
 interface DashboardMetric {
   title: string;
@@ -308,6 +309,14 @@ export function DesktopAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* TMC Credit System Administration */}
+        <div className="mb-6">
+          <TmcSystem 
+            userRole={user?.role as any || 'admin'} 
+            showAdminFeatures={true} 
+          />
         </div>
 
         {/* System Alerts */}

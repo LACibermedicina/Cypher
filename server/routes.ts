@@ -10,6 +10,46 @@ import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
+
+// TMC Credit System Validation Schemas
+const tmcTransferSchema = z.object({
+  toUserId: z.string().uuid("ID do usuário deve ser um UUID válido"),
+  amount: z.number().int().min(1, "Quantidade deve ser maior que 0").max(10000, "Quantidade máxima é 10.000 TMC"),
+  reason: z.string().min(1, "Motivo é obrigatório").max(500, "Motivo deve ter no máximo 500 caracteres")
+});
+
+const tmcRechargeSchema = z.object({
+  userId: z.string().uuid("ID do usuário deve ser um UUID válido"),
+  amount: z.number().int().min(1, "Quantidade deve ser maior que 0").max(50000, "Quantidade máxima é 50.000 TMC"),
+  method: z.enum(['manual', 'card', 'pix', 'bank_transfer'], {
+    errorMap: () => ({ message: "Método deve ser: manual, card, pix ou bank_transfer" })
+  })
+});
+
+const tmcDebitSchema = z.object({
+  functionName: z.string().min(1, "Nome da função é obrigatório"),
+  appointmentId: z.string().uuid().optional(),
+  medicalRecordId: z.string().uuid().optional()
+});
+
+const tmcConfigSchema = z.object({
+  functionName: z.string().min(1, "Nome da função é obrigatório"),
+  costInCredits: z.number().int().min(0, "Custo deve ser 0 ou maior").max(10000, "Custo máximo é 10.000 TMC"),
+  description: z.string().min(1, "Descrição é obrigatória").max(1000, "Descrição deve ter no máximo 1000 caracteres"),
+  category: z.enum(['consultation', 'prescription', 'data_access', 'admin'], {
+    errorMap: () => ({ message: "Categoria deve ser: consultation, prescription, data_access ou admin" })
+  }),
+  minimumRole: z.enum(['visitor', 'patient', 'doctor', 'admin', 'researcher'], {
+    errorMap: () => ({ message: "Nível mínimo deve ser: visitor, patient, doctor, admin ou researcher" })
+  }),
+  bonusForPatient: z.number().int().min(0, "Bônus deve ser 0 ou maior").max(1000, "Bônus máximo é 1.000 TMC"),
+  commissionPercentage: z.number().int().min(0, "Porcentagem deve ser 0 ou maior").max(50, "Porcentagem máxima é 50%"),
+  isActive: z.boolean()
+});
+
+const tmcValidateCreditsSchema = z.object({
+  functionName: z.string().min(1, "Nome da função é obrigatório")
+});
 import crypto from "crypto";
 import jwt from 'jsonwebtoken';
 
@@ -4999,6 +5039,302 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Healthcare compliance validation error:', error);
       res.status(500).json({ message: 'Failed to validate healthcare compliance' });
+    }
+  });
+
+  // ======================
+  // TMC CREDIT SYSTEM API ROUTES
+  // ======================
+
+  // Get user's TMC balance
+  app.get('/api/tmc/balance', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const balance = await storage.getUserBalance(user.id);
+      res.json({ balance, currency: 'TMC' });
+    } catch (error) {
+      console.error('TMC balance fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch TMC balance' });
+    }
+  });
+
+  // Get user's TMC transaction history
+  app.get('/api/tmc/transactions', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { limit = 50 } = req.query;
+      const transactions = await storage.getTmcTransactionsByUser(user.id, parseInt(limit as string));
+      res.json(transactions);
+    } catch (error) {
+      console.error('TMC transactions fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch TMC transactions' });
+    }
+  });
+
+  // Recharge TMC credits (admin only)
+  app.post('/api/tmc/recharge', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Only admins can recharge credits for users (security hardening)
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      // Validate request body with Zod
+      const validationResult = tmcRechargeSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Dados inválidos',
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { userId, amount, method } = validationResult.data;
+
+      const transaction = await storage.rechargeCredits(userId, amount, method);
+      const newBalance = await storage.getUserBalance(userId);
+
+      res.json({ 
+        transaction, 
+        newBalance,
+        message: `Successfully recharged ${amount} TMC credits`
+      });
+    } catch (error) {
+      console.error('TMC recharge error:', error);
+      res.status(500).json({ message: 'Failed to recharge TMC credits' });
+    }
+  });
+
+  // Transfer TMC credits between users
+  app.post('/api/tmc/transfer', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Validate request body with Zod
+      const validationResult = tmcTransferSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Dados inválidos',
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { toUserId, amount, reason } = validationResult.data;
+
+      if (user.id === toUserId) {
+        return res.status(400).json({ message: 'Cannot transfer credits to yourself' });
+      }
+
+      const transactions = await storage.transferCredits(user.id, toUserId, amount, reason);
+      const newBalance = await storage.getUserBalance(user.id);
+
+      res.json({ 
+        transactions, 
+        newBalance,
+        message: `Successfully transferred ${amount} TMC credits`
+      });
+    } catch (error) {
+      console.error('TMC transfer error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to transfer TMC credits';
+      res.status(400).json({ message });
+    }
+  });
+
+  // Debit TMC credits for function usage
+  app.post('/api/tmc/debit', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Validate request body with Zod
+      const validationResult = tmcDebitSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Dados inválidos',
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { functionName, appointmentId, medicalRecordId } = validationResult.data;
+
+      // Get function cost
+      const cost = await storage.getFunctionCost(functionName);
+      if (cost === 0) {
+        return res.status(400).json({ message: 'Function not found or is free' });
+      }
+
+      // Check sufficient credits
+      const hasCredits = await storage.validateSufficientCredits(user.id, functionName);
+      if (!hasCredits) {
+        return res.status(402).json({ message: 'Insufficient TMC credits', requiredAmount: cost });
+      }
+
+      // Process debit
+      const transaction = await storage.processDebit(
+        user.id, 
+        cost, 
+        `Function usage: ${functionName}`, 
+        functionName,
+        undefined,
+        appointmentId,
+        medicalRecordId
+      );
+
+      if (!transaction) {
+        return res.status(402).json({ message: 'Insufficient TMC credits' });
+      }
+
+      // Process hierarchical commission if user is a doctor
+      let commissionTransactions: any[] = [];
+      if (user.role === 'doctor' && cost > 0) {
+        commissionTransactions = await storage.processHierarchicalCommission(user.id, cost, functionName, appointmentId);
+      }
+
+      const newBalance = await storage.getUserBalance(user.id);
+
+      res.json({ 
+        transaction, 
+        commissionTransactions,
+        newBalance,
+        functionUsed: functionName,
+        cost
+      });
+    } catch (error) {
+      console.error('TMC debit error:', error);
+      res.status(500).json({ message: 'Failed to process TMC debit' });
+    }
+  });
+
+  // Get TMC system configuration (admin only)
+  app.get('/api/tmc/config', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const config = await storage.getTmcConfig();
+      res.json(config);
+    } catch (error) {
+      console.error('TMC config fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch TMC configuration' });
+    }
+  });
+
+  // Get function cost
+  app.get('/api/tmc/function-cost/:functionName', requireAuth, async (req, res) => {
+    try {
+      const { functionName } = req.params;
+      const cost = await storage.getFunctionCost(functionName);
+      const config = await storage.getTmcConfigByFunction(functionName);
+      
+      res.json({ 
+        functionName, 
+        cost, 
+        config: config ? {
+          description: config.description,
+          category: config.category,
+          minimumRole: config.minimumRole,
+          bonusForPatient: config.bonusForPatient,
+          commissionPercentage: config.commissionPercentage
+        } : null
+      });
+    } catch (error) {
+      console.error('TMC function cost fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch function cost' });
+    }
+  });
+
+  // Update TMC system configuration (admin only)
+  app.post('/api/tmc/config', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      // Validate request body with Zod
+      const validationResult = tmcConfigSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Dados inválidos',
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const configData = {
+        ...validationResult.data,
+        updatedBy: user.id
+      };
+
+      const config = await storage.createTmcConfig(configData);
+      res.json(config);
+    } catch (error) {
+      console.error('TMC config create error:', error);
+      res.status(500).json({ message: 'Failed to create TMC configuration' });
+    }
+  });
+
+  // Update existing TMC configuration (admin only)
+  app.patch('/api/tmc/config/:id', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { id } = req.params;
+      const updateData = {
+        ...req.body,
+        updatedBy: user.id
+      };
+
+      const config = await storage.updateTmcConfig(id, updateData);
+      
+      if (!config) {
+        return res.status(404).json({ message: 'TMC configuration not found' });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error('TMC config update error:', error);
+      res.status(500).json({ message: 'Failed to update TMC configuration' });
+    }
+  });
+
+  // Validate sufficient credits for function
+  app.post('/api/tmc/validate-credits', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      
+      // Validate request body with Zod
+      const validationResult = tmcValidateCreditsSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          message: 'Dados inválidos',
+          errors: validationResult.error.errors 
+        });
+      }
+
+      const { functionName } = validationResult.data;
+
+      const hasCredits = await storage.validateSufficientCredits(user.id, functionName);
+      const cost = await storage.getFunctionCost(functionName);
+      const balance = await storage.getUserBalance(user.id);
+
+      res.json({ 
+        hasCredits, 
+        functionName,
+        cost,
+        balance,
+        deficit: hasCredits ? 0 : cost - balance
+      });
+    } catch (error) {
+      console.error('TMC validation error:', error);
+      res.status(500).json({ message: 'Failed to validate TMC credits' });
     }
   });
 
