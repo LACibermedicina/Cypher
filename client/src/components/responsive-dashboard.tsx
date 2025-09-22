@@ -5,11 +5,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { MobileDoctorDashboard } from "@/components/mobile/mobile-doctor-dashboard";
 import { MobilePatientDashboard } from "@/components/mobile/mobile-patient-dashboard";
 import { MobileAdminDashboard } from "@/components/mobile/mobile-admin-dashboard";
+import { MobileVisitorDashboard } from "@/components/mobile/mobile-visitor-dashboard";
+import { MobileResearcherDashboard } from "@/components/mobile/mobile-researcher-dashboard";
 
 // Desktop Components  
 import { DesktopDoctorDashboard } from "@/components/desktop/desktop-doctor-dashboard";
 import { DesktopPatientDashboard } from "@/components/desktop/desktop-patient-dashboard";
 import { DesktopAdminDashboard } from "@/components/desktop/desktop-admin-dashboard";
+import { DesktopVisitorDashboard } from "@/components/desktop/desktop-visitor-dashboard";
+import { DesktopResearcherDashboard } from "@/components/desktop/desktop-researcher-dashboard";
 
 // Fallback component for non-mobile interfaces
 import Dashboard from "@/pages/dashboard";
@@ -31,9 +35,12 @@ export function ResponsiveDashboard() {
       case 'patient':
         return <MobilePatientDashboard />;
       case 'visitor':
+        return <MobileVisitorDashboard />;
+      case 'researcher':
+        return <MobileResearcherDashboard />;
       default:
-        // For visitors and researchers, use a simplified mobile view
-        return <MobilePatientDashboard />;
+        // Default to visitor interface for unknown roles
+        return <MobileVisitorDashboard />;
     }
   }
   
@@ -47,9 +54,12 @@ export function ResponsiveDashboard() {
       case 'patient':
         return <DesktopPatientDashboard />;
       case 'visitor':
+        return <DesktopVisitorDashboard />;
+      case 'researcher':
+        return <DesktopResearcherDashboard />;
       default:
-        // For visitors and researchers, use the patient desktop view with modifications
-        return <DesktopPatientDashboard />;
+        // Default to visitor interface for unknown roles
+        return <DesktopVisitorDashboard />;
     }
   }
   

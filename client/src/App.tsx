@@ -34,12 +34,10 @@ function Router() {
         </Route>
         <Route path="/join/:token" component={PatientJoin} />
         
-        {/* Protected routes with different role requirements */}
+        {/* Public homepage - accessible to all including visitors */}
         <Route path="/">
-          <ProtectedRoute>
-            <Header />
-            <ResponsiveDashboard />
-          </ProtectedRoute>
+          <Header />
+          <ResponsiveDashboard />
         </Route>
         
         <Route path="/dashboard">
