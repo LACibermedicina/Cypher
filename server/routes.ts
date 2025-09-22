@@ -957,6 +957,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     audioTranscript: z.string().min(1, "Audio transcript is required")
   });
 
+
   app.post('/api/medical-records/:patientId/analyze', async (req, res) => {
     try {
       // Validate patient ID format
@@ -3428,6 +3429,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next();
     };
   };
+
+  // ===== AI ANALYSIS ENDPOINTS =====
+  
+  // Simplified symptom analysis endpoint
+  app.post('/api/ai/analyze-symptoms', requireAuth, async (req, res) => {
+    try {
+      const validation = analyzeSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: 'Invalid input', 
+          errors: validation.error.issues 
+        });
+      }
+      
+      const { symptoms, history } = validation.data;
+      
+      // Generate AI diagnostic hypotheses
+      let hypotheses;
+      try {
+        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history || '');
+      } catch (openaiError) {
+        console.error('OpenAI service error:', openaiError);
+        return res.status(502).json({ 
+          message: 'AI diagnostic service temporarily unavailable',
+          hypotheses: [] 
+        });
+      }
+      
+      res.json({ hypotheses });
+    } catch (error) {
+      console.error('Symptom analysis error:', error);
+      res.status(500).json({ message: 'Failed to analyze symptoms' });
+    }
+  });
 
   // ===== AUTHENTICATION ENDPOINTS =====
 

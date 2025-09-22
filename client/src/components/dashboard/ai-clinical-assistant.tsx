@@ -22,7 +22,7 @@ export default function AIClinicalAssistant() {
 
   const analyzeSymptomsMutation = useMutation({
     mutationFn: (data: { symptoms: string; history: string }) =>
-      apiRequest('POST', '/api/medical-records/current-patient/analyze', data),
+      apiRequest('POST', '/api/ai/analyze-symptoms', data),
     onSuccess: (data) => {
       toast({
         title: "Análise IA Concluída",
