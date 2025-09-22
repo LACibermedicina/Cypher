@@ -8,6 +8,7 @@ import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
+import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID } from "@shared/schema";
 import { z } from "zod";
 
@@ -3461,6 +3462,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Symptom analysis error:', error);
       res.status(500).json({ message: 'Failed to analyze symptoms' });
+    }
+  });
+
+  // ===== PDF GENERATION ENDPOINTS =====
+  
+  // Generate prescription PDF
+  app.get('/api/medical-records/:id/prescription-pdf', requireAuth, async (req, res) => {
+    try {
+      const medicalRecordId = req.params.id;
+      
+      // Get medical record with prescription
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord || !medicalRecord.prescription) {
+        return res.status(404).json({ message: 'Prescription not found' });
+      }
+
+      // Get patient and doctor information
+      const patient = await storage.getPatient(medicalRecord.patientId);
+      const doctor = await storage.getUser(medicalRecord.doctorId);
+      
+      if (!patient || !doctor) {
+        return res.status(404).json({ message: 'Patient or doctor not found' });
+      }
+
+      // Get digital signature if exists
+      let digitalSignature = null;
+      if (medicalRecord.digitalSignature) {
+        digitalSignature = await storage.getDigitalSignature(medicalRecord.digitalSignature);
+      }
+
+      // Prepare prescription data
+      const prescriptionData: PrescriptionData = {
+        patientName: patient.name,
+        patientAge: patient.age || 0,
+        patientAddress: patient.address || 'Não informado',
+        doctorName: doctor.name,
+        doctorCRM: doctor.digitalCertificate?.split('-')[1] || '123456',
+        doctorCRMState: 'SP',
+        prescriptionText: medicalRecord.prescription,
+        date: new Date(medicalRecord.createdAt).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric'
+        }),
+        digitalSignature: digitalSignature ? {
+          signature: digitalSignature.signature,
+          certificateInfo: digitalSignature.certificateInfo,
+          timestamp: digitalSignature.signedAt?.toISOString() || new Date().toISOString()
+        } : undefined
+      };
+
+      // Generate PDF HTML
+      const htmlContent = await pdfGeneratorService.generatePrescriptionPDF(prescriptionData);
+      
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="receita-${patient.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.html"`);
+      res.send(htmlContent);
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      res.status(500).json({ message: 'Failed to generate prescription PDF' });
+    }
+  });
+
+  // Generate exam request PDF
+  app.get('/api/medical-records/:id/exam-request-pdf', requireAuth, async (req, res) => {
+    try {
+      const medicalRecordId = req.params.id;
+      
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord) {
+        return res.status(404).json({ message: 'Medical record not found' });
+      }
+
+      const patient = await storage.getPatient(medicalRecord.patientId);
+      const doctor = await storage.getUser(medicalRecord.doctorId);
+      
+      const examData = {
+        patientName: patient?.name || 'N/A',
+        date: new Date(medicalRecord.createdAt).toLocaleDateString('pt-BR'),
+        examRequests: medicalRecord.diagnosis || 'Exames conforme avaliação clínica',
+        doctorName: doctor?.name || 'Médico',
+        doctorCRM: doctor?.digitalCertificate?.split('-')[1] || '123456',
+        doctorCRMState: 'SP'
+      };
+
+      const htmlContent = await pdfGeneratorService.generateExamRequestPDF(examData);
+      
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="exame-${patient?.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.html"`);
+      res.send(htmlContent);
+      
+    } catch (error) {
+      console.error('Exam request PDF error:', error);
+      res.status(500).json({ message: 'Failed to generate exam request PDF' });
+    }
+  });
+
+  // Generate medical certificate PDF  
+  app.post('/api/medical-records/:id/certificate-pdf', requireAuth, async (req, res) => {
+    try {
+      const medicalRecordId = req.params.id;
+      const { restDays, cid10 } = req.body;
+      
+      const medicalRecord = await storage.getMedicalRecord(medicalRecordId);
+      if (!medicalRecord) {
+        return res.status(404).json({ message: 'Medical record not found' });
+      }
+
+      const patient = await storage.getPatient(medicalRecord.patientId);
+      const doctor = await storage.getUser(medicalRecord.doctorId);
+      
+      const certificateData = {
+        patientName: patient?.name || 'N/A',
+        patientDocument: 'Não informado',
+        restDays: restDays || 1,
+        cid10: cid10 || '',
+        date: new Date().toLocaleDateString('pt-BR'),
+        doctorName: doctor?.name || 'Médico',
+        doctorCRM: doctor?.digitalCertificate?.split('-')[1] || '123456',
+        doctorCRMState: 'SP'
+      };
+
+      const htmlContent = await pdfGeneratorService.generateMedicalCertificatePDF(certificateData);
+      
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="atestado-${patient?.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.html"`);
+      res.send(htmlContent);
+      
+    } catch (error) {
+      console.error('Medical certificate PDF error:', error);
+      res.status(500).json({ message: 'Failed to generate medical certificate PDF' });
     }
   });
 

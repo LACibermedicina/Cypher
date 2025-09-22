@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
@@ -18,14 +19,36 @@ import PatientJoin from "@/pages/patient-join";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
+import CommandPalette from "@/components/command-palette";
+import QuickActionsBar from "@/components/quick-actions-bar";
 
 // Responsive Dashboard Components
 import { ResponsiveDashboard } from "@/components/responsive-dashboard";
 
+// Global shortcuts hooks
+import { useGlobalShortcuts, useCommandEvents, useApplicationShortcuts } from "@/hooks/use-shortcuts";
+
 function Router() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { isCommandPaletteOpen, setIsCommandPaletteOpen } = useGlobalShortcuts();
+  
+  // Enable command events and global shortcuts
+  useCommandEvents();
+  useApplicationShortcuts();
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Command Palette */}
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={() => setIsCommandPaletteOpen(false)}
+        userRole={user?.role}
+      />
+
+      {/* Quick Actions Bar */}
+      {user && <QuickActionsBar userRole={user.role} />}
+
       <Switch>
         {/* Public routes */}
         <Route path="/login">
@@ -127,10 +150,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <NavigationProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </NavigationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
