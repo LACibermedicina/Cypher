@@ -29,12 +29,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t("dashboard.today_appointments")}</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-today-consultations">
+              <p className="text-2xl font-bold text-foreground" data-testid="text-today-consultations">
                 {stats?.todayConsultations || 0}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(210, 85%, 95%)' }}>
-              <i className="fas fa-calendar-day text-lg" style={{ color: 'var(--medical-primary)' }}></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+              <i className="fas fa-calendar-day text-lg text-muted-foreground"></i>
             </div>
           </div>
         </div>
@@ -43,12 +43,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t("dashboard.whatsapp_messages")}</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--medical-accent)' }} data-testid="text-whatsapp-messages">
+              <p className="text-2xl font-bold text-foreground" data-testid="text-whatsapp-messages">
                 {stats?.whatsappMessages || 0}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(145, 50%, 95%)' }}>
-              <i className="fab fa-whatsapp text-lg" style={{ color: 'var(--medical-accent)' }}></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+              <i className="fab fa-whatsapp text-lg text-muted-foreground"></i>
             </div>
           </div>
         </div>
@@ -57,12 +57,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t("dashboard.ai_scheduling")}</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--medical-secondary)' }} data-testid="text-ai-scheduling">
+              <p className="text-2xl font-bold text-foreground" data-testid="text-ai-scheduling">
                 {stats?.aiScheduling || 0}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(175, 45%, 95%)' }}>
-              <i className="fas fa-robot text-lg" style={{ color: 'var(--medical-secondary)' }}></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+              <i className="fas fa-robot text-lg text-muted-foreground"></i>
             </div>
           </div>
         </div>
@@ -71,12 +71,12 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">{t("dashboard.secure_records")}</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--medical-primary)' }} data-testid="text-secure-records">
+              <p className="text-2xl font-bold text-foreground" data-testid="text-secure-records">
                 {stats?.secureRecords || 0}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'hsl(210, 85%, 95%)' }}>
-              <i className="fas fa-shield-alt text-lg" style={{ color: 'var(--medical-primary)' }}></i>
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center">
+              <i className="fas fa-shield-alt text-lg text-muted-foreground"></i>
             </div>
           </div>
         </div>
