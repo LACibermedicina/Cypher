@@ -88,12 +88,26 @@ function SidebarContent() {
         </div>
       </div>
 
-      {/* Modern Security Badge */}
-      <div className="px-6 py-3">
-        <div className="security-badge px-4 py-3 rounded-xl text-white text-xs font-semibold text-center">
-          <i className="fas fa-shield-alt mr-2"></i>
-          {t("security.compliance")}
-        </div>
+      {/* Support and Emergency Access */}
+      <div className="px-6 py-3 space-y-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="w-full text-xs font-semibold hover:bg-accent/10 transition-colors"
+          data-testid="sidebar-support"
+        >
+          <i className="fas fa-headset mr-2 text-accent"></i>
+          Falar com Suporte
+        </Button>
+        <Button 
+          variant="destructive" 
+          size="sm" 
+          className="w-full text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
+          data-testid="sidebar-emergency"
+        >
+          <i className="fas fa-ambulance mr-2"></i>
+          Emergência Médica
+        </Button>
       </div>
 
       {/* Navigation */}
@@ -147,10 +161,10 @@ function SidebarContent() {
             {t("dashboard.system_status")}
           </h3>
           <div className="px-3 space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-ai-gradient/10 to-primary/10 border border-primary/20">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200">
               <div className="flex items-center space-x-3">
-                <div className="w-4 h-4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full shadow-sm"></div>
-                <span className="text-sm font-medium">{t("dashboard.ai_medical")}</span>
+                <div className="w-4 h-4 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-sm"></div>
+                <span className="text-sm font-medium">Sistema de Suporte</span>
               </div>
               <Badge className="success-badge text-xs px-3 py-1">{t("dashboard.status_active")}</Badge>
             </div>

@@ -84,10 +84,15 @@ export default function Header() {
                 </div>
               </div>
             </Link>
-            <div className="security-badge px-4 py-2 rounded-full text-white text-xs font-semibold">
-              <i className="fas fa-shield-alt mr-2"></i>
-              {t("security.compliance")}
-            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="px-4 py-2 text-xs font-semibold hover:bg-accent/10 transition-colors"
+              data-testid="button-support"
+            >
+              <i className="fas fa-headset mr-2 text-accent"></i>
+              Falar com Suporte
+            </Button>
           </div>
 
           {/* Desktop Navigation */}
@@ -220,10 +225,15 @@ export default function Header() {
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />
-            <div className="ai-indicator px-4 py-2 rounded-full text-white text-xs font-semibold">
-              <i className="fas fa-robot mr-2"></i>
-              {t("dashboard.ai_medical")} - {t("dashboard.status_active")}
-            </div>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
+              data-testid="button-emergency"
+            >
+              <i className="fas fa-ambulance mr-2"></i>
+              Emergência Médica
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
