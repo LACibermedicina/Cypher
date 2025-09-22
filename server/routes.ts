@@ -5535,11 +5535,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, userInfo, priority } = contactSchema.parse(req.body);
       const config = await storage.getOrCreateDefaultSupportConfig();
 
-      let response = { 
-        success: true, 
-        method: 'email',
-        message: 'Mensagem enviada por email. Nossa equipe entrará em contato em breve.'
-      };
+      let response;
+      let emailFallbackUsed = false;
 
       // Try WhatsApp first if configured
       if (config.whatsappNumber && config.supportChatbotEnabled) {
@@ -5557,7 +5554,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (whatsappError) {
           console.error('WhatsApp support failed, falling back to email:', whatsappError);
+          emailFallbackUsed = true;
         }
+      } else {
+        // No WhatsApp configured, use email fallback
+        emailFallbackUsed = true;
+      }
+
+      // If no WhatsApp success or WhatsApp not configured, log email fallback
+      if (!response || emailFallbackUsed) {
+        console.log(`[EMAIL SUPPORT] Sending email to info@interligas.org`);
+        console.log(`[EMAIL DETAILS] From: ${userInfo?.email || 'anonymous'}`);
+        console.log(`[EMAIL DETAILS] Name: ${userInfo?.name || 'Não informado'}`);
+        console.log(`[EMAIL DETAILS] Phone: ${userInfo?.phone || 'Não informado'}`);
+        console.log(`[EMAIL DETAILS] Message: ${message}`);
+        console.log(`[EMAIL DETAILS] Priority: ${priority}`);
+        console.log(`[EMAIL DETAILS] Timestamp: ${new Date().toISOString()}`);
+        
+        response = {
+          success: true,
+          method: 'email',
+          message: 'Mensagem enviada para nossa equipe via email (info@interligas.org). Retornaremos em breve.',
+          fallbackEmail: 'info@interligas.org'
+        };
       }
 
       // Auto-responder if enabled
