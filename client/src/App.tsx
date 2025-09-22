@@ -19,6 +19,9 @@ import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
 
+// Responsive Dashboard Components
+import { ResponsiveDashboard } from "@/components/responsive-dashboard";
+
 function Router() {
   const { t } = useTranslation();
   return (
@@ -35,14 +38,14 @@ function Router() {
         <Route path="/">
           <ProtectedRoute>
             <Header />
-            <Dashboard />
+            <ResponsiveDashboard />
           </ProtectedRoute>
         </Route>
         
         <Route path="/dashboard">
           <ProtectedRoute>
             <Header />
-            <Dashboard />
+            <ResponsiveDashboard />
           </ProtectedRoute>
         </Route>
         

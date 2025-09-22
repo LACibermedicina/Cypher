@@ -11,11 +11,23 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("doctor"), // doctor, admin, patient
+  role: text("role").notNull().default("visitor"), // admin, patient, doctor, visitor, researcher
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  whatsappNumber: text("whatsapp_number"),
+  tmcCredits: integer("tmc_credits").default(0), // Digital credits balance
   digitalCertificate: text("digital_certificate"), // For FIPS compliance
+  profilePicture: text("profile_picture"),
+  isBlocked: boolean("is_blocked").default(false),
+  blockedBy: uuid("blocked_by"),
+  superiorDoctorId: uuid("superior_doctor_id"),
+  hierarchyLevel: integer("hierarchy_level").default(0),
+  inviteQrCode: text("invite_qr_code"),
+  percentageFromInferiors: integer("percentage_from_inferiors").default(10), // Percentage received from hierarchical inferiors
+  medicalLicense: text("medical_license"), // CRM number for doctors
+  specialization: text("specialization"),
+  lastLogin: timestamp("last_login"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -256,13 +268,111 @@ export const videoConsultations = pgTable("video_consultations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// TMC Credit System
+export const tmcTransactions = pgTable("tmc_transactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(), // debit, credit, recharge, transfer, commission
+  amount: integer("amount").notNull(), // Can be negative for debits
+  reason: text("reason").notNull(), // consultation, prescription, data_access, etc.
+  relatedUserId: uuid("related_user_id").references(() => users.id), // For commissions and transfers
+  functionUsed: text("function_used"), // Which feature was used
+  balanceBefore: integer("balance_before").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  appointmentId: uuid("appointment_id").references(() => appointments.id),
+  medicalRecordId: uuid("medical_record_id").references(() => medicalRecords.id),
+  metadata: jsonb("metadata"), // Additional transaction details
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// TMC System Configuration
+export const tmcConfig = pgTable("tmc_config", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  functionName: text("function_name").notNull().unique(),
+  costInCredits: integer("cost_in_credits").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // consultation, prescription, data_access, admin
+  isActive: boolean("is_active").default(true),
+  minimumRole: text("minimum_role").default("visitor"), // Minimum role required
+  bonusForPatient: integer("bonus_for_patient").default(0), // Credits patient receives when their data is accessed
+  commissionPercentage: integer("commission_percentage").default(10), // For hierarchical doctors
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Chatbot Configuration and References
+export const chatbotReferences = pgTable("chatbot_references", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull(), // medical, procedural, emergency, general
+  keywords: text("keywords").array(), // Keywords for AI matching
+  priority: integer("priority").default(1), // Higher priority = used first
+  source: text("source"), // Reference source (medical guidelines, etc.)
+  isActive: boolean("is_active").default(true),
+  language: text("language").default("pt"), // Language of content
+  lastUsed: timestamp("last_used"),
+  usageCount: integer("usage_count").default(0),
+  createdBy: uuid("created_by").references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Laboratory Templates for PDF Processing
+export const labTemplates = pgTable("lab_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  laboratoryName: text("laboratory_name").notNull(),
+  templateName: text("template_name").notNull(),
+  fieldMappings: jsonb("field_mappings").notNull(), // JSON mapping of PDF fields to database
+  extractionRules: jsonb("extraction_rules").notNull(), // Rules for text extraction
+  validationRules: jsonb("validation_rules"), // Data validation rules
+  samplePdfUrl: text("sample_pdf_url"), // Example PDF for testing
+  isActive: boolean("is_active").default(true),
+  successRate: integer("success_rate").default(0), // Percentage of successful extractions
+  lastTested: timestamp("last_tested"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Clinical Interview Templates
+export const clinicalInterviews = pgTable("clinical_interviews", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: uuid("patient_id").references(() => patients.id),
+  userId: uuid("user_id").references(() => users.id), // Who initiated (can be visitor)
+  currentStage: integer("current_stage").default(1),
+  totalStages: integer("total_stages").default(7),
+  responses: jsonb("responses").notNull(), // Array of user responses
+  symptoms: jsonb("symptoms"), // Extracted symptoms data
+  urgencyLevel: text("urgency_level").default("low"), // low, medium, high, emergency
+  aiAnalysis: jsonb("ai_analysis"), // AI diagnostic hypotheses
+  isCompleted: boolean("is_completed").default(false),
+  requiresEmergency: boolean("requires_emergency").default(false),
+  sessionToken: text("session_token").unique(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   appointments: many(appointments),
   medicalRecords: many(medicalRecords),
   doctorSchedule: many(doctorSchedule),
   digitalSignatures: many(digitalSignatures),
   videoConsultations: many(videoConsultations),
+  tmcTransactions: many(tmcTransactions),
+  chatbotReferencesCreated: many(chatbotReferences, { relationName: "chatbotCreator" }),
+  chatbotReferencesUpdated: many(chatbotReferences, { relationName: "chatbotUpdater" }),
+  labTemplatesCreated: many(labTemplates),
+  clinicalInterviews: many(clinicalInterviews),
+  superiorDoctor: one(users, { fields: [users.superiorDoctorId], references: [users.id], relationName: "hierarchy" }),
+  subordinateDoctors: many(users, { relationName: "hierarchy" }),
+  blockedByUser: one(users, { fields: [users.blockedBy], references: [users.id], relationName: "blocking" }),
+  blockedUsers: many(users, { relationName: "blocking" }),
 }));
 
 export const patientsRelations = relations(patients, ({ many }) => ({
@@ -422,6 +532,64 @@ export const collaboratorApiKeysRelations = relations(collaboratorApiKeys, ({ on
   }),
 }));
 
+// New relations for TMC and extended functionality
+export const tmcTransactionsRelations = relations(tmcTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [tmcTransactions.userId],
+    references: [users.id],
+  }),
+  relatedUser: one(users, {
+    fields: [tmcTransactions.relatedUserId],
+    references: [users.id],
+  }),
+  appointment: one(appointments, {
+    fields: [tmcTransactions.appointmentId],
+    references: [appointments.id],
+  }),
+  medicalRecord: one(medicalRecords, {
+    fields: [tmcTransactions.medicalRecordId],
+    references: [medicalRecords.id],
+  }),
+}));
+
+export const tmcConfigRelations = relations(tmcConfig, ({ one }) => ({
+  updatedByUser: one(users, {
+    fields: [tmcConfig.updatedBy],
+    references: [users.id],
+  }),
+}));
+
+export const chatbotReferencesRelations = relations(chatbotReferences, ({ one }) => ({
+  creator: one(users, {
+    fields: [chatbotReferences.createdBy],
+    references: [users.id],
+    relationName: "chatbotCreator",
+  }),
+  updater: one(users, {
+    fields: [chatbotReferences.updatedBy],
+    references: [users.id],
+    relationName: "chatbotUpdater",
+  }),
+}));
+
+export const labTemplatesRelations = relations(labTemplates, ({ one }) => ({
+  creator: one(users, {
+    fields: [labTemplates.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const clinicalInterviewsRelations = relations(clinicalInterviews, ({ one }) => ({
+  patient: one(patients, {
+    fields: [clinicalInterviews.patientId],
+    references: [patients.id],
+  }),
+  user: one(users, {
+    fields: [clinicalInterviews.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -506,6 +674,35 @@ export const insertVideoConsultationSchema = createInsertSchema(videoConsultatio
   updatedAt: true,
 });
 
+export const insertTmcTransactionSchema = createInsertSchema(tmcTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTmcConfigSchema = createInsertSchema(tmcConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChatbotReferenceSchema = createInsertSchema(chatbotReferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLabTemplateSchema = createInsertSchema(labTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClinicalInterviewSchema = createInsertSchema(clinicalInterviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -552,10 +749,40 @@ export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema
 export type VideoConsultation = typeof videoConsultations.$inferSelect;
 export type InsertVideoConsultation = z.infer<typeof insertVideoConsultationSchema>;
 
+export type TmcTransaction = typeof tmcTransactions.$inferSelect;
+export type InsertTmcTransaction = z.infer<typeof insertTmcTransactionSchema>;
+
+export type TmcConfig = typeof tmcConfig.$inferSelect;
+export type InsertTmcConfig = z.infer<typeof insertTmcConfigSchema>;
+
+export type ChatbotReference = typeof chatbotReferences.$inferSelect;
+export type InsertChatbotReference = z.infer<typeof insertChatbotReferenceSchema>;
+
+export type LabTemplate = typeof labTemplates.$inferSelect;
+export type InsertLabTemplate = z.infer<typeof insertLabTemplateSchema>;
+
+export type ClinicalInterview = typeof clinicalInterviews.$inferSelect;
+export type InsertClinicalInterview = z.infer<typeof insertClinicalInterviewSchema>;
+
 // Dashboard stats type
 export interface DashboardStats {
   todayConsultations: number;
   whatsappMessages: number;
   aiScheduling: number;
   secureRecords: number;
+  tmcCredits: number;
+  activeUsers: number;
+}
+
+// TMC system types
+export interface TmcBalance {
+  userId: string;
+  balance: number;
+  lastTransaction: string;
+}
+
+export interface SystemConfig {
+  functionCosts: Record<string, number>;
+  commissionRates: Record<string, number>;
+  bonusRates: Record<string, number>;
 }
