@@ -274,6 +274,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   };
+
+  // Broadcast to all admin users
+  const broadcastToAdmins = async (data: any) => {
+    try {
+      const adminUsers = await storage.getUsersByRole('admin');
+      adminUsers.forEach(admin => {
+        const clients = authenticatedClients.get(admin.id);
+        if (clients) {
+          clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                ...data,
+                timestamp: new Date().toISOString()
+              }));
+            }
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error broadcasting to admins:', error);
+    }
+  };
+
+  // Broadcast real-time activity to all connected admin users
+  const broadcastAdminActivity = async (activity: {
+    type: string;
+    action: string;
+    entityId?: string;
+    userId?: string;
+    details?: any;
+  }) => {
+    const activityData = {
+      type: 'admin-activity',
+      activity: {
+        ...activity,
+        timestamp: new Date().toISOString()
+      }
+    };
+    await broadcastToAdmins(activityData);
+  };
   
   // WebRTC signaling helper functions
   
@@ -5207,6 +5247,237 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Healthcare compliance validation error:', error);
       res.status(500).json({ message: 'Failed to validate healthcare compliance' });
+    }
+  });
+
+  // ======================
+  // ADMIN USER MANAGEMENT API ROUTES
+  // ======================
+
+  // Get all users for admin management
+  app.get('/api/admin/users', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { role, blocked } = req.query;
+      let users;
+
+      if (role) {
+        users = await storage.getUsersByRole(role as string);
+      } else {
+        users = await storage.getAllUsers();
+      }
+
+      // Filter by blocked status if specified
+      if (blocked !== undefined) {
+        const isBlocked = blocked === 'true';
+        users = users.filter(u => u.isBlocked === isBlocked);
+      }
+
+      // Remove sensitive data
+      const safeUsers = users.map(u => ({
+        ...u,
+        password: undefined
+      }));
+
+      res.json(safeUsers);
+    } catch (error) {
+      console.error('Admin users fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  // Get specific user details
+  app.get('/api/admin/users/:userId', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { userId } = req.params;
+      const targetUser = await storage.getUser(userId);
+
+      if (!targetUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Remove sensitive data
+      const safeUser = { ...targetUser, password: undefined };
+      res.json(safeUser);
+    } catch (error) {
+      console.error('Admin user fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch user' });
+    }
+  });
+
+  // Update user information
+  app.patch('/api/admin/users/:userId', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { userId } = req.params;
+      const updateData = req.body;
+
+      // Prevent updating sensitive fields directly
+      delete updateData.password;
+      delete updateData.id;
+
+      const updatedUser = await storage.updateUser(userId, updateData);
+
+      if (!updatedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Remove sensitive data
+      const safeUser = { ...updatedUser, password: undefined };
+      res.json(safeUser);
+    } catch (error) {
+      console.error('Admin user update error:', error);
+      res.status(500).json({ message: 'Failed to update user' });
+    }
+  });
+
+  // Block user
+  app.post('/api/admin/users/:userId/block', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { userId } = req.params;
+      const { reason } = req.body;
+
+      // Prevent self-blocking
+      if (userId === user.id) {
+        return res.status(400).json({ message: 'Cannot block your own account' });
+      }
+
+      const blockedUser = await storage.blockUser(userId, user.id, reason);
+
+      if (!blockedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Log the blocking action
+      const systemCollaborator = await storage.getOrCreateSystemCollaborator();
+      await storage.createCollaboratorIntegration({
+        collaboratorId: systemCollaborator.id,
+        integrationType: 'user_management',
+        entityId: userId,
+        action: 'user_blocked',
+        status: 'success',
+        requestData: {
+          blockedBy: user.id,
+          blockedByUsername: user.username,
+          reason: reason || 'No reason provided',
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Broadcast real-time activity to all admins
+      await broadcastAdminActivity({
+        type: 'user_management',
+        action: 'user_blocked',
+        entityId: userId,
+        userId: user.id,
+        details: {
+          blockedUsername: blockedUser.username,
+          blockedUserName: blockedUser.name,
+          blockedBy: user.username,
+          reason: reason || 'No reason provided'
+        }
+      });
+
+      // Remove sensitive data
+      const safeUser = { ...blockedUser, password: undefined };
+      res.json({ message: 'User blocked successfully', user: safeUser });
+    } catch (error) {
+      console.error('Admin user block error:', error);
+      res.status(500).json({ message: 'Failed to block user' });
+    }
+  });
+
+  // Unblock user
+  app.post('/api/admin/users/:userId/unblock', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { userId } = req.params;
+      const unblockedUser = await storage.unblockUser(userId);
+
+      if (!unblockedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Log the unblocking action
+      const systemCollaborator = await storage.getOrCreateSystemCollaborator();
+      await storage.createCollaboratorIntegration({
+        collaboratorId: systemCollaborator.id,
+        integrationType: 'user_management',
+        entityId: userId,
+        action: 'user_unblocked',
+        status: 'success',
+        requestData: {
+          unblockedBy: user.id,
+          unblockedByUsername: user.username,
+          timestamp: new Date().toISOString()
+        },
+      });
+
+      // Broadcast real-time activity to all admins
+      await broadcastAdminActivity({
+        type: 'user_management',
+        action: 'user_unblocked',
+        entityId: userId,
+        userId: user.id,
+        details: {
+          unblockedUsername: unblockedUser.username,
+          unblockedUserName: unblockedUser.name,
+          unblockedBy: user.username
+        }
+      });
+
+      // Remove sensitive data
+      const safeUser = { ...unblockedUser, password: undefined };
+      res.json({ message: 'User unblocked successfully', user: safeUser });
+    } catch (error) {
+      console.error('Admin user unblock error:', error);
+      res.status(500).json({ message: 'Failed to unblock user' });
+    }
+  });
+
+  // Get recent user activity
+  app.get('/api/admin/users/activity/recent', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied: admin privileges required' });
+      }
+
+      const { limit = 50 } = req.query;
+      const recentActivity = await storage.getRecentUserActivity(parseInt(limit as string));
+
+      // Remove sensitive data
+      const safeUsers = recentActivity.map(u => ({
+        ...u,
+        password: undefined
+      }));
+
+      res.json(safeUsers);
+    } catch (error) {
+      console.error('Admin user activity fetch error:', error);
+      res.status(500).json({ message: 'Failed to fetch user activity' });
     }
   });
 

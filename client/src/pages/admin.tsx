@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Users, Key, Activity, AlertTriangle, Plus, Eye, EyeOff, Copy, Trash2 } from 'lucide-react';
+import { Shield, Users, Key, Activity, AlertTriangle, Plus, Eye, EyeOff, Copy, Trash2, UserCheck, UserX, Edit3, Clock, Zap } from 'lucide-react';
 import { format } from 'date-fns';
+import { useWebSocket } from '@/hooks/use-websocket';
 
 interface Collaborator {
   id: string;
@@ -55,12 +56,58 @@ interface CollaboratorIntegration {
   createdAt: string;
 }
 
+interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  role: string;
+  isBlocked: boolean;
+  blockedBy?: string;
+  lastLogin?: string;
+  hierarchyLevel?: number;
+  superiorDoctorId?: string;
+  medicalLicense?: string;
+  specialization?: string;
+  tmcCredits?: number;
+  createdAt: string;
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
   const [showCreateCollaborator, setShowCreateCollaborator] = useState(false);
   const [showCreateApiKey, setShowCreateApiKey] = useState(false);
   const [selectedCollaborator, setSelectedCollaborator] = useState<string>('');
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [realtimeActivities, setRealtimeActivities] = useState<any[]>([]);
+
+  // WebSocket for real-time activity monitoring
+  const { isConnected, messages } = useWebSocket();
+
+  // Process WebSocket messages for admin activities
+  useEffect(() => {
+    const adminMessages = messages.filter(msg => msg.type === 'admin-activity');
+    if (adminMessages.length > 0) {
+      const latestMessage = adminMessages[adminMessages.length - 1];
+      const activity = (latestMessage as any).activity; // Type assertion for admin activity messages
+      setRealtimeActivities(prev => [activity, ...prev.slice(0, 49)]); // Keep last 50 activities
+      
+      // Show toast notification for new activities
+      if (activity.action === 'user_blocked') {
+        toast({
+          title: "User Blocked",
+          description: `${activity.details.blockedUsername} was blocked by ${activity.details.blockedBy}`,
+          variant: "destructive",
+        });
+      } else if (activity.action === 'user_unblocked') {
+        toast({
+          title: "User Unblocked",
+          description: `${activity.details.unblockedUsername} was unblocked by ${activity.details.unblockedBy}`,
+        });
+      }
+    }
+  }, [messages, toast]);
 
   // Queries
   const { data: collaborators = [], isLoading: loadingCollaborators } = useQuery({
@@ -77,6 +124,14 @@ export default function AdminPage() {
 
   const { data: analytics } = useQuery({
     queryKey: ['/api/admin/analytics'],
+  });
+
+  const { data: adminUsers = [], isLoading: loadingUsers } = useQuery({
+    queryKey: ['/api/admin/users'],
+  });
+
+  const { data: recentActivity = [], isLoading: loadingActivity } = useQuery({
+    queryKey: ['/api/admin/users/activity/recent'],
   });
 
   // Mutations
@@ -110,6 +165,42 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/api-keys'] });
       toast({ title: 'Success', description: 'API key updated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const blockUserMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: string; reason?: string }) => 
+      apiRequest('POST', `/api/admin/users/${userId}/block`, { reason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Success', description: 'User blocked successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const unblockUserMutation = useMutation({
+    mutationFn: (userId: string) => 
+      apiRequest('POST', `/api/admin/users/${userId}/unblock`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Success', description: 'User unblocked successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  });
+
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, data }: { userId: string; data: any }) => 
+      apiRequest('PATCH', `/api/admin/users/${userId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({ title: 'Success', description: 'User updated successfully' });
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -218,11 +309,334 @@ export default function AdminPage() {
 
       <Tabs defaultValue="collaborators" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+          <TabsTrigger value="activity" data-testid="tab-activity">
+            <div className="flex items-center space-x-2">
+              <Zap className="h-4 w-4" />
+              <span>Live Activity</span>
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            </div>
+          </TabsTrigger>
           <TabsTrigger value="collaborators" data-testid="tab-collaborators">Collaborators</TabsTrigger>
           <TabsTrigger value="api-keys" data-testid="tab-api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="monitoring" data-testid="tab-monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
         </TabsList>
+
+        {/* Users Tab */}
+        <TabsContent value="users" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Total Users</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="total-users">
+                  {(adminUsers as AdminUser[]).length}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Active: {(adminUsers as AdminUser[]).filter((u: AdminUser) => !u.isBlocked).length}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Blocked Users</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600" data-testid="blocked-users">
+                  {(adminUsers as AdminUser[]).filter((u: AdminUser) => u.isBlocked).length}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Require attention
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="recent-activity">
+                  {(recentActivity as AdminUser[]).length}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Users active today
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                Manage system users, roles, and access permissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingUsers ? (
+                <div className="text-center py-8">Loading users...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Username</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last Login</TableHead>
+                      <TableHead>TMC Credits</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(adminUsers as AdminUser[]).map((user: AdminUser) => (
+                      <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
+                        <TableCell className="font-medium">{user.username}</TableCell>
+                        <TableCell>{user.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            user.role === 'admin' ? 'bg-red-100 text-red-800' :
+                            user.role === 'doctor' ? 'bg-blue-100 text-blue-800' :
+                            user.role === 'patient' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          }>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={user.isBlocked ? 'destructive' : 'default'}>
+                            {user.isBlocked ? 'Blocked' : 'Active'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.lastLogin ? format(new Date(user.lastLogin), 'MMM dd, yyyy HH:mm') : 'Never'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono">{user.tmcCredits || 0} TMC</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {user.isBlocked ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => unblockUserMutation.mutate(user.id)}
+                                data-testid={`button-unblock-${user.id}`}
+                                disabled={unblockUserMutation.isPending}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => blockUserMutation.mutate({ 
+                                  userId: user.id, 
+                                  reason: 'Administrative action' 
+                                })}
+                                data-testid={`button-block-${user.id}`}
+                                disabled={blockUserMutation.isPending}
+                              >
+                                <UserX className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-testid={`button-edit-${user.id}`}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Live Activity Tab */}
+        <TabsContent value="activity" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span>WebSocket</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm font-medium">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Real-time connection status
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Live Activities</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="live-activities-count">
+                  {realtimeActivities.length}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Recent admin actions
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Messages</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="websocket-messages-count">
+                  {messages.length}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Total WebSocket messages
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">System Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm font-medium text-green-600">
+                  Online
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  All systems operational
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Real-time Activity Feed */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Activity className="h-5 w-5" />
+                  <span>Live Activity Feed</span>
+                  <Badge variant="outline" className="ml-2">
+                    {realtimeActivities.length} activities
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  Real-time administrative actions and system events
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-96 overflow-y-auto space-y-3">
+                  {realtimeActivities.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Clock className="h-8 w-8 mx-auto mb-2" />
+                      <p>No recent activity</p>
+                      <p className="text-sm">Administrative actions will appear here in real-time</p>
+                    </div>
+                  ) : (
+                    realtimeActivities.map((activity, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg"
+                        data-testid={`activity-item-${index}`}
+                      >
+                        <div className={`w-2 h-2 rounded-full mt-2 ${
+                          activity.action === 'user_blocked' ? 'bg-red-500' :
+                          activity.action === 'user_unblocked' ? 'bg-green-500' :
+                          'bg-blue-500'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline" className="text-xs">
+                              {activity.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(activity.timestamp), 'HH:mm:ss')}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium mt-1">
+                            {activity.action === 'user_blocked' && 
+                              `User ${activity.details.blockedUsername} was blocked`}
+                            {activity.action === 'user_unblocked' && 
+                              `User ${activity.details.unblockedUsername} was unblocked`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {activity.action === 'user_blocked' && 
+                              `By ${activity.details.blockedBy} - ${activity.details.reason}`}
+                            {activity.action === 'user_unblocked' && 
+                              `By ${activity.details.unblockedBy}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* WebSocket Messages Debug */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5" />
+                  <span>WebSocket Messages</span>
+                  <Badge variant="outline" className="ml-2">
+                    {messages.length} messages
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  Debug information for WebSocket communication
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {messages.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-8 w-8 mx-auto mb-2" />
+                      <p>No WebSocket messages</p>
+                      <p className="text-sm">Messages will appear here when received</p>
+                    </div>
+                  ) : (
+                    messages.slice(-20).reverse().map((message, index) => (
+                      <div
+                        key={index}
+                        className="p-2 bg-muted/30 rounded text-xs font-mono"
+                        data-testid={`websocket-message-${index}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="text-xs">
+                            {message.type}
+                          </Badge>
+                          <span className="text-muted-foreground">
+                            {format(new Date(), 'HH:mm:ss')}
+                          </span>
+                        </div>
+                        <pre className="mt-1 text-xs overflow-x-auto">
+                          {JSON.stringify(message.data, null, 2)}
+                        </pre>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         {/* Collaborators Tab */}
         <TabsContent value="collaborators" className="space-y-4">

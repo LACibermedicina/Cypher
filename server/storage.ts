@@ -32,7 +32,13 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
+  blockUser(userId: string, blockedById: string, reason?: string): Promise<User | undefined>;
+  unblockUser(userId: string): Promise<User | undefined>;
+  getUsersByRole(role: string): Promise<User[]>;
+  getRecentUserActivity(limit?: number): Promise<User[]>;
 
   // Patients
   getPatient(id: string): Promise<Patient | undefined>;
@@ -167,9 +173,57 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async updateUser(id: string, updateUser: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ ...updateUser })
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async blockUser(userId: string, blockedById: string, reason?: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ 
+        isBlocked: true, 
+        blockedBy: blockedById,
+        // Note: we could add a blockedReason field to schema later if needed
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async unblockUser(userId: string): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set({ 
+        isBlocked: false, 
+        blockedBy: null 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.role, role))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getRecentUserActivity(limit: number = 50): Promise<User[]> {
+    return await db.select().from(users)
+      .where(sql`last_login IS NOT NULL`)
+      .orderBy(desc(users.lastLogin))
+      .limit(limit);
   }
 
   // Patients
