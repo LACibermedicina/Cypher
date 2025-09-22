@@ -270,9 +270,25 @@ export function useCommandEvents() {
   useEffect(() => {
     // AI Analysis
     const handleAiAnalysis = () => {
-      const modal = document.querySelector('[data-testid="button-analyze-symptoms"]') as HTMLButtonElement;
-      if (modal) {
-        modal.click();
+      const tryClick = () => {
+        const button = document.querySelector('[data-testid="button-analyze-symptoms"]') as HTMLButtonElement;
+        if (button && button.offsetParent !== null) { // Check if element is visible
+          button.click();
+          return true;
+        }
+        return false;
+      };
+
+      // Try immediately first
+      if (!tryClick()) {
+        // If not found, wait a bit and try again
+        setTimeout(() => {
+          if (!tryClick()) {
+            console.warn('AI Analysis button not found or not visible');
+            // Fallback: Show a simple alert or toast
+            alert('Para usar a Análise de IA, vá para o Dashboard e clique em "Analisar Novos Sintomas" no card do Assistente Clínico IA.');
+          }
+        }, 100);
       }
     };
 
