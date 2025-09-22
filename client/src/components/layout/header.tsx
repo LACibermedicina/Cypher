@@ -9,6 +9,7 @@ import LanguageSelector from "@/components/ui/language-selector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { LogOut, User, Settings } from "lucide-react";
 
 export default function Header() {
@@ -30,6 +31,115 @@ export default function Header() {
       toast({
         title: t("auth.logout_error"),
         description: t("auth.logout_error_desc"),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSupportContact = async () => {
+    try {
+      const response: any = await apiRequest('POST', '/api/support/contact', {
+        message: 'Solicitação de suporte através da interface do sistema',
+        userInfo: {
+          name: user?.name,
+          email: user?.email,
+          phone: user?.phone
+        },
+        priority: 'medium'
+      });
+
+      toast({
+        title: "Suporte Contactado",
+        description: response.message || "Mensagem enviada com sucesso!",
+      });
+
+      if (response.method === 'whatsapp' && response.autoResponse) {
+        setTimeout(() => {
+          toast({
+            title: "Resposta Automática",
+            description: response.autoResponse,
+          });
+        }, 1000);
+      }
+    } catch (error) {
+      toast({
+        title: "Erro no Suporte",
+        description: "Não foi possível enviar a mensagem. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEmergencyContact = async () => {
+    try {
+      // Try to get user's location for emergency
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (position) => {
+          const response: any = await apiRequest('POST', '/api/support/emergency', {
+            location: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            },
+            userInfo: {
+              name: user?.name,
+              phone: user?.phone
+            },
+            type: 'samu_whatsapp'
+          });
+
+          if (response.phone) {
+            const whatsappUrl = `https://wa.me/${response.phone}?text=Emergência médica - Solicito atendimento imediato`;
+            window.open(whatsappUrl, '_blank');
+          }
+
+          toast({
+            title: "Emergência Médica",
+            description: response.message || "Contato de emergência acionado",
+          });
+        }, async () => {
+          // Fallback without location
+          const response: any = await apiRequest('POST', '/api/support/emergency', {
+            userInfo: {
+              name: user?.name,
+              phone: user?.phone
+            },
+            type: 'samu_whatsapp'
+          });
+
+          if (response.phone) {
+            const whatsappUrl = `https://wa.me/${response.phone}?text=Emergência médica - Solicito atendimento imediato`;
+            window.open(whatsappUrl, '_blank');
+          }
+
+          toast({
+            title: "Emergência Médica",
+            description: response.message || "Contato de emergência acionado",
+          });
+        });
+      } else {
+        // No geolocation support
+        const response: any = await apiRequest('POST', '/api/support/emergency', {
+          userInfo: {
+            name: user?.name,
+            phone: user?.phone
+          },
+          type: 'samu_whatsapp'
+        });
+
+        if (response.phone) {
+          const whatsappUrl = `https://wa.me/${response.phone}?text=Emergência médica - Solicito atendimento imediato`;
+          window.open(whatsappUrl, '_blank');
+        }
+
+        toast({
+          title: "Emergência Médica",
+          description: response.message || "Contato de emergência acionado",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro na Emergência",
+        description: "Não foi possível acionar o contato de emergência. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -89,6 +199,7 @@ export default function Header() {
               size="sm" 
               className="px-4 py-2 text-xs font-semibold hover:bg-accent/10 transition-colors"
               data-testid="button-support"
+              onClick={handleSupportContact}
             >
               <i className="fas fa-headset mr-2 text-accent"></i>
               Falar com Suporte
@@ -230,6 +341,7 @@ export default function Header() {
               size="sm" 
               className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
               data-testid="button-emergency"
+              onClick={handleEmergencyContact}
             >
               <i className="fas fa-ambulance mr-2"></i>
               Emergência Médica

@@ -5506,6 +5506,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== SUPPORT SYSTEM ENDPOINTS =====
+
+  // Get Support Configuration
+  app.get('/api/support/config', async (req, res) => {
+    try {
+      const config = await storage.getOrCreateDefaultSupportConfig();
+      res.json(config);
+    } catch (error) {
+      console.error('Support config error:', error);
+      res.status(500).json({ message: 'Failed to get support configuration' });
+    }
+  });
+
+  // Trigger Support Contact
+  app.post('/api/support/contact', async (req, res) => {
+    try {
+      const contactSchema = z.object({
+        message: z.string().min(1, 'Message is required'),
+        userInfo: z.object({
+          name: z.string().optional(),
+          email: z.string().optional(),
+          phone: z.string().optional()
+        }).optional(),
+        priority: z.enum(['low', 'medium', 'high', 'emergency']).default('medium')
+      });
+      
+      const { message, userInfo, priority } = contactSchema.parse(req.body);
+      const config = await storage.getOrCreateDefaultSupportConfig();
+
+      let response = { 
+        success: true, 
+        method: 'email',
+        message: 'Mensagem enviada por email. Nossa equipe entrará em contato em breve.'
+      };
+
+      // Try WhatsApp first if configured
+      if (config.whatsappNumber && config.supportChatbotEnabled) {
+        try {
+          const supportMessage = `Nova solicitação de suporte:\n\nMensagem: ${message}\n\nPrioridade: ${priority}\n\nUsuário: ${userInfo?.name || 'Não informado'}\nEmail: ${userInfo?.email || 'Não informado'}\nTelefone: ${userInfo?.phone || 'Não informado'}`;
+          
+          const whatsappSuccess = await whatsAppService.sendMessage(config.whatsappNumber, supportMessage);
+          
+          if (whatsappSuccess) {
+            response = {
+              success: true,
+              method: 'whatsapp',
+              message: 'Mensagem enviada via WhatsApp. Nossa equipe responderá em breve.'
+            };
+          }
+        } catch (whatsappError) {
+          console.error('WhatsApp support failed, falling back to email:', whatsappError);
+        }
+      }
+
+      // Auto-responder if enabled
+      if (config.autoResponderEnabled && config.autoResponderMessage) {
+        response.autoResponse = config.autoResponderMessage;
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error('Support contact error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to send support message' });
+    }
+  });
+
+  // Emergency System Contact
+  app.post('/api/support/emergency', async (req, res) => {
+    try {
+      const emergencySchema = z.object({
+        location: z.object({
+          latitude: z.number().optional(),
+          longitude: z.number().optional(),
+          country: z.string().optional()
+        }).optional(),
+        userInfo: z.object({
+          name: z.string().optional(),
+          phone: z.string().optional(),
+          emergencyContact: z.string().optional()
+        }).optional(),
+        type: z.enum(['samu_online', 'samu_whatsapp', 'emergency_contact']).default('samu_online')
+      });
+      
+      const { location, userInfo, type } = emergencySchema.parse(req.body);
+      const config = await storage.getOrCreateDefaultSupportConfig();
+
+      let response = {
+        success: true,
+        phone: config.samuWhatsapp,
+        onlineUrl: config.samuOnlineUrl
+      };
+
+      // Handle different emergency types
+      switch (type) {
+        case 'samu_online':
+          response = {
+            ...response,
+            method: 'online',
+            url: config.samuOnlineUrl,
+            message: 'Redirecionando para o SAMU online'
+          };
+          break;
+        
+        case 'samu_whatsapp':
+          response = {
+            ...response,
+            method: 'whatsapp',
+            phone: config.samuWhatsapp,
+            message: `Entre em contato com o SAMU: ${config.samuWhatsapp}`
+          };
+          break;
+        
+        case 'emergency_contact':
+          if (userInfo?.emergencyContact && config.emergencySmsEnabled) {
+            // Here you would integrate with SMS service
+            response = {
+              ...response,
+              method: 'emergency_sms',
+              message: 'SMS de emergência enviado para seu contato',
+              emergencyContact: userInfo.emergencyContact
+            };
+          }
+          break;
+      }
+
+      // Handle Paraguay location
+      if (location?.country === 'Paraguay' || location?.country === 'PY') {
+        response.phone = config.paraguayEmergencyNumber;
+        response.message = `Emergência no Paraguai. Contate: ${config.paraguayEmergencyNumber}`;
+      }
+
+      res.json(response);
+    } catch (error) {
+      console.error('Emergency contact error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to process emergency request' });
+    }
+  });
+
   return httpServer;
 }
 

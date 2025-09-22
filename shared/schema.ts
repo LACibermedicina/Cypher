@@ -321,6 +321,25 @@ export const chatbotReferences = pgTable("chatbot_references", {
 });
 
 // Laboratory Templates for PDF Processing
+// Support System Configuration
+export const supportConfig = pgTable("support_config", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  whatsappNumber: text("whatsapp_number"), // Support WhatsApp number
+  supportEmail: text("support_email").default("info@interligas.org"),
+  samuWhatsapp: text("samu_whatsapp").default("5517933004006"), // (17) 93300-4006
+  samuOnlineUrl: text("samu_online_url").default("https://samu.saude.gov.br/emergencia"),
+  supportChatbotEnabled: boolean("support_chatbot_enabled").default(true),
+  emergencyGeolocationEnabled: boolean("emergency_geolocation_enabled").default(true),
+  paraguayEmergencyNumber: text("paraguay_emergency_number").default("911"),
+  emergencySmsEnabled: boolean("emergency_sms_enabled").default(true),
+  businessHours: jsonb("business_hours"), // Support hours configuration
+  autoResponderEnabled: boolean("auto_responder_enabled").default(true),
+  autoResponderMessage: text("auto_responder_message").default("Obrigado por entrar em contato! Nossa equipe responderá em breve."),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const labTemplates = pgTable("lab_templates", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   laboratoryName: text("laboratory_name").notNull(),
@@ -703,6 +722,12 @@ export const insertClinicalInterviewSchema = createInsertSchema(clinicalIntervie
   updatedAt: true,
 });
 
+export const insertSupportConfigSchema = createInsertSchema(supportConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -763,6 +788,9 @@ export type InsertLabTemplate = z.infer<typeof insertLabTemplateSchema>;
 
 export type ClinicalInterview = typeof clinicalInterviews.$inferSelect;
 export type InsertClinicalInterview = z.infer<typeof insertClinicalInterviewSchema>;
+
+export type SupportConfig = typeof supportConfig.$inferSelect;
+export type InsertSupportConfig = z.infer<typeof insertSupportConfigSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {

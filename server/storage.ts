@@ -2,7 +2,7 @@ import {
   users, patients, appointments, medicalRecords, whatsappMessages, 
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
-  tmcTransactions, tmcConfig,
+  tmcTransactions, tmcConfig, supportConfig,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -10,7 +10,7 @@ import {
   type DigitalSignature, type InsertDigitalSignature, type VideoConsultation, type InsertVideoConsultation,
   type PrescriptionShare, type InsertPrescriptionShare, type LabOrder, type InsertLabOrder,
   type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
-  type CollaboratorApiKey, type InsertCollaboratorApiKey
+  type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig
 } from "@shared/schema";
 
 // Import TMC types from schema
@@ -1264,6 +1264,51 @@ export class DatabaseStorage implements IStorage {
     const userBalance = await this.getUserBalance(userId);
     const functionCost = await this.getFunctionCost(functionName);
     return userBalance >= functionCost;
+  }
+
+  // Support System Implementation
+  async getSupportConfig(): Promise<SupportConfig | undefined> {
+    const [config] = await db.select().from(supportConfig)
+      .where(eq(supportConfig.isActive, true))
+      .orderBy(desc(supportConfig.createdAt))
+      .limit(1);
+    return config || undefined;
+  }
+
+  async createSupportConfig(insertConfig: InsertSupportConfig): Promise<SupportConfig> {
+    const [config] = await db.insert(supportConfig).values(insertConfig).returning();
+    return config;
+  }
+
+  async updateSupportConfig(id: string, updateConfig: Partial<InsertSupportConfig>): Promise<SupportConfig | undefined> {
+    const [config] = await db.update(supportConfig)
+      .set({ ...updateConfig, updatedAt: sql`now()` })
+      .where(eq(supportConfig.id, id))
+      .returning();
+    return config || undefined;
+  }
+
+  async getOrCreateDefaultSupportConfig(): Promise<SupportConfig> {
+    let config = await this.getSupportConfig();
+    
+    if (!config) {
+      // Create default support configuration
+      config = await this.createSupportConfig({
+        whatsappNumber: "5511960708817", // +55 11 96070-8817 - Default admin support number
+        supportEmail: "info@interligas.org",
+        samuWhatsapp: "5517933004006",
+        samuOnlineUrl: "https://samu.saude.gov.br/emergencia",
+        supportChatbotEnabled: true,
+        emergencyGeolocationEnabled: true,
+        paraguayEmergencyNumber: "911",
+        emergencySmsEnabled: true,
+        autoResponderEnabled: true,
+        autoResponderMessage: "Obrigado por entrar em contato! Nossa equipe responderá em breve.",
+        isActive: true
+      });
+    }
+    
+    return config;
   }
 }
 
