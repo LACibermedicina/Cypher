@@ -6328,6 +6328,43 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
+  // Get recent prescriptions (for dashboard or general view)
+  app.get('/api/prescriptions/recent', requireAuth, async (req, res) => {
+    try {
+      const { limit = '20' } = req.query;
+      
+      // Use simple select all approach to avoid circular references
+      let query = db.select()
+        .from(prescriptions);
+      
+      // For doctors, filter to their own prescriptions; for admins, show all
+      if (req.user?.role === 'doctor') {
+        query = query.where(eq(prescriptions.doctorId, req.user.id));
+      }
+      
+      const results = await query
+        .orderBy(desc(prescriptions.createdAt))
+        .limit(parseInt(limit.toString()));
+      
+      // Transform results to match expected structure
+      const recentPrescriptions = results.map(prescription => ({
+        id: prescription.id,
+        prescriptionNumber: prescription.prescriptionNumber,
+        diagnosis: prescription.diagnosis,
+        status: prescription.status,
+        createdAt: prescription.createdAt,
+        expiresAt: prescription.expiresAt,
+        doctorName: 'Doctor', // Simplified for now
+        patientName: 'Patient', // Simplified for now
+      }));
+      
+      res.json(recentPrescriptions);
+    } catch (error) {
+      console.error('Get recent prescriptions error:', error);
+      res.status(500).json({ message: 'Failed to get recent prescriptions' });
+    }
+  });
+
   // Get prescription details with items
   app.get('/api/prescriptions/:id', requireAuth, async (req, res) => {
     try {
@@ -6440,35 +6477,6 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
-  // Get recent prescriptions (for dashboard or general view)
-  app.get('/api/prescriptions/recent', requireAuth, async (req, res) => {
-    try {
-      const { limit = '20' } = req.query;
-      
-      // For doctors, show their own prescriptions; for admins, show all
-      let whereCondition = req.user?.role === 'doctor' ? eq(prescriptions.doctorId, req.user.id) : undefined;
-      
-      const recentPrescriptions = await db.select({
-        id: prescriptions.id,
-        prescriptionNumber: prescriptions.prescriptionNumber,
-        diagnosis: prescriptions.diagnosis,
-        status: prescriptions.status,
-        createdAt: prescriptions.createdAt,
-        expiresAt: prescriptions.expiresAt,
-        doctorName: 'Doctor', // Simplified for now
-        patientName: 'Patient', // Simplified for now
-      })
-      .from(prescriptions)
-      .where(whereCondition)
-      .orderBy(desc(prescriptions.createdAt))
-      .limit(parseInt(limit.toString()));
-      
-      res.json(recentPrescriptions);
-    } catch (error) {
-      console.error('Get recent prescriptions error:', error);
-      res.status(500).json({ message: 'Failed to get recent prescriptions' });
-    }
-  });
 
   // Helper function to check drug interactions
   async function checkDrugInteractions(medicationIds: string[]) {
