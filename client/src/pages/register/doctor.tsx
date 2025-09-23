@@ -52,6 +52,8 @@ export default function DoctorRegister() {
         name: data.name,
         email: data.email,
         phone: data.phone,
+        medicalLicense: data.crm, // Map CRM to medicalLicense
+        specialization: data.specialty, // Map specialty to specialization
         role: "doctor" as const,
       });
       

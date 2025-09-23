@@ -3644,11 +3644,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Registration
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, password, role, name, email, phone } = req.body;
+      const { username, password, role, name, email, phone, medicalLicense, specialization } = req.body;
       
       // Validate required fields
       if (!username || !password || !role || !name) {
         return res.status(400).json({ message: 'Missing required fields' });
+      }
+      
+      // Validate doctor-specific fields
+      if (role === 'doctor') {
+        if (!medicalLicense || !specialization) {
+          return res.status(400).json({ message: 'CRM and specialization are required for doctors' });
+        }
       }
       
       // Validate role
@@ -3673,6 +3680,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         email,
         phone,
+        medicalLicense: role === 'doctor' ? medicalLicense : undefined,
+        specialization: role === 'doctor' ? specialization : undefined,
         digitalCertificate: role === 'doctor' ? `cert-${Date.now()}` : undefined,
       });
       

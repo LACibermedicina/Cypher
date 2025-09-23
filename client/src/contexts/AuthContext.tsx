@@ -27,6 +27,8 @@ interface RegisterData {
   name: string;
   email?: string;
   phone?: string;
+  medicalLicense?: string; // CRM for doctors
+  specialization?: string; // Specialty for doctors
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
