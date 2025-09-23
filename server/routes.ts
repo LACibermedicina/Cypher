@@ -96,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Verify JWT token and extract user info with proper signature verification
     let userId: string;
-    let userType: 'doctor' | 'patient';
+    let userType: 'doctor' | 'patient' | 'visitor';
     let consultationId: string | undefined;
     
     try {
@@ -115,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         algorithms: ['HS256']
       }) as any;
       
-      // Support both doctor and patient authentication
+      // Support doctor, patient, and visitor authentication
       if (payload.type === 'doctor_auth') {
         userId = payload.doctorId;
         userType = 'doctor';
@@ -130,6 +130,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consultationId = payload.consultationId; // Required for patient tokens
         if (!userId || !consultationId) {
           console.log('WebSocket connection denied: Invalid JWT payload - missing patientId or consultationId');
+          ws.close(1008, 'Invalid token payload');
+          return;
+        }
+      } else if (payload.type === 'visitor_auth') {
+        userId = payload.visitorId || payload.userId;
+        userType = 'visitor';
+        if (!userId) {
+          console.log('WebSocket connection denied: Invalid JWT payload - missing visitorId');
           ws.close(1008, 'Invalid token payload');
           return;
         }
@@ -320,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebRTC signaling helper functions
   
   // Handle room joining for video consultations
-  const handleJoinRoom = (message: any, ws: WebSocket, userType: 'doctor' | 'patient', userId: string, consultationId?: string) => {
+  const handleJoinRoom = (message: any, ws: WebSocket, userType: 'doctor' | 'patient' | 'visitor', userId: string, consultationId?: string) => {
     const targetConsultationId = consultationId || message.consultationId;
     
     if (!targetConsultationId) {
@@ -3417,9 +3425,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //
   // This provides complete workflow tracking and audit logging for Brazilian healthcare compliance.
 
+  // ===== VISITOR MANAGEMENT MIDDLEWARE =====
+  
+  // Middleware to detect and create visitor accounts for new IPs
+  const ensureVisitorAccount = async (req: any, res: any, next: any) => {
+    try {
+      // Skip visitor creation for API routes and authenticated users
+      if (req.path.startsWith('/api/') || req.cookies?.authToken) {
+        return next();
+      }
+
+      // Get client IP address
+      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+      
+      // Skip only if IP is truly unknown (allow localhost for development)
+      if (clientIp === 'unknown') {
+        return next();
+      }
+
+      // Check if visitor account already exists for this IP
+      let visitor = await storage.getVisitorByIp(clientIp);
+      
+      if (!visitor) {
+        // Create new visitor account
+        visitor = await storage.createVisitorAccount(clientIp);
+        console.log(`Created visitor account for IP: ${clientIp}`);
+      }
+
+      // Generate JWT token for visitor
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (jwtSecret) {
+        const visitorToken = jwt.sign(
+          { 
+            userId: visitor.id,
+            username: visitor.username,
+            role: visitor.role,
+            type: 'visitor_auth'
+          },
+          jwtSecret,
+          { 
+            expiresIn: '24h', // Shorter expiry for visitors
+            issuer: 'healthcare-system',
+            audience: 'websocket',
+            algorithm: 'HS256'
+          }
+        );
+
+        // Set visitor token as HTTP-only cookie
+        res.cookie('visitorToken', visitorToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+          maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        });
+
+        // Attach visitor to request for other middleware
+        req.visitor = visitor;
+      }
+
+      next();
+    } catch (error) {
+      console.error('Visitor management error:', error);
+      // Don't fail the request if visitor creation fails
+      next();
+    }
+  };
+
+  // Apply visitor management middleware globally (after definition)
+  app.use(ensureVisitorAccount);
+
   // ===== AUTHENTICATION MIDDLEWARE FOR INTERNAL USERS =====
   
-  // Enhanced authentication middleware with proper JWT session validation
+  // Enhanced authentication middleware with proper JWT session validation and visitor support
   const requireAuth = async (req: any, res: any, next: any) => {
     try {
       // Get JWT token from Authorization header or cookies
@@ -4470,6 +4547,62 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Error generating WebSocket token:', error);
       res.status(500).json({ message: 'Failed to generate WebSocket token' });
+    }
+  });
+
+  // Get JWT token for WebSocket authentication for visitors (self-sufficient, no prior auth required)
+  app.get('/api/auth/visitor-websocket-token', async (req, res) => {
+    try {
+      // Require SESSION_SECRET - fail if not set
+      const jwtSecret = process.env.SESSION_SECRET;
+      if (!jwtSecret) {
+        console.error('SESSION_SECRET not configured - cannot generate visitor WebSocket token');
+        return res.status(500).json({ message: 'Server configuration error' });
+      }
+
+      // Get client IP address for visitor identification
+      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+      
+      if (clientIp === 'unknown') {
+        return res.status(400).json({ message: 'Cannot identify client for visitor access' });
+      }
+
+      // Find or create visitor account based on IP
+      let visitor = await storage.getVisitorByIp(clientIp);
+      
+      if (!visitor) {
+        // Create new visitor account
+        visitor = await storage.createVisitorAccount(clientIp);
+        console.log(`Created visitor account for IP: ${clientIp} during WebSocket token request`);
+      }
+
+      // Generate JWT token for WebSocket authentication with visitor auth
+      const wsToken = jwt.sign(
+        { 
+          visitorId: visitor.id,
+          userId: visitor.id,
+          role: visitor.role,
+          type: 'visitor_auth'
+        },
+        jwtSecret,
+        { 
+          expiresIn: '24h',
+          issuer: 'healthcare-system',
+          audience: 'websocket',
+          algorithm: 'HS256'
+        }
+      );
+      
+      console.log(`Generated visitor WebSocket token for ${clientIp}`);
+      res.json({ 
+        token: wsToken, 
+        visitorId: visitor.id, 
+        userId: visitor.id,
+        role: 'visitor'
+      });
+    } catch (error) {
+      console.error('Error generating visitor WebSocket token:', error);
+      res.status(500).json({ message: 'Failed to generate visitor WebSocket token' });
     }
   });
 

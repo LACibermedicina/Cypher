@@ -27,6 +27,7 @@ export type InsertTmcConfig = z.infer<typeof insertTmcConfigSchema>;
 
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import crypto from "crypto";
 
 export interface IStorage {
   // Users
@@ -224,6 +225,52 @@ export class DatabaseStorage implements IStorage {
       .where(sql`last_login IS NOT NULL`)
       .orderBy(desc(users.lastLogin))
       .limit(limit);
+  }
+
+  // Visitor Management
+  async getVisitorByIp(ipAddress: string): Promise<User | undefined> {
+    const [visitor] = await db.select().from(users)
+      .where(and(
+        eq(users.role, 'visitor'),
+        eq(users.username, ipAddress)
+      ));
+    return visitor || undefined;
+  }
+
+  async createVisitorAccount(ipAddress: string): Promise<User> {
+    // Create a visitor account with IP as username
+    const visitorData = {
+      username: ipAddress,
+      password: crypto.createHash('sha256').update(`visitor-${ipAddress}-${Date.now()}`).digest('hex'),
+      role: 'visitor' as const,
+      name: `Visitante ${ipAddress}`,
+      email: undefined,
+      phone: undefined,
+      tmcCredits: 0
+    };
+    
+    const [visitor] = await db.insert(users).values(visitorData).returning();
+    return visitor;
+  }
+
+  async upgradeVisitorToUser(ipAddress: string, userData: Partial<InsertUser>): Promise<User | undefined> {
+    // Find existing visitor by IP
+    const visitor = await this.getVisitorByIp(ipAddress);
+    if (!visitor) {
+      return undefined;
+    }
+
+    // Update visitor account with full user data
+    const [upgradedUser] = await db.update(users)
+      .set({
+        ...userData,
+        role: userData.role || 'patient', // Default to patient if no role specified
+        lastLogin: new Date()
+      })
+      .where(eq(users.id, visitor.id))
+      .returning();
+    
+    return upgradedUser || undefined;
   }
 
   // Patients
