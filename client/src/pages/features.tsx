@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { 
   Video, 
   Shield, 
@@ -22,125 +23,126 @@ import {
 } from "lucide-react";
 
 export default function Features() {
+  const { t } = useTranslation();
   const technicalFeatures = [
     {
       icon: Video,
-      title: "Videochamadas HD",
-      description: "Consultas médicas por vídeo com qualidade profissional",
-      technical: "WebRTC, resolução até 1080p, baixa latência",
+      title: t("features.video.title"),
+      description: t("features.video.description"),
+      technical: t("features.video.technical"),
       details: [
-        "Tecnologia WebRTC para conexão direta",
-        "Qualidade adaptativa baseada na conexão",
-        "Criptografia end-to-end",
-        "Suporte a múltiplos dispositivos"
+        t("features.video.detail_1"),
+        t("features.video.detail_2"),
+        t("features.video.detail_3"),
+        t("features.video.detail_4")
       ]
     },
     {
       icon: Bot,
-      title: "Assistente Virtual IA",
-      description: "Inteligência artificial para triagem e orientações médicas",
-      technical: "OpenAI GPT-5, processamento de linguagem natural",
+      title: t("features.ai.title"),
+      description: t("features.ai.description"),
+      technical: t("features.ai.technical"),
       details: [
-        "Análise inteligente de sintomas",
-        "Agendamento automatizado",
-        "Base de conhecimento médico",
-        "Integração com prontuários"
+        t("features.ai.detail_1"),
+        t("features.ai.detail_2"),
+        t("features.ai.detail_3"),
+        t("features.ai.detail_4")
       ]
     },
     {
       icon: Shield,
-      title: "Segurança LGPD",
-      description: "Proteção de dados conforme legislação brasileira",
-      technical: "Criptografia AES-256, conformidade LGPD/GDPR",
+      title: t("features.security.title"),
+      description: t("features.security.description"),
+      technical: t("features.security.technical"),
       details: [
-        "Criptografia de dados em repouso e trânsito",
-        "Controle granular de acesso",
-        "Auditoria completa de ações",
-        "Backup automatizado seguro"
+        t("features.security.detail_1"),
+        t("features.security.detail_2"),
+        t("features.security.detail_3"),
+        t("features.security.detail_4")
       ]
     },
     {
       icon: MessageCircle,
-      title: "WhatsApp Integrado",
-      description: "Comunicação direta via WhatsApp Business API",
-      technical: "WhatsApp Business API, webhooks em tempo real",
+      title: t("features.whatsapp.title"),
+      description: t("features.whatsapp.description"),
+      technical: t("features.whatsapp.technical"),
       details: [
-        "Notificações automáticas",
-        "Status de consultas",
-        "Lembretes de agendamento",
-        "Suporte 24/7"
+        t("features.whatsapp.detail_1"),
+        t("features.whatsapp.detail_2"),
+        t("features.whatsapp.detail_3"),
+        t("features.whatsapp.detail_4")
       ]
     },
     {
       icon: FileText,
-      title: "Assinatura Digital",
-      description: "Prescrições e documentos com assinatura eletrônica",
-      technical: "FIPS 140-2 Level 3, certificados digitais A1/A3",
+      title: t("features.signature.title"),
+      description: t("features.signature.description"),
+      technical: t("features.signature.technical"),
       details: [
-        "Validade jurídica garantida",
-        "Certificação ICP-Brasil",
-        "Timestamping seguro",
-        "Geração de PDFs assinados"
+        t("features.signature.detail_1"),
+        t("features.signature.detail_2"),
+        t("features.signature.detail_3"),
+        t("features.signature.detail_4")
       ]
     },
     {
       icon: Database,
-      title: "Prontuários Digitais",
-      description: "Histórico médico completo e organizado",
-      technical: "PostgreSQL, backup em nuvem, versionamento",
+      title: t("features.records.title"),
+      description: t("features.records.description"),
+      technical: t("features.records.technical"),
       details: [
-        "Histórico versionado",
-        "Busca inteligente",
-        "Anexos seguros",
-        "Compartilhamento controlado"
+        t("features.records.detail_1"),
+        t("features.records.detail_2"),
+        t("features.records.detail_3"),
+        t("features.records.detail_4")
       ]
     }
   ];
 
   const architectureSpecs = [
     {
-      category: "Frontend",
+      category: t("architecture.frontend.title"),
       technologies: [
-        { name: "React 18", description: "Interface moderna e responsiva" },
-        { name: "TypeScript", description: "Tipagem forte e segurança" },
-        { name: "Tailwind CSS", description: "Design system consistente" },
-        { name: "Wouter", description: "Roteamento otimizado" }
+        { name: "React 18", description: t("architecture.frontend.react") },
+        { name: "TypeScript", description: t("architecture.frontend.typescript") },
+        { name: "Tailwind CSS", description: t("architecture.frontend.tailwind") },
+        { name: "Wouter", description: t("architecture.frontend.wouter") }
       ]
     },
     {
-      category: "Backend", 
+      category: t("architecture.backend.title"), 
       technologies: [
-        { name: "Node.js", description: "Runtime de alta performance" },
-        { name: "Express.js", description: "Framework web robusto" },
-        { name: "PostgreSQL", description: "Banco de dados relacional" },
-        { name: "Drizzle ORM", description: "ORM type-safe" }
+        { name: "Node.js", description: t("architecture.backend.nodejs") },
+        { name: "Express.js", description: t("architecture.backend.express") },
+        { name: "PostgreSQL", description: t("architecture.backend.postgresql") },
+        { name: "Drizzle ORM", description: t("architecture.backend.drizzle") }
       ]
     },
     {
-      category: "Infraestrutura",
+      category: t("architecture.infrastructure.title"),
       technologies: [
-        { name: "Neon Database", description: "PostgreSQL serverless" },
-        { name: "WebSocket", description: "Comunicação em tempo real" },
-        { name: "CDN Global", description: "Entrega de conteúdo otimizada" },
-        { name: "SSL/TLS", description: "Criptografia de transporte" }
+        { name: "Neon Database", description: t("architecture.infrastructure.neon") },
+        { name: "WebSocket", description: t("architecture.infrastructure.websocket") },
+        { name: "CDN Global", description: t("architecture.infrastructure.cdn") },
+        { name: "SSL/TLS", description: t("architecture.infrastructure.ssl") }
       ]
     },
     {
-      category: "Integrações",
+      category: t("architecture.integrations.title"),
       technologies: [
-        { name: "OpenAI API", description: "Inteligência artificial médica" },
-        { name: "WhatsApp Business", description: "Comunicação via WhatsApp" },
-        { name: "TMC Payment", description: "Sistema de pagamentos próprio" },
-        { name: "Digital Certificates", description: "Assinatura eletrônica" }
+        { name: "OpenAI API", description: t("architecture.integrations.openai") },
+        { name: "WhatsApp Business", description: t("architecture.integrations.whatsapp_business") },
+        { name: "TMC Payment", description: t("architecture.integrations.tmc") },
+        { name: "Digital Certificates", description: t("architecture.integrations.digital_certs") }
       ]
     }
   ];
 
   const performanceMetrics = [
-    { metric: "Uptime", value: "99.9%", description: "Disponibilidade garantida" },
-    { metric: "Latência", value: "<200ms", description: "Resposta ultra-rápida" },
-    { metric: "Segurança", value: "A+", description: "Classificação SSL Labs" },
-    { metric: "LGPD", value: "100%", description: "Conformidade total" }
+    { metric: t("performance.uptime"), value: "99.9%", description: t("performance.uptime_desc") },
+    { metric: t("performance.latency"), value: "<200ms", description: t("performance.latency_desc") },
+    { metric: t("performance.security"), value: "A+", description: t("performance.security_desc") },
+    { metric: t("performance.lgpd"), value: "100%", description: t("performance.lgpd_desc") }
   ];
 
   return (
@@ -151,13 +153,13 @@ export default function Features() {
         <div className="max-w-6xl mx-auto px-4">
           <Link href="/">
             <Button variant="ghost" className="mb-6 text-white hover:bg-white/10" data-testid="button-back-home">
-              ← Voltar para Início
+              {t("features.back_to_home")}
             </Button>
           </Link>
           <div className="text-center">
-            <h1 className="text-4xl font-bold mb-4">Recursos Técnicos da Plataforma</h1>
+            <h1 className="text-4xl font-bold mb-4">{t("features.page_title")}</h1>
             <p className="text-xl text-blue-100 mb-8">
-              Tecnologia de ponta para cuidados médicos digitais
+              {t("features.page_subtitle")}
             </p>
             <div className="flex justify-center space-x-4">
               <Badge className="bg-white/20 text-white text-lg px-4 py-2">
@@ -181,7 +183,7 @@ export default function Features() {
 
         {/* Main Features */}
         <section>
-          <h2 className="text-3xl font-bold text-center mb-8">Funcionalidades Principais</h2>
+          <h2 className="text-3xl font-bold text-center mb-8">{t("features.main_features_title")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {technicalFeatures.map((feature, index) => (
               <Card key={index} className="shadow-lg hover:shadow-xl transition-shadow">
@@ -210,7 +212,7 @@ export default function Features() {
 
         {/* Architecture */}
         <section>
-          <h2 className="text-3xl font-bold text-center mb-8">Arquitetura Técnica</h2>
+          <h2 className="text-3xl font-bold text-center mb-8">{t("architecture.title")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {architectureSpecs.map((category, index) => (
               <Card key={index} className="shadow-lg">
@@ -232,7 +234,7 @@ export default function Features() {
 
         {/* Performance Metrics */}
         <section>
-          <h2 className="text-3xl font-bold text-center mb-8">Métricas de Performance</h2>
+          <h2 className="text-3xl font-bold text-center mb-8">{t("performance.title")}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {performanceMetrics.map((metric, index) => (
               <Card key={index} className="shadow-lg text-center">

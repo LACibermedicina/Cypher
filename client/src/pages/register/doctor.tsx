@@ -58,13 +58,13 @@ export default function DoctorRegister() {
       });
       
       toast({
-        title: "Conta criada com sucesso!",
-        description: "Bem-vindo à plataforma Telemed. Você já pode fazer login.",
+        title: t("register.doctor.success_title"),
+        description: t("register.doctor.success_description"),
       });
     } catch (error) {
       toast({
-        title: "Erro ao criar conta",
-        description: "Ocorreu um erro ao criar sua conta. Tente novamente.",
+        title: t("register.doctor.error_title"),
+        description: t("register.doctor.error_description"),
         variant: "destructive",
       });
     } finally {
@@ -75,51 +75,51 @@ export default function DoctorRegister() {
   const doctorBenefits = [
     {
       icon: Calendar,
-      title: "Agenda Flexível",
-      description: "Gerencie sua agenda de consultas de forma autônoma e eficiente"
+      title: t("register.doctor.benefit_flexible_schedule"),
+      description: t("register.doctor.benefit_flexible_schedule_desc")
     },
     {
       icon: Users,
-      title: "Pacientes Online",
-      description: "Atenda pacientes de todo o Brasil através da telemedicina"
+      title: t("register.doctor.benefit_online_patients"),
+      description: t("register.doctor.benefit_online_patients_desc")
     },
     {
       icon: TrendingUp,
-      title: "Sistema TMC",
-      description: "Receba pagamentos através do nosso sistema de créditos TMC"
+      title: t("register.doctor.benefit_tmc_system"),
+      description: t("register.doctor.benefit_tmc_system_desc")
     },
     {
       icon: FileText,
-      title: "Prontuários Digitais",
-      description: "Mantenha registros médicos organizados e seguros"
+      title: t("register.doctor.benefit_digital_records"),
+      description: t("register.doctor.benefit_digital_records_desc")
     },
     {
       icon: Shield,
-      title: "Ferramentas Profissionais",
-      description: "Acesso a prescrições digitais e assinatura eletrônica"
+      title: t("register.doctor.benefit_professional_tools"),
+      description: t("register.doctor.benefit_professional_tools_desc")
     },
     {
       icon: Clock,
-      title: "Atendimento 24/7",
-      description: "Flexibilidade para atender conforme sua disponibilidade"
+      title: t("register.doctor.benefit_24_7"),
+      description: t("register.doctor.benefit_24_7_desc")
     }
   ];
 
   const specialties = [
-    "Clínica Geral",
-    "Cardiologia",
-    "Dermatologia",
-    "Pediatria",
-    "Ginecologia",
-    "Psiquiatria",
-    "Neurologia",
-    "Ortopedia",
-    "Oftalmologia",
-    "Endocrinologia",
-    "Urologia",
-    "Gastroenterologia",
-    "Pneumologia",
-    "Outra"
+    { value: "clinica_geral", label: t("specialties.clinica_geral") },
+    { value: "cardiologia", label: t("specialties.cardiologia") },
+    { value: "dermatologia", label: t("specialties.dermatologia") },
+    { value: "pediatria", label: t("specialties.pediatria") },
+    { value: "ginecologia", label: t("specialties.ginecologia") },
+    { value: "psiquiatria", label: t("specialties.psiquiatria") },
+    { value: "neurologia", label: t("specialties.neurologia") },
+    { value: "ortopedia", label: t("specialties.ortopedia") },
+    { value: "oftalmologia", label: t("specialties.oftalmologia") },
+    { value: "endocrinologia", label: t("specialties.endocrinologia") },
+    { value: "urologia", label: t("specialties.urologia") },
+    { value: "gastroenterologia", label: t("specialties.gastroenterologia") },
+    { value: "pneumologia", label: t("specialties.pneumologia") },
+    { value: "outra", label: t("specialties.outra") }
   ];
 
   return (
@@ -130,15 +130,15 @@ export default function DoctorRegister() {
         <div className="text-center mb-8">
           <Link href="/">
             <Button variant="ghost" className="mb-4" data-testid="button-back-home">
-              ← Voltar para Início
+              {t("features.back_to_home")}
             </Button>
           </Link>
           <div className="flex items-center justify-center space-x-3 mb-4">
             <Stethoscope className="w-12 h-12 text-medical-secondary" />
-            <h1 className="text-3xl font-bold text-medical-secondary">Registro de Médico</h1>
+            <h1 className="text-3xl font-bold text-medical-secondary">{t("register.doctor.title")}</h1>
           </div>
           <p className="text-lg text-muted-foreground">
-            Una-se à nossa rede de profissionais e ofereça seus serviços através da telemedicina
+            {t("register.doctor.subtitle")}
           </p>
         </div>
 
@@ -148,7 +148,7 @@ export default function DoctorRegister() {
           <div className="lg:col-span-2">
             <Card className="shadow-xl border-medical-secondary/20">
               <CardHeader>
-                <CardTitle className="text-center text-xl">Criar Conta de Médico</CardTitle>
+                <CardTitle className="text-center text-xl">{t("register.doctor.form_title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -203,10 +203,10 @@ export default function DoctorRegister() {
                               className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-medical-secondary focus:border-transparent"
                               data-testid="select-doctor-specialty"
                             >
-                              <option value="">Selecione sua especialidade</option>
+                              <option value="">{t("register.doctor.specialty_placeholder")}</option>
                               {specialties.map((specialty) => (
-                                <option key={specialty} value={specialty}>
-                                  {specialty}
+                                <option key={specialty.value} value={specialty.value}>
+                                  {specialty.label}
                                 </option>
                               ))}
                             </select>

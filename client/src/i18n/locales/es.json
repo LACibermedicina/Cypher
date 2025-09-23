@@ -210,5 +210,192 @@
   "footer": {
     "copyright": "© 2024 Telemed - Sistema de Telemedicina",
     "all_rights_reserved": "Todos los derechos reservados"
+  },
+  "chatbot": {
+    "title": "IA Médica",
+    "welcome_message": "¡Hola! Soy tu asistente médica virtual. Puedo ayudarte con diagnósticos, citas y preguntas clínicas. ¿Cómo puedo ayudarte hoy?",
+    "error_message": "Lo siento, ocurrió un error al procesar tu mensaje. Inténtalo de nuevo.",
+    "error_title": "Error del Chatbot",
+    "error_description": "No se pudo procesar tu mensaje.",
+    "typing": "Escribiendo...",
+    "input_placeholder": "Escribe tu mensaje...",
+    "quick_scheduling": "Me gustaría agendar una cita",
+    "quick_symptoms": "Estoy experimentando algunos síntomas",
+    "schedule": "Agendar",
+    "symptoms": "Síntomas",
+    "clear": "Limpiar",
+    "diagnostic_hypotheses": "Hipótesis Diagnósticas"
+  },
+  "features": {
+    "page_title": "Características Técnicas de la Plataforma",
+    "page_subtitle": "Descubre nuestra infraestructura moderna y recursos médicos avanzados",
+    "back_to_home": "← Volver al Inicio",
+    "main_features_title": "Características Principales",
+    "video": {
+      "title": "Videollamadas HD",
+      "description": "Consultas médicas por video con calidad profesional",
+      "technical": "WebRTC, resolución hasta 1080p, baja latencia",
+      "detail_1": "Tecnología WebRTC para conexión directa",
+      "detail_2": "Calidad adaptativa basada en la conexión",
+      "detail_3": "Cifrado end-to-end",
+      "detail_4": "Soporte para múltiples dispositivos"
+    },
+    "ai": {
+      "title": "Asistente Virtual IA",
+      "description": "Inteligencia artificial para triaje y orientación médica",
+      "technical": "OpenAI GPT-5, procesamiento de lenguaje natural",
+      "detail_1": "Análisis inteligente de síntomas",
+      "detail_2": "Programación automatizada",
+      "detail_3": "Base de conocimiento médico",
+      "detail_4": "Integración con historiales médicos"
+    },
+    "security": {
+      "title": "Seguridad LGPD",
+      "description": "Protección de datos conforme a la legislación brasileña",
+      "technical": "Cifrado AES-256, cumplimiento LGPD/GDPR",
+      "detail_1": "Cifrado de datos en reposo y tránsito",
+      "detail_2": "Control granular de acceso",
+      "detail_3": "Auditoría completa de acciones",
+      "detail_4": "Respaldo automatizado seguro"
+    },
+    "whatsapp": {
+      "title": "WhatsApp Integrado",
+      "description": "Comunicación directa vía WhatsApp Business API",
+      "technical": "WhatsApp Business API, webhooks en tiempo real",
+      "detail_1": "Notificaciones automáticas",
+      "detail_2": "Estado de consultas",
+      "detail_3": "Recordatorios de citas",
+      "detail_4": "Soporte 24/7"
+    },
+    "signature": {
+      "title": "Firma Digital",
+      "description": "Recetas y documentos con firma electrónica",
+      "technical": "FIPS 140-2 Level 3, certificados digitales A1/A3",
+      "detail_1": "Validez jurídica garantizada",
+      "detail_2": "Certificación ICP-Brasil",
+      "detail_3": "Timestamping seguro",
+      "detail_4": "Generación de PDFs firmados"
+    },
+    "records": {
+      "title": "Historiales Digitales",
+      "description": "Historial médico completo y organizado",
+      "technical": "PostgreSQL, respaldo en la nube, versionado",
+      "detail_1": "Historial versionado",
+      "detail_2": "Búsqueda inteligente",
+      "detail_3": "Archivos adjuntos seguros",
+      "detail_4": "Compartición controlada"
+    }
+  },
+  "architecture": {
+    "title": "Arquitectura del Sistema",
+    "subtitle": "Stack tecnológico moderno y escalable",
+    "frontend": {
+      "title": "Frontend",
+      "react": "Interfaz moderna y responsiva",
+      "typescript": "Tipado fuerte y seguridad",
+      "tailwind": "Sistema de diseño consistente",
+      "wouter": "Enrutamiento optimizado"
+    },
+    "backend": {
+      "title": "Backend",
+      "nodejs": "Runtime de alto rendimiento",
+      "express": "Framework web robusto",
+      "postgresql": "Base de datos relacional",
+      "drizzle": "ORM type-safe"
+    },
+    "infrastructure": {
+      "title": "Infraestructura",
+      "neon": "PostgreSQL sin servidor",
+      "websocket": "Comunicación en tiempo real",
+      "cdn": "Entrega de contenido optimizada",
+      "ssl": "Cifrado de transporte"
+    },
+    "integrations": {
+      "title": "Integraciones",
+      "openai": "Inteligencia artificial médica",
+      "whatsapp_business": "Comunicación WhatsApp",
+      "tmc": "Sistema de pago propietario",
+      "digital_certs": "Firma electrónica"
+    }
+  },
+  "performance": {
+    "title": "Métricas de Rendimiento",
+    "uptime": "99.9% Tiempo Activo",
+    "latency": "< 100ms Latencia",
+    "security": "Seguridad SSL/TLS",
+    "lgpd": "Cumplimiento LGPD",
+    "uptime_desc": "Disponibilidad garantizada",
+    "latency_desc": "Respuesta ultra-rápida",
+    "security_desc": "Calificación SSL Labs",
+    "lgpd_desc": "Cumplimiento total"
+  },
+  "register": {
+    "doctor": {
+      "title": "Registro de Doctor",
+      "subtitle": "Únete a nuestra red de profesionales y ofrece tus servicios a través de la telemedicina",
+      "form_title": "Crear Cuenta de Doctor",
+      "form_subtitle": "Completa los datos para crear tu cuenta profesional",
+      "name_label": "Nombre Completo",
+      "name_placeholder": "Dr. Nombre Completo",
+      "crm_label": "Licencia Médica",
+      "crm_placeholder": "Licencia/Estado (ej. 123456/CA)",
+      "specialty_label": "Especialidad",
+      "specialty_placeholder": "Selecciona tu especialidad",
+      "username_label": "Nombre de Usuario",
+      "username_placeholder": "Elige un nombre de usuario",
+      "password_label": "Contraseña",
+      "password_placeholder": "Crea una contraseña segura",
+      "email_label": "Email",
+      "email_placeholder": "tu@email.com",
+      "phone_label": "Teléfono",
+      "phone_placeholder": "(555) 123-4567",
+      "submit_button": "Crear Cuenta de Doctor",
+      "submitting": "Creando cuenta...",
+      "already_have_account": "¿Ya tienes una cuenta?",
+      "login_link": "Iniciar sesión",
+      "success_title": "¡Cuenta creada exitosamente!",
+      "success_description": "Bienvenido a la plataforma Telemed. Ya puedes iniciar sesión.",
+      "error_title": "Error al crear cuenta",
+      "error_description": "Ocurrió un error al crear tu cuenta. Inténtalo de nuevo.",
+      "benefits_title": "Beneficios para Doctores",
+      "benefit_flexible_schedule": "Horario Flexible",
+      "benefit_flexible_schedule_desc": "Gestiona tu horario de consultas de forma autónoma y eficiente",
+      "benefit_online_patients": "Pacientes Online",
+      "benefit_online_patients_desc": "Atiende pacientes en todo el país a través de la telemedicina",
+      "benefit_tmc_system": "Sistema TMC",
+      "benefit_tmc_system_desc": "Recibe pagos a través de nuestro sistema de créditos TMC",
+      "benefit_digital_records": "Historiales Digitales",
+      "benefit_digital_records_desc": "Mantén los historiales médicos organizados y seguros",
+      "benefit_professional_tools": "Herramientas Profesionales",
+      "benefit_professional_tools_desc": "Acceso a recetas digitales y firma electrónica",
+      "benefit_24_7": "Servicio 24/7",
+      "benefit_24_7_desc": "Flexibilidad para atender según tu disponibilidad",
+      "validation_title": "Validación Profesional",
+      "validation_desc": "Todas las cuentas de doctores pasan por validación de licencia médica y credenciales profesionales.",
+      "opportunity_title": "Oportunidad de Ingresos",
+      "opportunity_desc": "Monetiza tu conocimiento médico atendiendo pacientes online."
+    },
+    "patient": {
+      "title": "Registro de Paciente",
+      "subtitle": "Regístrate para acceso completo a la telemedicina",
+      "form_title": "Crear Cuenta de Paciente",
+      "benefits_title": "Beneficios para Pacientes"
+    }
+  },
+  "specialties": {
+    "clinica_geral": "Medicina General",
+    "cardiologia": "Cardiología",
+    "dermatologia": "Dermatología",
+    "pediatria": "Pediatría",
+    "ginecologia": "Ginecología",
+    "psiquiatria": "Psiquiatría",
+    "neurologia": "Neurología",
+    "ortopedia": "Ortopedia",
+    "oftalmologia": "Oftalmología",
+    "endocrinologia": "Endocrinología",
+    "urologia": "Urología",
+    "gastroenterologia": "Gastroenterología",
+    "pneumologia": "Neumología",
+    "outra": "Otra"
   }
 }

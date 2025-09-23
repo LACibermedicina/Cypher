@@ -215,5 +215,177 @@
     "symptoms": "Sintomas",
     "clear": "Limpar",
     "diagnostic_hypotheses": "Hipóteses Diagnósticas"
+  },
+  "features": {
+    "page_title": "Recursos Técnicos da Plataforma",
+    "page_subtitle": "Conheça nossa infraestrutura moderna e recursos médicos avançados",
+    "back_to_home": "← Voltar para Início",
+    "main_features_title": "Funcionalidades Principais",
+    "video": {
+      "title": "Videochamadas HD",
+      "description": "Consultas médicas por vídeo com qualidade profissional",
+      "technical": "WebRTC, resolução até 1080p, baixa latência",
+      "detail_1": "Tecnologia WebRTC para conexão direta",
+      "detail_2": "Qualidade adaptativa baseada na conexão",
+      "detail_3": "Criptografia end-to-end",
+      "detail_4": "Suporte a múltiplos dispositivos"
+    },
+    "ai": {
+      "title": "Assistente Virtual IA",
+      "description": "Inteligência artificial para triagem e orientações médicas",
+      "technical": "OpenAI GPT-5, processamento de linguagem natural",
+      "detail_1": "Análise inteligente de sintomas",
+      "detail_2": "Agendamento automatizado",
+      "detail_3": "Base de conhecimento médico",
+      "detail_4": "Integração com prontuários"
+    },
+    "security": {
+      "title": "Segurança LGPD",
+      "description": "Proteção de dados conforme legislação brasileira",
+      "technical": "Criptografia AES-256, conformidade LGPD/GDPR",
+      "detail_1": "Criptografia de dados em repouso e trânsito",
+      "detail_2": "Controle granular de acesso",
+      "detail_3": "Auditoria completa de ações",
+      "detail_4": "Backup automatizado seguro"
+    },
+    "whatsapp": {
+      "title": "WhatsApp Integrado",
+      "description": "Comunicação direta via WhatsApp Business API",
+      "technical": "WhatsApp Business API, webhooks em tempo real",
+      "detail_1": "Notificações automáticas",
+      "detail_2": "Status de consultas",
+      "detail_3": "Lembretes de agendamento",
+      "detail_4": "Suporte 24/7"
+    },
+    "signature": {
+      "title": "Assinatura Digital",
+      "description": "Prescrições e documentos com assinatura eletrônica",
+      "technical": "FIPS 140-2 Level 3, certificados digitais A1/A3",
+      "detail_1": "Validade jurídica garantida",
+      "detail_2": "Certificação ICP-Brasil",
+      "detail_3": "Timestamping seguro",
+      "detail_4": "Geração de PDFs assinados"
+    },
+    "records": {
+      "title": "Prontuários Digitais",
+      "description": "Histórico médico completo e organizado",
+      "technical": "PostgreSQL, backup em nuvem, versionamento",
+      "detail_1": "Histórico versionado",
+      "detail_2": "Busca inteligente",
+      "detail_3": "Anexos seguros",
+      "detail_4": "Compartilhamento controlado"
+    }
+  },
+  "architecture": {
+    "title": "Arquitetura do Sistema",
+    "subtitle": "Stack tecnológico moderno e escalável",
+    "frontend": {
+      "title": "Frontend",
+      "react": "Interface moderna e responsiva",
+      "typescript": "Tipagem forte e segurança",
+      "tailwind": "Design system consistente",
+      "wouter": "Roteamento otimizado"
+    },
+    "backend": {
+      "title": "Backend",
+      "nodejs": "Runtime de alta performance",
+      "express": "Framework web robusto",
+      "postgresql": "Banco de dados relacional",
+      "drizzle": "ORM type-safe"
+    },
+    "infrastructure": {
+      "title": "Infraestrutura",
+      "neon": "PostgreSQL serverless",
+      "websocket": "Comunicação em tempo real",
+      "cdn": "Entrega de conteúdo otimizada",
+      "ssl": "Criptografia de transporte"
+    },
+    "integrations": {
+      "title": "Integrações",
+      "openai": "Inteligência artificial médica",
+      "whatsapp_business": "Comunicação via WhatsApp",
+      "tmc": "Sistema de pagamentos próprio",
+      "digital_certs": "Assinatura eletrônica"
+    }
+  },
+  "performance": {
+    "title": "Métricas de Performance",
+    "uptime": "99.9% Uptime",
+    "latency": "< 100ms Latência",
+    "security": "Segurança SSL/TLS",
+    "lgpd": "Conformidade LGPD",
+    "uptime_desc": "Disponibilidade garantida",
+    "latency_desc": "Resposta ultra-rápida",
+    "security_desc": "Classificação SSL Labs",
+    "lgpd_desc": "Conformidade total"
+  },
+  "register": {
+    "doctor": {
+      "title": "Registro de Médico",
+      "subtitle": "Una-se à nossa rede de profissionais e ofereça seus serviços através da telemedicina",
+      "form_title": "Criar Conta de Médico",
+      "form_subtitle": "Preencha os dados para criar sua conta profissional",
+      "name_label": "Nome Completo",
+      "name_placeholder": "Dr(a). Nome Completo",
+      "crm_label": "CRM",
+      "crm_placeholder": "CRM/UF (ex: 123456/SP)",
+      "specialty_label": "Especialidade",
+      "specialty_placeholder": "Selecione sua especialidade",
+      "username_label": "Nome de Usuário",
+      "username_placeholder": "Escolha um nome de usuário",
+      "password_label": "Senha",
+      "password_placeholder": "Crie uma senha segura",
+      "email_label": "Email",
+      "email_placeholder": "seu@email.com",
+      "phone_label": "Telefone",
+      "phone_placeholder": "(11) 99999-9999",
+      "submit_button": "Criar Conta de Médico",
+      "submitting": "Criando conta...",
+      "already_have_account": "Já tem uma conta?",
+      "login_link": "Fazer login",
+      "success_title": "Conta criada com sucesso!",
+      "success_description": "Bem-vindo à plataforma Telemed. Você já pode fazer login.",
+      "error_title": "Erro ao criar conta",
+      "error_description": "Ocorreu um erro ao criar sua conta. Tente novamente.",
+      "benefits_title": "Benefícios para Médicos",
+      "benefit_flexible_schedule": "Agenda Flexível",
+      "benefit_flexible_schedule_desc": "Gerencie sua agenda de consultas de forma autônoma e eficiente",
+      "benefit_online_patients": "Pacientes Online",
+      "benefit_online_patients_desc": "Atenda pacientes de todo o Brasil através da telemedicina",
+      "benefit_tmc_system": "Sistema TMC",
+      "benefit_tmc_system_desc": "Receba pagamentos através do nosso sistema de créditos TMC",
+      "benefit_digital_records": "Prontuários Digitais",
+      "benefit_digital_records_desc": "Mantenha registros médicos organizados e seguros",
+      "benefit_professional_tools": "Ferramentas Profissionais",
+      "benefit_professional_tools_desc": "Acesso a prescrições digitais e assinatura eletrônica",
+      "benefit_24_7": "Atendimento 24/7",
+      "benefit_24_7_desc": "Flexibilidade para atender conforme sua disponibilidade",
+      "validation_title": "Validação Profissional",
+      "validation_desc": "Todas as contas de médicos passam por validação de CRM e credenciais profissionais.",
+      "opportunity_title": "Oportunidade de Renda",
+      "opportunity_desc": "Monetize seus conhecimentos médicos atendendo pacientes online."
+    },
+    "patient": {
+      "title": "Registro de Paciente",
+      "subtitle": "Cadastre-se para ter acesso completo à telemedicina",
+      "form_title": "Criar Conta de Paciente",
+      "benefits_title": "Benefícios para Pacientes"
+    }
+  },
+  "specialties": {
+    "clinica_geral": "Clínica Geral",
+    "cardiologia": "Cardiologia",
+    "dermatologia": "Dermatologia",
+    "pediatria": "Pediatria",
+    "ginecologia": "Ginecologia",
+    "psiquiatria": "Psiquiatria",
+    "neurologia": "Neurologia",
+    "ortopedia": "Ortopedia",
+    "oftalmologia": "Oftalmologia",
+    "endocrinologia": "Endocrinologia",
+    "urologia": "Urologia",
+    "gastroenterologia": "Gastroenterologia",
+    "pneumologia": "Pneumologia",
+    "outra": "Outra"
   }
 }

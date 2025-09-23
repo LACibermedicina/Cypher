@@ -215,5 +215,177 @@
     "symptoms": "Symptoms",
     "clear": "Clear",
     "diagnostic_hypotheses": "Diagnostic Hypotheses"
+  },
+  "features": {
+    "page_title": "Technical Platform Features",
+    "page_subtitle": "Discover our modern infrastructure and advanced medical resources",
+    "back_to_home": "← Back to Home",
+    "main_features_title": "Main Features",
+    "video": {
+      "title": "HD Video Calls",
+      "description": "Professional quality medical consultations via video",
+      "technical": "WebRTC, up to 1080p resolution, low latency",
+      "detail_1": "WebRTC technology for direct connection",
+      "detail_2": "Adaptive quality based on connection",
+      "detail_3": "End-to-end encryption",
+      "detail_4": "Multi-device support"
+    },
+    "ai": {
+      "title": "AI Virtual Assistant",
+      "description": "Artificial intelligence for triage and medical guidance",
+      "technical": "OpenAI GPT-5, natural language processing",
+      "detail_1": "Intelligent symptom analysis",
+      "detail_2": "Automated scheduling",
+      "detail_3": "Medical knowledge base",
+      "detail_4": "Medical records integration"
+    },
+    "security": {
+      "title": "LGPD Security",
+      "description": "Data protection compliant with Brazilian legislation",
+      "technical": "AES-256 encryption, LGPD/GDPR compliance",
+      "detail_1": "Data encryption at rest and in transit",
+      "detail_2": "Granular access control",
+      "detail_3": "Complete action auditing",
+      "detail_4": "Automated secure backup"
+    },
+    "whatsapp": {
+      "title": "Integrated WhatsApp",
+      "description": "Direct communication via WhatsApp Business API",
+      "technical": "WhatsApp Business API, real-time webhooks",
+      "detail_1": "Automatic notifications",
+      "detail_2": "Consultation status",
+      "detail_3": "Appointment reminders",
+      "detail_4": "24/7 support"
+    },
+    "signature": {
+      "title": "Digital Signature",
+      "description": "Prescriptions and documents with electronic signature",
+      "technical": "FIPS 140-2 Level 3, A1/A3 digital certificates",
+      "detail_1": "Guaranteed legal validity",
+      "detail_2": "ICP-Brasil certification",
+      "detail_3": "Secure timestamping",
+      "detail_4": "Signed PDF generation"
+    },
+    "records": {
+      "title": "Digital Medical Records",
+      "description": "Complete and organized medical history",
+      "technical": "PostgreSQL, cloud backup, versioning",
+      "detail_1": "Versioned history",
+      "detail_2": "Intelligent search",
+      "detail_3": "Secure attachments",
+      "detail_4": "Controlled sharing"
+    }
+  },
+  "architecture": {
+    "title": "System Architecture",
+    "subtitle": "Modern and scalable technology stack",
+    "frontend": {
+      "title": "Frontend",
+      "react": "Modern and responsive interface",
+      "typescript": "Strong typing and security",
+      "tailwind": "Consistent design system",
+      "wouter": "Optimized routing"
+    },
+    "backend": {
+      "title": "Backend",
+      "nodejs": "High performance runtime",
+      "express": "Robust web framework",
+      "postgresql": "Relational database",
+      "drizzle": "Type-safe ORM"
+    },
+    "infrastructure": {
+      "title": "Infrastructure",
+      "neon": "Serverless PostgreSQL",
+      "websocket": "Real-time communication",
+      "cdn": "Optimized content delivery",
+      "ssl": "Transport encryption"
+    },
+    "integrations": {
+      "title": "Integrations",
+      "openai": "Medical artificial intelligence",
+      "whatsapp_business": "WhatsApp communication",
+      "tmc": "Proprietary payment system",
+      "digital_certs": "Electronic signature"
+    }
+  },
+  "performance": {
+    "title": "Performance Metrics",
+    "uptime": "99.9% Uptime",
+    "latency": "< 100ms Latency",
+    "security": "SSL/TLS Security",
+    "lgpd": "LGPD Compliance",
+    "uptime_desc": "Guaranteed availability",
+    "latency_desc": "Ultra-fast response",
+    "security_desc": "SSL Labs rating",
+    "lgpd_desc": "Full compliance"
+  },
+  "register": {
+    "doctor": {
+      "title": "Doctor Registration",
+      "subtitle": "Join our network of professionals and offer your services through telemedicine",
+      "form_title": "Create Doctor Account",
+      "form_subtitle": "Fill in the data to create your professional account",
+      "name_label": "Full Name",
+      "name_placeholder": "Dr. Full Name",
+      "crm_label": "Medical License",
+      "crm_placeholder": "License/State (e.g. 123456/CA)",
+      "specialty_label": "Specialty",
+      "specialty_placeholder": "Select your specialty",
+      "username_label": "Username",
+      "username_placeholder": "Choose a username",
+      "password_label": "Password",
+      "password_placeholder": "Create a secure password",
+      "email_label": "Email",
+      "email_placeholder": "your@email.com",
+      "phone_label": "Phone",
+      "phone_placeholder": "(555) 123-4567",
+      "submit_button": "Create Doctor Account",
+      "submitting": "Creating account...",
+      "already_have_account": "Already have an account?",
+      "login_link": "Sign in",
+      "success_title": "Account created successfully!",
+      "success_description": "Welcome to Telemed platform. You can now sign in.",
+      "error_title": "Error creating account",
+      "error_description": "An error occurred creating your account. Please try again.",
+      "benefits_title": "Benefits for Doctors",
+      "benefit_flexible_schedule": "Flexible Schedule",
+      "benefit_flexible_schedule_desc": "Manage your consultation schedule autonomously and efficiently",
+      "benefit_online_patients": "Online Patients",
+      "benefit_online_patients_desc": "Care for patients across the country through telemedicine",
+      "benefit_tmc_system": "TMC System",
+      "benefit_tmc_system_desc": "Receive payments through our TMC credit system",
+      "benefit_digital_records": "Digital Records",
+      "benefit_digital_records_desc": "Keep medical records organized and secure",
+      "benefit_professional_tools": "Professional Tools",
+      "benefit_professional_tools_desc": "Access to digital prescriptions and electronic signature",
+      "benefit_24_7": "24/7 Service",
+      "benefit_24_7_desc": "Flexibility to serve according to your availability",
+      "validation_title": "Professional Validation",
+      "validation_desc": "All doctor accounts undergo medical license and professional credential validation.",
+      "opportunity_title": "Income Opportunity",
+      "opportunity_desc": "Monetize your medical knowledge by caring for patients online."
+    },
+    "patient": {
+      "title": "Patient Registration",
+      "subtitle": "Sign up for complete access to telemedicine",
+      "form_title": "Create Patient Account",
+      "benefits_title": "Benefits for Patients"
+    }
+  },
+  "specialties": {
+    "clinica_geral": "General Practice",
+    "cardiologia": "Cardiology",
+    "dermatologia": "Dermatology",
+    "pediatria": "Pediatrics",
+    "ginecologia": "Gynecology",
+    "psiquiatria": "Psychiatry",
+    "neurologia": "Neurology",
+    "ortopedia": "Orthopedics",
+    "oftalmologia": "Ophthalmology",
+    "endocrinologia": "Endocrinology",
+    "urologia": "Urology",
+    "gastroenterologia": "Gastroenterology",
+    "pneumologia": "Pulmonology",
+    "outra": "Other"
   }
 }
