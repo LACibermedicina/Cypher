@@ -376,6 +376,103 @@ export const clinicalInterviews = pgTable("clinical_interviews", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Enhanced Prescription System
+export const medications = pgTable("medications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  genericName: text("generic_name").notNull(),
+  brandNames: text("brand_names").array(),
+  activeIngredient: text("active_ingredient").notNull(),
+  dosageForm: text("dosage_form").notNull(), // tablet, capsule, syrup, injection, etc.
+  strength: text("strength").notNull(), // mg, ml, etc.
+  route: text("route").notNull(), // oral, topical, intravenous, etc.
+  category: text("category").notNull(), // antibiotic, analgesic, etc.
+  indication: text("indication").array(), // What it treats
+  contraindications: text("contraindications").array(),
+  sideEffects: text("side_effects").array(),
+  pregnancyCategory: text("pregnancy_category"), // A, B, C, D, X
+  requiresPrescription: boolean("requires_prescription").default(true),
+  isControlled: boolean("is_controlled").default(false),
+  controlledSubstanceClass: text("controlled_substance_class"), // I, II, III, IV, V
+  registrationNumber: text("registration_number"), // ANVISA registration
+  manufacturer: text("manufacturer"),
+  isActive: boolean("is_active").default(true),
+  interactions: jsonb("interactions"), // Drug interactions data
+  dosageGuidelines: jsonb("dosage_guidelines"), // Age/weight-based dosing
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const prescriptions = pgTable("prescriptions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  doctorId: uuid("doctor_id").references(() => users.id).notNull(),
+  medicalRecordId: uuid("medical_record_id").references(() => medicalRecords.id),
+  appointmentId: uuid("appointment_id").references(() => appointments.id),
+  prescriptionNumber: text("prescription_number").unique().notNull(),
+  diagnosis: text("diagnosis"),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"), // active, dispensed, cancelled, expired
+  isElectronic: boolean("is_electronic").default(true),
+  digitalSignatureId: uuid("digital_signature_id").references(() => digitalSignatures.id),
+  isUrgent: boolean("is_urgent").default(false),
+  allowGeneric: boolean("allow_generic").default(true),
+  specialInstructions: text("special_instructions"),
+  expiresAt: timestamp("expires_at"),
+  dispensedAt: timestamp("dispensed_at"),
+  tmcCostPaid: integer("tmc_cost_paid").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const prescriptionItems = pgTable("prescription_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  prescriptionId: uuid("prescription_id").references(() => prescriptions.id).notNull(),
+  medicationId: uuid("medication_id").references(() => medications.id).notNull(),
+  dosage: text("dosage").notNull(), // "500mg"
+  frequency: text("frequency").notNull(), // "3 times daily", "every 8 hours"
+  duration: text("duration").notNull(), // "7 days", "until finished"
+  quantity: integer("quantity").notNull(), // Total quantity to dispense
+  instructions: text("instructions").notNull(), // "Take with food"
+  customMedication: text("custom_medication"), // For non-database medications
+  isGenericAllowed: boolean("is_generic_allowed").default(true),
+  priority: integer("priority").default(1), // Order in prescription
+  isDispensed: boolean("is_dispensed").default(false),
+  dispensedQuantity: integer("dispensed_quantity").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const prescriptionTemplates = pgTable("prescription_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // "common_cold", "hypertension", etc.
+  doctorId: uuid("doctor_id").references(() => users.id).notNull(),
+  isPublic: boolean("is_public").default(false), // Available to all doctors
+  templateData: jsonb("template_data").notNull(), // Structured template with medications
+  usageCount: integer("usage_count").default(0),
+  isActive: boolean("is_active").default(true),
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const drugInteractions = pgTable("drug_interactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  medication1Id: uuid("medication1_id").references(() => medications.id).notNull(),
+  medication2Id: uuid("medication2_id").references(() => medications.id).notNull(),
+  severity: text("severity").notNull(), // minor, moderate, major, contraindicated
+  effect: text("effect").notNull(), // Description of interaction
+  mechanism: text("mechanism"), // How the interaction occurs
+  management: text("management"), // How to manage the interaction
+  evidence: text("evidence").default("theoretical"), // theoretical, possible, probable, established
+  isActive: boolean("is_active").default(true),
+  source: text("source"), // Reference source
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   appointments: many(appointments),
@@ -609,6 +706,68 @@ export const clinicalInterviewsRelations = relations(clinicalInterviews, ({ one 
   }),
 }));
 
+// Prescription system relations
+export const medicationsRelations = relations(medications, ({ many }) => ({
+  prescriptionItems: many(prescriptionItems),
+  drugInteractions1: many(drugInteractions, { relationName: "medication1" }),
+  drugInteractions2: many(drugInteractions, { relationName: "medication2" }),
+}));
+
+export const prescriptionsRelations = relations(prescriptions, ({ one, many }) => ({
+  patient: one(patients, {
+    fields: [prescriptions.patientId],
+    references: [patients.id],
+  }),
+  doctor: one(users, {
+    fields: [prescriptions.doctorId],
+    references: [users.id],
+  }),
+  medicalRecord: one(medicalRecords, {
+    fields: [prescriptions.medicalRecordId],
+    references: [medicalRecords.id],
+  }),
+  appointment: one(appointments, {
+    fields: [prescriptions.appointmentId],
+    references: [appointments.id],
+  }),
+  digitalSignature: one(digitalSignatures, {
+    fields: [prescriptions.digitalSignatureId],
+    references: [digitalSignatures.id],
+  }),
+  items: many(prescriptionItems),
+}));
+
+export const prescriptionItemsRelations = relations(prescriptionItems, ({ one }) => ({
+  prescription: one(prescriptions, {
+    fields: [prescriptionItems.prescriptionId],
+    references: [prescriptions.id],
+  }),
+  medication: one(medications, {
+    fields: [prescriptionItems.medicationId],
+    references: [medications.id],
+  }),
+}));
+
+export const prescriptionTemplatesRelations = relations(prescriptionTemplates, ({ one }) => ({
+  doctor: one(users, {
+    fields: [prescriptionTemplates.doctorId],
+    references: [users.id],
+  }),
+}));
+
+export const drugInteractionsRelations = relations(drugInteractions, ({ one }) => ({
+  medication1: one(medications, {
+    fields: [drugInteractions.medication1Id],
+    references: [medications.id],
+    relationName: "medication1",
+  }),
+  medication2: one(medications, {
+    fields: [drugInteractions.medication2Id],
+    references: [medications.id],
+    relationName: "medication2",
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -728,6 +887,37 @@ export const insertSupportConfigSchema = createInsertSchema(supportConfig).omit(
   updatedAt: true,
 });
 
+// Prescription system insert schemas
+export const insertMedicationSchema = createInsertSchema(medications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
+  id: true,
+  prescriptionNumber: true, // Auto-generated by server
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPrescriptionItemSchema = createInsertSchema(prescriptionItems).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPrescriptionTemplateSchema = createInsertSchema(prescriptionTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDrugInteractionSchema = createInsertSchema(drugInteractions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -791,6 +981,22 @@ export type InsertClinicalInterview = z.infer<typeof insertClinicalInterviewSche
 
 export type SupportConfig = typeof supportConfig.$inferSelect;
 export type InsertSupportConfig = z.infer<typeof insertSupportConfigSchema>;
+
+// Prescription system types
+export type Medication = typeof medications.$inferSelect;
+export type InsertMedication = z.infer<typeof insertMedicationSchema>;
+
+export type Prescription = typeof prescriptions.$inferSelect;
+export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
+
+export type PrescriptionItem = typeof prescriptionItems.$inferSelect;
+export type InsertPrescriptionItem = z.infer<typeof insertPrescriptionItemSchema>;
+
+export type PrescriptionTemplate = typeof prescriptionTemplates.$inferSelect;
+export type InsertPrescriptionTemplate = z.infer<typeof insertPrescriptionTemplateSchema>;
+
+export type DrugInteraction = typeof drugInteractions.$inferSelect;
+export type InsertDrugInteraction = z.infer<typeof insertDrugInteractionSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {

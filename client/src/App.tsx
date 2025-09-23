@@ -13,6 +13,7 @@ import PatientProfile from "@/pages/patient-profile";
 import Schedule from "@/pages/schedule";
 import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
+import Prescriptions from "@/pages/prescriptions";
 import AdminPage from "@/pages/admin";
 import Login from "@/pages/login";
 import PatientJoin from "@/pages/patient-join";
@@ -103,6 +104,13 @@ function Router() {
           <ProtectedRoute>
             <Header />
             <MedicalRecords />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/prescriptions">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <Prescriptions />
           </ProtectedRoute>
         </Route>
         

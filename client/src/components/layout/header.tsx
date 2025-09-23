@@ -205,6 +205,7 @@ export default function Header() {
     { path: "/schedule", label: t("navigation.schedule"), icon: "fas fa-calendar-alt" },
     { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp" },
     { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical" },
+    { path: "/prescriptions", label: "Prescrições", icon: "fas fa-prescription-bottle-alt" },
     { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt" },
   ];
 

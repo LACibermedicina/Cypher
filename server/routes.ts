@@ -9,10 +9,10 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID, examResults, patients } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 
 // TMC Credit System Validation Schemas
 const tmcTransferSchema = z.object({
@@ -6152,6 +6152,354 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       res.status(500).json({ message: 'Failed to validate TMC credits' });
     }
   });
+
+  // ===== ENHANCED PRESCRIPTION MANAGEMENT SYSTEM =====
+  
+  // Get medications database (searchable)
+  app.get('/api/medications', requireAuth, async (req, res) => {
+    try {
+      const { search, category, active = 'true' } = req.query;
+      
+      let query = db.select().from(medications);
+      
+      // Apply filters
+      if (active === 'true') {
+        query = query.where(eq(medications.isActive, true));
+      }
+      
+      const allMedications = await query;
+      
+      // Apply search filter (simple text search)
+      let filteredMedications = allMedications;
+      if (search && typeof search === 'string') {
+        const searchLower = search.toLowerCase();
+        filteredMedications = allMedications.filter(med => 
+          med.name.toLowerCase().includes(searchLower) ||
+          med.genericName.toLowerCase().includes(searchLower) ||
+          med.activeIngredient.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Apply category filter
+      if (category && typeof category === 'string') {
+        filteredMedications = filteredMedications.filter(med => 
+          med.category === category
+        );
+      }
+      
+      res.json(filteredMedications);
+    } catch (error) {
+      console.error('Get medications error:', error);
+      res.status(500).json({ message: 'Failed to get medications' });
+    }
+  });
+
+  // Add new medication (admin only)
+  app.post('/api/medications', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Only administrators can add medications' });
+      }
+      
+      const validatedData = insertMedicationSchema.parse(req.body);
+      const medication = await db.insert(medications).values(validatedData).returning();
+      
+      console.log('[MEDICATION] New medication added:', medication[0].name);
+      res.status(201).json(medication[0]);
+    } catch (error) {
+      console.error('Add medication error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid medication data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to add medication' });
+    }
+  });
+
+  // Create new structured prescription
+  app.post('/api/prescriptions', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'doctor') {
+        return res.status(403).json({ message: 'Only doctors can create prescriptions' });
+      }
+      
+      const { patientId, diagnosis, notes, items, specialInstructions } = req.body;
+      
+      if (!patientId || !items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: 'Patient ID and prescription items are required' });
+      }
+      
+      // Generate unique prescription number
+      const prescriptionNumber = `RX-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`.toUpperCase();
+      
+      // Create prescription
+      const prescriptionData = {
+        patientId,
+        doctorId: req.user.id,
+        prescriptionNumber,
+        diagnosis: diagnosis || '',
+        notes: notes || '',
+        specialInstructions: specialInstructions || '',
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year expiry
+      };
+      
+      const prescription = await db.insert(prescriptions).values(prescriptionData).returning();
+      const prescriptionId = prescription[0].id;
+      
+      // Add prescription items
+      const prescriptionItemsData = items.map((item: any, index: number) => ({
+        prescriptionId,
+        medicationId: item.medicationId,
+        dosage: item.dosage,
+        frequency: item.frequency,
+        duration: item.duration,
+        quantity: item.quantity,
+        instructions: item.instructions,
+        customMedication: item.customMedication,
+        isGenericAllowed: item.isGenericAllowed !== false,
+        priority: index + 1,
+        notes: item.notes || '',
+      }));
+      
+      const insertedItems = await db.insert(prescriptionItems).values(prescriptionItemsData).returning();
+      
+      // Check for drug interactions
+      const medicationIds = items
+        .filter((item: any) => item.medicationId)
+        .map((item: any) => item.medicationId);
+      
+      const interactions = await checkDrugInteractions(medicationIds);
+      
+      // TMC credit system integration
+      try {
+        await storage.debitTMCCredits(req.user.id, 'prescription_creation', {
+          prescriptionId: prescriptionId,
+          itemCount: items.length
+        });
+      } catch (tmcError) {
+        console.log('[TMC] TMC debit failed (continuing):', tmcError);
+      }
+      
+      console.log('[PRESCRIPTION] New prescription created:', prescriptionNumber);
+      
+      res.status(201).json({
+        prescription: prescription[0],
+        items: insertedItems,
+        interactions,
+        tmcCostDeducted: 5 // Standard prescription cost
+      });
+    } catch (error) {
+      console.error('Create prescription error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid prescription data', errors: error.errors });
+      }
+      res.status(500).json({ message: 'Failed to create prescription' });
+    }
+  });
+
+  // Get prescriptions for a patient
+  app.get('/api/patients/:patientId/prescriptions', requireAuth, async (req, res) => {
+    try {
+      const { patientId } = req.params;
+      const { status, limit = '10' } = req.query;
+      
+      const prescriptionList = await db.select({
+        id: prescriptions.id,
+        prescriptionNumber: prescriptions.prescriptionNumber,
+        diagnosis: prescriptions.diagnosis,
+        status: prescriptions.status,
+        createdAt: prescriptions.createdAt,
+        expiresAt: prescriptions.expiresAt,
+        doctorName: 'users.name', // Simple fallback
+      })
+      .from(prescriptions)
+      .where(eq(prescriptions.patientId, patientId))
+      .orderBy(desc(prescriptions.createdAt))
+      .limit(parseInt(limit.toString()));
+      
+      // Filter by status if provided
+      const filteredPrescriptions = status 
+        ? prescriptionList.filter(p => p.status === status)
+        : prescriptionList;
+      
+      res.json(filteredPrescriptions);
+    } catch (error) {
+      console.error('Get patient prescriptions error:', error);
+      res.status(500).json({ message: 'Failed to get patient prescriptions' });
+    }
+  });
+
+  // Get prescription details with items
+  app.get('/api/prescriptions/:id', requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get prescription details
+      const prescription = await db.select()
+        .from(prescriptions)
+        .where(eq(prescriptions.id, id))
+        .limit(1);
+      
+      if (!prescription.length) {
+        return res.status(404).json({ message: 'Prescription not found' });
+      }
+      
+      // Get prescription items with medication details
+      const items = await db.select({
+        id: prescriptionItems.id,
+        dosage: prescriptionItems.dosage,
+        frequency: prescriptionItems.frequency,
+        duration: prescriptionItems.duration,
+        quantity: prescriptionItems.quantity,
+        instructions: prescriptionItems.instructions,
+        customMedication: prescriptionItems.customMedication,
+        isGenericAllowed: prescriptionItems.isGenericAllowed,
+        priority: prescriptionItems.priority,
+        notes: prescriptionItems.notes,
+        medicationId: prescriptionItems.medicationId,
+      })
+      .from(prescriptionItems)
+      .where(eq(prescriptionItems.prescriptionId, id))
+      .orderBy(prescriptionItems.priority);
+      
+      // Get medication details for each item
+      const itemsWithMedications = await Promise.all(
+        items.map(async (item) => {
+          if (item.medicationId) {
+            const medication = await db.select()
+              .from(medications)
+              .where(eq(medications.id, item.medicationId))
+              .limit(1);
+            
+            return {
+              ...item,
+              medication: medication[0] || null
+            };
+          }
+          return {
+            ...item,
+            medication: null
+          };
+        })
+      );
+      
+      res.json({
+        ...prescription[0],
+        items: itemsWithMedications
+      });
+    } catch (error) {
+      console.error('Get prescription details error:', error);
+      res.status(500).json({ message: 'Failed to get prescription details' });
+    }
+  });
+
+  // Check drug interactions
+  app.post('/api/prescriptions/check-interactions', requireAuth, async (req, res) => {
+    try {
+      const { medicationIds } = req.body;
+      
+      if (!Array.isArray(medicationIds) || medicationIds.length < 2) {
+        return res.json({ interactions: [] });
+      }
+      
+      const interactions = await checkDrugInteractions(medicationIds);
+      res.json({ interactions });
+    } catch (error) {
+      console.error('Check drug interactions error:', error);
+      res.status(500).json({ message: 'Failed to check drug interactions' });
+    }
+  });
+
+  // Get prescription templates
+  app.get('/api/prescription-templates', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'doctor') {
+        return res.status(403).json({ message: 'Only doctors can access prescription templates' });
+      }
+      
+      const { category } = req.query;
+      
+      const templates = await db.select()
+        .from(prescriptionTemplates)
+        .where(eq(prescriptionTemplates.isActive, true))
+        .orderBy(desc(prescriptionTemplates.usageCount));
+      
+      // Filter public templates and doctor's own templates
+      const filteredTemplates = templates.filter(template => 
+        template.isPublic || template.doctorId === req.user?.id
+      );
+      
+      // Apply category filter if provided
+      const finalTemplates = category && typeof category === 'string'
+        ? filteredTemplates.filter(t => t.category === category)
+        : filteredTemplates;
+      
+      res.json(finalTemplates);
+    } catch (error) {
+      console.error('Get prescription templates error:', error);
+      res.status(500).json({ message: 'Failed to get prescription templates' });
+    }
+  });
+
+  // Get recent prescriptions (for dashboard or general view)
+  app.get('/api/prescriptions/recent', requireAuth, async (req, res) => {
+    try {
+      const { limit = '20' } = req.query;
+      
+      // For doctors, show their own prescriptions; for admins, show all
+      let whereCondition = req.user?.role === 'doctor' ? eq(prescriptions.doctorId, req.user.id) : undefined;
+      
+      const recentPrescriptions = await db.select({
+        id: prescriptions.id,
+        prescriptionNumber: prescriptions.prescriptionNumber,
+        diagnosis: prescriptions.diagnosis,
+        status: prescriptions.status,
+        createdAt: prescriptions.createdAt,
+        expiresAt: prescriptions.expiresAt,
+        doctorName: 'Doctor', // Simplified for now
+        patientName: 'Patient', // Simplified for now
+      })
+      .from(prescriptions)
+      .where(whereCondition)
+      .orderBy(desc(prescriptions.createdAt))
+      .limit(parseInt(limit.toString()));
+      
+      res.json(recentPrescriptions);
+    } catch (error) {
+      console.error('Get recent prescriptions error:', error);
+      res.status(500).json({ message: 'Failed to get recent prescriptions' });
+    }
+  });
+
+  // Helper function to check drug interactions
+  async function checkDrugInteractions(medicationIds: string[]) {
+    try {
+      const interactions = [];
+      
+      for (let i = 0; i < medicationIds.length; i++) {
+        for (let j = i + 1; j < medicationIds.length; j++) {
+          const med1 = medicationIds[i];
+          const med2 = medicationIds[j];
+          
+          const interaction = await db.select()
+            .from(drugInteractions)
+            .where(
+              sql`(medication1_id = ${med1} AND medication2_id = ${med2}) OR 
+                  (medication1_id = ${med2} AND medication2_id = ${med1})`
+            )
+            .limit(1);
+          
+          if (interaction.length > 0) {
+            interactions.push(interaction[0]);
+          }
+        }
+      }
+      
+      return interactions;
+    } catch (error) {
+      console.error('Drug interaction check error:', error);
+      return [];
+    }
+  }
 
   // ===== SUPPORT SYSTEM ENDPOINTS =====
 
