@@ -115,22 +115,22 @@ function Router() {
         <Route component={NotFound} />
       </Switch>
       
-      {/* Security Footer */}
+      {/* Enhanced Footer with Quick Access */}
       <footer className="bg-card border-t border-border mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
-                <i className="fas fa-shield-alt text-accent"></i>
-                <span>{t("security.compliance")}</span>
+                <i className="fas fa-video text-accent"></i>
+                <span>Teleconsultas Ativas</span>
               </div>
               <div className="flex items-center space-x-2">
-                <i className="fas fa-lock text-accent"></i>
-                <span>{t("security.encryption")}</span>
+                <i className="fas fa-heartbeat text-accent"></i>
+                <span>Sistema de Monitoramento</span>
               </div>
               <div className="flex items-center space-x-2">
-                <i className="fas fa-certificate text-accent"></i>
-                <span>{t("security.iso_cert")}</span>
+                <i className="fas fa-users-cog text-accent"></i>
+                <span>Gestão Integrada</span>
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
