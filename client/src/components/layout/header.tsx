@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LogOut, User, Settings } from "lucide-react";
+import NotificationCenter from "@/components/notifications/notification-center";
 
 export default function Header() {
   const [location] = useLocation();
@@ -367,6 +368,7 @@ export default function Header() {
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />
+            <NotificationCenter />
             <Button 
               variant="destructive" 
               size="sm" 

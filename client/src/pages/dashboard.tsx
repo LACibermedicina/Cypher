@@ -5,6 +5,7 @@ import AIClinicalAssistant from "@/components/dashboard/ai-clinical-assistant";
 import DigitalSignature from "@/components/dashboard/digital-signature";
 import MedicalCollaborators from "@/components/dashboard/medical-collaborators";
 import ExamResults from "@/components/dashboard/exam-results";
+import RealTimeStatus from "@/components/dashboard/real-time-status";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { DEFAULT_DOCTOR_ID, type DashboardStats } from "@shared/schema";
@@ -92,6 +93,7 @@ export default function Dashboard() {
 
         {/* Right Column - Patient Info & AI Tools */}
         <div className="space-y-6">
+          <RealTimeStatus />
           <PatientQuickInfo />
           <AIClinicalAssistant />
           <DigitalSignature />

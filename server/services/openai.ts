@@ -355,6 +355,57 @@ Formato: texto corrido, máximo 300 palavras.
       return 'Erro ao gerar resumo do paciente.';
     }
   }
+
+  async analyzeExamResults(
+    examType: string,
+    results: any,
+    patientHistory: string
+  ): Promise<{
+    analysis: string;
+    abnormalValues?: Array<{ parameter: string; value: string; status: 'high' | 'low'; severity: 'mild' | 'moderate' | 'severe' }>;
+    recommendations: string[];
+    followUpRequired: boolean;
+  }> {
+    try {
+      const resultsText = typeof results === 'object' ? JSON.stringify(results, null, 2) : results.toString();
+      
+      const prompt = `
+        Como médico especialista em análise laboratorial, analise os resultados do exame e forneça uma interpretação clínica completa.
+        
+        Tipo de exame: ${examType}
+        Resultados: ${resultsText}
+        Histórico do paciente: ${patientHistory}
+        
+        Forneça uma análise em JSON com:
+        - analysis: interpretação detalhada dos resultados
+        - abnormalValues: array de valores alterados com parameter, value, status (high/low), severity (mild/moderate/severe)
+        - recommendations: array de recomendações clínicas
+        - followUpRequired: boolean indicando se requer acompanhamento
+        
+        Base sua análise nas diretrizes do Ministério da Saúde brasileiro e valores de referência padrão.
+      `;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature: 0.2, // Very low temperature for consistent medical analysis
+      });
+
+      return JSON.parse(response.choices[0].message.content || '{}');
+    } catch (error) {
+      console.error('OpenAI exam analysis error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to analyze exam results'
+      });
+      return {
+        analysis: 'Não foi possível analisar os resultados do exame automaticamente.',
+        recommendations: ['Consulte um médico para interpretação dos resultados'],
+        followUpRequired: true
+      };
+    }
+  }
 }
 
 export const openAIService = new OpenAIService();

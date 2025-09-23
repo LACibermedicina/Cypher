@@ -9,8 +9,10 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, User, DEFAULT_DOCTOR_ID, examResults, patients } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 // TMC Credit System Validation Schemas
 const tmcTransferSchema = z.object({
@@ -4180,6 +4182,107 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Recent transcriptions error:', error);
       res.status(500).json({ message: 'Failed to fetch recent transcriptions' });
+    }
+  });
+
+  // Recent exam results endpoint
+  app.get('/api/exam-results/recent', requireAuth, async (req, res) => {
+    try {
+      // Get recent exam results from database
+      const recentExamResults = await db.select({
+        id: examResults.id,
+        patientId: examResults.patientId,
+        examType: examResults.examType,
+        results: examResults.results,
+        abnormalValues: examResults.abnormalValues,
+        analyzedByAI: examResults.analyzedByAI,
+        createdAt: examResults.createdAt,
+        patientName: patients.name
+      })
+      .from(examResults)
+      .leftJoin(patients, eq(examResults.patientId, patients.id))
+      .orderBy(desc(examResults.createdAt))
+      .limit(10);
+
+      console.log('[EXAM RESULTS] Retrieved recent results:', recentExamResults.length);
+
+      res.json(recentExamResults);
+    } catch (error) {
+      console.error('Recent exam results error:', error);
+      res.status(500).json({ message: 'Failed to fetch recent exam results' });
+    }
+  });
+
+  // System status endpoint for real-time monitoring
+  app.get('/api/system/status', requireAuth, async (req, res) => {
+    try {
+      // Get basic system metrics (non-PHI)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Count active users (simplified - would use session data in production)
+      const activeUsers = authenticatedClients.size;
+
+      // Count today's appointments
+      const todayAppointments = await storage.getTodayAppointments(req.user?.id || '');
+
+      // Count unprocessed WhatsApp messages  
+      const unprocessedMessages = await storage.getUnprocessedWhatsappMessages();
+
+      // System health check (simplified)
+      const systemHealth = activeUsers > 0 ? 'healthy' : 'warning';
+
+      const systemStatus = {
+        activeUsers,
+        onlinePatients: Math.floor(activeUsers * 0.3), // Estimate
+        pendingMessages: unprocessedMessages.length,
+        todayAppointments: todayAppointments.length,
+        systemHealth
+      };
+
+      console.log('[SYSTEM STATUS] Retrieved status:', systemStatus);
+
+      res.json(systemStatus);
+    } catch (error) {
+      console.error('System status error:', error);
+      res.status(500).json({ message: 'Failed to fetch system status' });
+    }
+  });
+
+  // AI analysis of exam results endpoint
+  app.post('/api/exam-results/analyze', requireAuth, async (req, res) => {
+    try {
+      const { examResultId, examType, results, patientHistory } = req.body;
+      
+      // Generate AI analysis of exam results
+      const analysis = await openAIService.analyzeExamResults(
+        examType,
+        results,
+        patientHistory || "Histórico não informado"
+      );
+
+      // Update exam result with AI analysis
+      if (examResultId) {
+        await db.update(examResults)
+          .set({ 
+            analyzedByAI: true,
+            abnormalValues: analysis.abnormalValues || null
+          })
+          .where(eq(examResults.id, examResultId));
+      }
+
+      console.log('[EXAM ANALYSIS] AI analysis completed for exam:', examResultId);
+
+      res.json({
+        success: true,
+        analysis,
+        examResultId,
+        analyzedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('Exam analysis error:', error);
+      res.status(500).json({ message: 'Failed to analyze exam results' });
     }
   });
 
