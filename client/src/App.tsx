@@ -20,6 +20,10 @@ import Login from "@/pages/login";
 import PatientJoin from "@/pages/patient-join";
 import VideoConsultation from "@/pages/video-consultation";
 import NotFound from "@/pages/not-found";
+import Features from "@/pages/features";
+import RegisterSelect from "@/pages/register/index";
+import PatientRegister from "@/pages/register/patient";
+import DoctorRegister from "@/pages/register/doctor";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
 import CommandPalette from "@/components/command-palette";
@@ -59,6 +63,22 @@ function Router() {
           <Login />
         </Route>
         <Route path="/join/:token" component={PatientJoin} />
+        
+        {/* Registration routes - public */}
+        <Route path="/register">
+          <RegisterSelect />
+        </Route>
+        <Route path="/register/patient">
+          <PatientRegister />
+        </Route>
+        <Route path="/register/doctor">
+          <DoctorRegister />
+        </Route>
+        
+        {/* Features page - public */}
+        <Route path="/features">
+          <Features />
+        </Route>
         
         {/* Public homepage - accessible to all including visitors */}
         <Route path="/">
