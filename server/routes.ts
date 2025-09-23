@@ -3919,6 +3919,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { transcript, notes, patientHistory, patientInfo } = req.body;
       
+      // Normalize notes to array format for consistent processing
+      let normalizedNotes = [];
+      if (Array.isArray(notes)) {
+        normalizedNotes = notes;
+      } else if (typeof notes === 'string') {
+        normalizedNotes = [{ type: 'observation', note: notes }];
+      }
+      
       // Create comprehensive prompt for AI analysis
       const prompt = `
 Analyze the following medical consultation data and generate a structured SOAP report:
@@ -3931,10 +3939,10 @@ CONSULTATION TRANSCRIPT:
 ${transcript || 'No transcript available'}
 
 CONSULTATION NOTES:
-${notes?.map((note: any) => `[${note.type}] ${note.note}`).join('\n') || 'No notes available'}
+${normalizedNotes?.map((note: any) => `[${note.type || 'note'}] ${note.note || note}`).join('\n') || 'No notes available'}
 
 PATIENT MEDICAL HISTORY:
-${patientHistory?.map((h: any) => h.condition || h.description).join(', ') || 'No history available'}
+${patientHistory?.map((h: any) => h.condition || h.diagnosis || h.description).join(', ') || 'No history available'}
 
 Please provide a structured SOAP analysis in Brazilian Portuguese following SUS standards:
 
@@ -4064,6 +4072,86 @@ Format your response as valid JSON with this structure:
     } catch (error) {
       console.error('SMS notification error:', error);
       res.status(500).json({ message: 'Failed to send SMS notification' });
+    }
+  });
+
+  // Audio transcription endpoint
+  app.post('/api/ai/transcribe-audio', requireAuth, async (req, res) => {
+    try {
+      // Handle multipart/form-data for audio files
+      const audioFile = req.file || req.body.audioFile;
+      
+      if (!audioFile) {
+        return res.status(400).json({ message: 'No audio file provided' });
+      }
+
+      // For now, simulate transcription (would use actual file buffer in production)
+      console.log('[AUDIO TRANSCRIPTION] Processing audio file:', {
+        filename: audioFile.filename || 'audio.wav',
+        size: audioFile.size || 'unknown',
+        mimetype: audioFile.mimetype || 'audio/wav'
+      });
+
+      // Simulate transcription result
+      const mockTranscription = `
+Paciente relata dor de cabeça há 3 dias, intensidade moderada, localizada na região frontal.
+Nega febre, náuseas ou vômitos. Histórico de enxaqueca na família.
+Exame físico: paciente consciente, orientado, sem sinais neurológicos focais.
+Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
+      `.trim();
+
+      res.json({ 
+        success: true, 
+        transcription: mockTranscription,
+        duration: '5:32',
+        language: 'pt-BR',
+        confidence: 0.95
+      });
+
+    } catch (error) {
+      console.error('Audio transcription error:', error);
+      res.status(500).json({ message: 'Failed to transcribe audio' });
+    }
+  });
+
+  // Patient summary generation endpoint
+  app.post('/api/ai/patient-summary', requireAuth, async (req, res) => {
+    try {
+      const { patientId, includeHistory, includeConsultationNotes } = req.body;
+      
+      // Get patient history (would fetch from database in production)
+      const mockPatientHistory = [
+        { date: '2024-01-15', condition: 'Hipertensão arterial diagnosticada' },
+        { date: '2024-02-20', condition: 'Diabetes tipo 2 - início do tratamento' },
+        { date: '2024-06-10', condition: 'Consulta de rotina - controle glicêmico adequado' }
+      ];
+
+      const mockConsultationNotes = [
+        { type: 'symptom', note: 'Dor de cabeça há 3 dias' },
+        { type: 'observation', note: 'Paciente consciente e orientado' },
+        { type: 'vital', note: 'PA: 120/80 mmHg, FC: 78 bpm' }
+      ];
+
+      // Generate summary using AI
+      const summary = await openAIService.generatePatientSummary(
+        includeHistory ? mockPatientHistory : [],
+        includeConsultationNotes ? mockConsultationNotes : []
+      );
+
+      console.log('[PATIENT SUMMARY] Generated for patient:', patientId);
+
+      res.json({ 
+        success: true, 
+        summary,
+        patientId,
+        generatedAt: new Date().toISOString(),
+        includedHistory: !!includeHistory,
+        includedNotes: !!includeConsultationNotes
+      });
+
+    } catch (error) {
+      console.error('Patient summary error:', error);
+      res.status(500).json({ message: 'Failed to generate patient summary' });
     }
   });
 

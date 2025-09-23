@@ -73,6 +73,14 @@ export default function VideoConsultation() {
         localVideoRef.current.srcObject = stream;
       }
 
+      // TODO: Implement real WebRTC peer-to-peer connection
+      // This implementation only shows local video but doesn't establish
+      // a real connection with the remote patient. For production, this needs:
+      // 1. RTCPeerConnection setup
+      // 2. ICE candidate handling
+      // 3. SDP offer/answer exchange via WebSocket signaling
+      // 4. Connection to existing consultation rooms in server/routes.ts
+
       // Initialize speech recognition for transcription
       if ('webkitSpeechRecognition' in window) {
         const recognition = new (window as any).webkitSpeechRecognition();
@@ -123,12 +131,72 @@ export default function VideoConsultation() {
     }
   };
 
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    toast({
-      title: isRecording ? "Gravação Parada" : "Gravação Iniciada",
-      description: isRecording ? "Áudio não está mais sendo transcrito" : "Áudio sendo transcrito automaticamente",
-    });
+  const toggleRecording = async () => {
+    if (!isRecording) {
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        
+        recorder.ondataavailable = (event) => {
+          // TODO: Send audio chunks to server for transcription
+          console.log('Audio chunk available:', event.data.size);
+        };
+        
+        recorder.onstop = () => {
+          console.log('Recording stopped');
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        recorder.start(1000); // Capture 1-second chunks
+        mediaRecorderRef.current = recorder;
+        
+        // Start speech recognition
+        if ('webkitSpeechRecognition' in window) {
+          const recognition = new (window as any).webkitSpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'pt-BR';
+          
+          recognition.onresult = (event: any) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                transcript += event.results[i][0].transcript + ' ';
+              }
+            }
+            if (transcript) {
+              setAudioTranscript(prev => prev + transcript);
+            }
+          };
+          
+          recognition.start();
+        }
+        
+        setIsRecording(true);
+        toast({
+          title: "Gravação Iniciada",
+          description: "Áudio sendo transcrito automaticamente",
+        });
+      } catch (error) {
+        toast({
+          title: "Erro na Gravação",
+          description: "Não foi possível iniciar a gravação de áudio",
+          variant: "destructive",
+        });
+      }
+    } else {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      
+      setIsRecording(false);
+      toast({
+        title: "Gravação Parada",
+        description: "Áudio não está mais sendo transcrito",
+      });
+    }
   };
 
   const addNote = (type: ConsultationNote['type']) => {

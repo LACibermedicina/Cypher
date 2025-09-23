@@ -252,6 +252,109 @@ export class OpenAIService {
       };
     }
   }
+
+  async generateClinicalAnalysis(prompt: string): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a medical AI assistant specialized in generating SOAP reports for Brazilian healthcare (SUS). Always respond in Portuguese and follow medical documentation standards." 
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500
+      });
+
+      return response.choices[0]?.message?.content || '';
+    } catch (error) {
+      console.error('OpenAI clinical analysis error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to generate clinical analysis'
+      });
+      return 'Erro ao gerar análise clínica. Tente novamente.';
+    }
+  }
+
+  async transcribeAudio(audioBuffer: Buffer, mimeType: string): Promise<string> {
+    try {
+      // For Node.js, we need to create a proper stream/blob for OpenAI
+      // Note: This requires implementing file upload handling with multer or similar
+      console.log('Transcription requested - buffer size:', audioBuffer.length, 'type:', mimeType);
+      
+      // TODO: Implement real Whisper API call with proper file handling
+      // This would require:
+      // 1. Proper file stream creation compatible with Node.js
+      // 2. File validation and size limits
+      // 3. Error handling for different audio formats
+      
+      // For now, return a placeholder indicating transcription was requested
+      return 'Transcrição de áudio solicitada. Implementação do Whisper API pendente para ambiente Node.js.';
+      
+    } catch (error) {
+      console.error('OpenAI transcription error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to transcribe audio'
+      });
+      return 'Erro ao transcrever áudio. Verifique o formato do arquivo.';
+    }
+  }
+
+  async generatePatientSummary(patientHistory: any[], consultationNotes: any[]): Promise<string> {
+    try {
+      const historyText = patientHistory.map(h => 
+        `${h.date}: ${h.condition || h.diagnosis || h.description}`
+      ).join('\n');
+      
+      const notesText = consultationNotes.map(n => 
+        `[${n.type}] ${n.note}`
+      ).join('\n');
+
+      const prompt = `
+Analise o histórico médico e as anotações da consulta atual para gerar um resumo do paciente:
+
+HISTÓRICO MÉDICO:
+${historyText}
+
+ANOTAÇÕES DA CONSULTA ATUAL:
+${notesText}
+
+Gere um resumo estruturado em português brasileiro incluindo:
+1. Condições médicas relevantes
+2. Evolução do quadro clínico
+3. Padrões identificados
+4. Recomendações para acompanhamento
+
+Formato: texto corrido, máximo 300 palavras.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a medical AI assistant specialized in patient summary generation for Brazilian healthcare." 
+          },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
+
+      return response.choices[0]?.message?.content || 'Resumo não disponível.';
+    } catch (error) {
+      console.error('OpenAI patient summary error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        status: (error as any)?.status || 'Unknown',
+        message: 'Failed to generate patient summary'
+      });
+      return 'Erro ao gerar resumo do paciente.';
+    }
+  }
 }
 
 export const openAIService = new OpenAIService();
