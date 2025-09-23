@@ -199,15 +199,21 @@ export default function Header() {
     }
   };
 
-  const navItems = [
-    { path: "/dashboard", label: t("navigation.dashboard"), icon: "fas fa-chart-line" },
-    { path: "/patients", label: t("navigation.patients"), icon: "fas fa-users" },
-    { path: "/schedule", label: t("navigation.schedule"), icon: "fas fa-calendar-alt" },
-    { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp" },
-    { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical" },
-    { path: "/prescriptions", label: "Prescrições", icon: "fas fa-prescription-bottle-alt" },
-    { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt" },
+  const allNavItems = [
+    { path: "/dashboard", label: t("navigation.dashboard"), icon: "fas fa-chart-line", roles: ["admin", "doctor", "patient"] },
+    { path: "/patients", label: t("navigation.patients"), icon: "fas fa-users", roles: ["admin", "doctor"] },
+    { path: "/schedule", label: t("navigation.schedule"), icon: "fas fa-calendar-alt", roles: ["admin", "doctor"] },
+    { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp", roles: ["admin", "doctor"] },
+    { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical", roles: ["admin", "doctor", "patient"] },
+    { path: "/prescriptions", label: "Prescrições", icon: "fas fa-prescription-bottle-alt", roles: ["admin", "doctor"] },
+    { path: "/analytics", label: "Analytics", icon: "fas fa-chart-bar", roles: ["admin"] },
+    { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt", roles: ["admin"] },
   ];
+
+  // Filter navigation items based on user role
+  const navItems = allNavItems.filter(item => 
+    user?.role && item.roles.includes(user.role)
+  );
 
   return (
     <header className="bg-card/95 backdrop-blur-sm border-b border-border shadow-sm sticky top-0 z-50" data-testid="header-main">

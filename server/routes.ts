@@ -9,7 +9,7 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -6669,6 +6669,482 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
       }
       res.status(500).json({ message: 'Failed to process emergency request' });
+    }
+  });
+
+  // ===== ADVANCED ANALYTICS & REPORTING ENDPOINTS =====
+
+  // Dashboard Overview Analytics
+  app.get('/api/analytics/dashboard', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { period = '30' } = req.query; // days
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      // Get basic metrics
+      const [
+        totalPatients,
+        totalDoctors,
+        totalAppointments,
+        completedAppointments,
+        totalPrescriptions,
+        tmcTransactionsData,
+        recentActivity
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(patients),
+        db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.role, 'doctor')),
+        db.select({ count: sql<number>`count(*)` }).from(appointments).where(sql`created_at >= ${startDate}`),
+        db.select({ count: sql<number>`count(*)` }).from(appointments)
+          .where(sql`status = 'completed' AND created_at >= ${startDate}`),
+        db.select({ count: sql<number>`count(*)` }).from(prescriptions).where(sql`created_at >= ${startDate}`),
+        db.select({ total: sql<number>`COALESCE(sum(amount), 0)` }).from(tmcTransactions)
+          .where(sql`created_at >= ${startDate}`),
+        db.select({
+          type: sql`'appointment'`,
+          count: sql<number>`count(*)`,
+          date: sql`date_trunc('day', created_at)`
+        })
+        .from(appointments)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(sql`date_trunc('day', created_at)`)
+        .orderBy(sql`date_trunc('day', created_at)`)
+        .limit(30)
+      ]);
+
+      const dashboardMetrics = {
+        overview: {
+          totalPatients: totalPatients[0]?.count || 0,
+          totalDoctors: totalDoctors[0]?.count || 0,
+          appointmentsThisPeriod: totalAppointments[0]?.count || 0,
+          completedAppointments: completedAppointments[0]?.count || 0,
+          prescriptionsThisPeriod: totalPrescriptions[0]?.count || 0,
+          tmcCreditsUsed: tmcTransactionsData[0]?.total || 0,
+          completionRate: totalAppointments[0]?.count > 0 
+            ? Math.round((completedAppointments[0]?.count / totalAppointments[0]?.count) * 100) 
+            : 0
+        },
+        activityTrend: recentActivity,
+        period: periodDays
+      };
+
+      res.json(dashboardMetrics);
+    } catch (error) {
+      console.error('Dashboard analytics error:', error);
+      res.status(500).json({ message: 'Failed to get dashboard analytics' });
+    }
+  });
+
+  // Patient Demographics Analytics
+  app.get('/api/analytics/patients', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const [
+        ageDistribution,
+        genderDistribution,
+        recentPatients
+      ] = await Promise.all([
+        db.select({
+          ageGroup: sql`CASE 
+            WHEN date_part('year', age(date_of_birth)) < 18 THEN 'Menor de 18'
+            WHEN date_part('year', age(date_of_birth)) < 30 THEN '18-29'
+            WHEN date_part('year', age(date_of_birth)) < 50 THEN '30-49'
+            WHEN date_part('year', age(date_of_birth)) < 65 THEN '50-64'
+            ELSE '65+'
+          END`,
+          count: sql<number>`count(*)`
+        })
+        .from(patients)
+        .where(sql`date_of_birth IS NOT NULL`)
+        .groupBy(sql`CASE 
+          WHEN date_part('year', age(date_of_birth)) < 18 THEN 'Menor de 18'
+          WHEN date_part('year', age(date_of_birth)) < 30 THEN '18-29'
+          WHEN date_part('year', age(date_of_birth)) < 50 THEN '30-49'
+          WHEN date_part('year', age(date_of_birth)) < 65 THEN '50-64'
+          ELSE '65+'
+        END`),
+        
+        db.select({
+          gender: patients.gender,
+          count: sql<number>`count(*)`
+        })
+        .from(patients)
+        .where(sql`gender IS NOT NULL`)
+        .groupBy(patients.gender),
+
+        db.select({
+          registrationDate: sql`date_trunc('month', created_at)`,
+          count: sql<number>`count(*)`
+        })
+        .from(patients)
+        .where(sql`created_at >= NOW() - INTERVAL '12 months'`)
+        .groupBy(sql`date_trunc('month', created_at)`)
+        .orderBy(sql`date_trunc('month', created_at)`)
+      ]);
+
+      res.json({
+        ageDistribution,
+        genderDistribution,
+        registrationTrend: recentPatients
+      });
+    } catch (error) {
+      console.error('Patient analytics error:', error);
+      res.status(500).json({ message: 'Failed to get patient analytics' });
+    }
+  });
+
+  // Doctor Performance Analytics
+  app.get('/api/analytics/doctors', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { period = '30' } = req.query;
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      const [
+        doctorAppointments,
+        doctorPrescriptions,
+        doctorRevenue
+      ] = await Promise.all([
+        db.select({
+          doctorId: appointments.doctorId,
+          doctorName: users.name,
+          appointmentCount: sql<number>`count(*)`,
+          completedCount: sql<number>`count(*) filter (where status = 'completed')`,
+          cancelledCount: sql<number>`count(*) filter (where status = 'cancelled')`
+        })
+        .from(appointments)
+        .leftJoin(users, eq(appointments.doctorId, users.id))
+        .where(sql`appointments.created_at >= ${startDate}`)
+        .groupBy(appointments.doctorId, users.name),
+
+        db.select({
+          doctorId: prescriptions.doctorId,
+          prescriptionCount: sql<number>`count(*)`
+        })
+        .from(prescriptions)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(prescriptions.doctorId),
+
+        db.select({
+          doctorId: tmcTransactions.userId,
+          totalRevenue: sql<number>`COALESCE(sum(amount), 0)`
+        })
+        .from(tmcTransactions)
+        .where(sql`created_at >= ${startDate} AND transaction_type = 'consultation'`)
+        .groupBy(tmcTransactions.userId)
+      ]);
+
+      // Combine data by doctor
+      const doctorMetrics = doctorAppointments.map(doc => {
+        const prescriptions = doctorPrescriptions.find(p => p.doctorId === doc.doctorId);
+        const revenue = doctorRevenue.find(r => r.doctorId === doc.doctorId);
+        
+        return {
+          doctorId: doc.doctorId,
+          doctorName: doc.doctorName,
+          appointmentCount: doc.appointmentCount,
+          completedCount: doc.completedCount,
+          cancelledCount: doc.cancelledCount,
+          completionRate: doc.appointmentCount > 0 
+            ? Math.round((doc.completedCount / doc.appointmentCount) * 100) 
+            : 0,
+          prescriptionCount: prescriptions?.prescriptionCount || 0,
+          totalRevenue: revenue?.totalRevenue || 0
+        };
+      });
+
+      res.json({ doctors: doctorMetrics, period: periodDays });
+    } catch (error) {
+      console.error('Doctor analytics error:', error);
+      res.status(500).json({ message: 'Failed to get doctor analytics' });
+    }
+  });
+
+  // Prescription Analytics
+  app.get('/api/analytics/prescriptions', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { period = '30' } = req.query;
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      const [
+        prescriptionTrend,
+        topMedications,
+        statusDistribution
+      ] = await Promise.all([
+        db.select({
+          date: sql`date_trunc('day', created_at)`,
+          count: sql<number>`count(*)`
+        })
+        .from(prescriptions)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(sql`date_trunc('day', created_at)`)
+        .orderBy(sql`date_trunc('day', created_at)`),
+
+        db.select({
+          medicationName: medications.name,
+          prescriptionCount: sql<number>`count(prescription_items.id)`
+        })
+        .from(prescriptionItems)
+        .leftJoin(medications, eq(prescriptionItems.medicationId, medications.id))
+        .leftJoin(prescriptions, eq(prescriptionItems.prescriptionId, prescriptions.id))
+        .where(sql`prescriptions.created_at >= ${startDate}`)
+        .groupBy(medications.name)
+        .orderBy(sql`count(prescription_items.id) DESC`)
+        .limit(10),
+
+        db.select({
+          status: prescriptions.status,
+          count: sql<number>`count(*)`
+        })
+        .from(prescriptions)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(prescriptions.status)
+      ]);
+
+      res.json({
+        prescriptionTrend,
+        topMedications,
+        statusDistribution,
+        period: periodDays
+      });
+    } catch (error) {
+      console.error('Prescription analytics error:', error);
+      res.status(500).json({ message: 'Failed to get prescription analytics' });
+    }
+  });
+
+  // Financial Analytics
+  app.get('/api/analytics/financial', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { period = '30' } = req.query;
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      const [
+        revenueByType,
+        tmcFlowTrend,
+        topSpenders
+      ] = await Promise.all([
+        db.select({
+          transactionType: tmcTransactions.transactionType,
+          totalAmount: sql<number>`COALESCE(sum(amount), 0)`,
+          transactionCount: sql<number>`count(*)`
+        })
+        .from(tmcTransactions)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(tmcTransactions.transactionType),
+
+        db.select({
+          date: sql`date_trunc('day', created_at)`,
+          totalRevenue: sql<number>`COALESCE(sum(amount), 0)`
+        })
+        .from(tmcTransactions)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(sql`date_trunc('day', created_at)`)
+        .orderBy(sql`date_trunc('day', created_at)`),
+
+        db.select({
+          userId: tmcTransactions.userId,
+          userName: users.name,
+          totalSpent: sql<number>`COALESCE(sum(amount), 0)`
+        })
+        .from(tmcTransactions)
+        .leftJoin(users, eq(tmcTransactions.userId, users.id))
+        .where(sql`tmcTransactions.created_at >= ${startDate}`)
+        .groupBy(tmcTransactions.userId, users.name)
+        .orderBy(sql`sum(amount) DESC`)
+        .limit(10)
+      ]);
+
+      res.json({
+        revenueByType,
+        tmcFlowTrend,
+        topSpenders,
+        period: periodDays
+      });
+    } catch (error) {
+      console.error('Financial analytics error:', error);
+      res.status(500).json({ message: 'Failed to get financial analytics' });
+    }
+  });
+
+  // System Activity Analytics
+  app.get('/api/analytics/system', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { period = '7' } = req.query; // Default to 7 days for system analytics
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      const [
+        userActivity,
+        whatsappActivity,
+        examResults,
+        aiUsage
+      ] = await Promise.all([
+        db.select({
+          date: sql`date_trunc('hour', last_login)`,
+          activeUsers: sql<number>`count(DISTINCT id)`
+        })
+        .from(users)
+        .where(sql`last_login >= ${startDate}`)
+        .groupBy(sql`date_trunc('hour', last_login)`)
+        .orderBy(sql`date_trunc('hour', last_login)`),
+
+        db.select({
+          date: sql`date_trunc('day', created_at)`,
+          messageCount: sql<number>`count(*)`,
+          aiMessages: sql<number>`count(*) filter (where is_from_ai = true)`
+        })
+        .from(whatsappMessages)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(sql`date_trunc('day', created_at)`)
+        .orderBy(sql`date_trunc('day', created_at)`),
+
+        db.select({
+          examType: examResults.examType,
+          count: sql<number>`count(*)`,
+          aiAnalyzed: sql<number>`count(*) filter (where analyzed_by_ai = true)`
+        })
+        .from(examResults)
+        .where(sql`created_at >= ${startDate}`)
+        .groupBy(examResults.examType),
+
+        db.select({
+          aiGeneratedRecords: sql<number>`count(*) filter (where diagnostic_hypotheses IS NOT NULL)`,
+          totalRecords: sql<number>`count(*)`
+        })
+        .from(medicalRecords)
+        .where(sql`created_at >= ${startDate}`)
+      ]);
+
+      res.json({
+        userActivity,
+        whatsappActivity,
+        examResults,
+        aiUsage: aiUsage[0] || { aiGeneratedRecords: 0, totalRecords: 0 },
+        period: periodDays
+      });
+    } catch (error) {
+      console.error('System analytics error:', error);
+      res.status(500).json({ message: 'Failed to get system analytics' });
+    }
+  });
+
+  // Export Report Data
+  app.get('/api/analytics/export/:reportType', requireAuth, async (req, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { reportType } = req.params;
+      const { format = 'json', period = '30' } = req.query;
+
+      let reportData;
+      const periodDays = parseInt(period.toString());
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - periodDays);
+
+      switch (reportType) {
+        case 'appointments':
+          reportData = await db.select({
+            appointmentId: appointments.id,
+            patientName: patients.name,
+            doctorName: users.name,
+            scheduledAt: appointments.scheduledAt,
+            type: appointments.type,
+            status: appointments.status,
+            createdAt: appointments.createdAt
+          })
+          .from(appointments)
+          .leftJoin(patients, eq(appointments.patientId, patients.id))
+          .leftJoin(users, eq(appointments.doctorId, users.id))
+          .where(sql`appointments.created_at >= ${startDate}`)
+          .orderBy(appointments.createdAt);
+          break;
+
+        case 'prescriptions':
+          reportData = await db.select({
+            prescriptionNumber: prescriptions.prescriptionNumber,
+            patientId: prescriptions.patientId,
+            doctorId: prescriptions.doctorId,
+            diagnosis: prescriptions.diagnosis,
+            status: prescriptions.status,
+            createdAt: prescriptions.createdAt,
+            expiresAt: prescriptions.expiresAt
+          })
+          .from(prescriptions)
+          .where(sql`created_at >= ${startDate}`)
+          .orderBy(prescriptions.createdAt);
+          break;
+
+        case 'financial':
+          reportData = await db.select({
+            transactionId: tmcTransactions.id,
+            userId: tmcTransactions.userId,
+            amount: tmcTransactions.amount,
+            transactionType: tmcTransactions.transactionType,
+            description: tmcTransactions.description,
+            createdAt: tmcTransactions.createdAt
+          })
+          .from(tmcTransactions)
+          .where(sql`created_at >= ${startDate}`)
+          .orderBy(tmcTransactions.createdAt);
+          break;
+
+        default:
+          return res.status(400).json({ message: 'Invalid report type' });
+      }
+
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="${reportType}-report.csv"`);
+        
+        if (reportData.length > 0) {
+          const headers = Object.keys(reportData[0]).join(',');
+          const rows = reportData.map(row => 
+            Object.values(row).map(value => 
+              typeof value === 'string' ? `"${value}"` : value
+            ).join(',')
+          ).join('\n');
+          res.send(headers + '\n' + rows);
+        } else {
+          res.send('No data available for the selected period');
+        }
+      } else {
+        res.json({ data: reportData, reportType, period: periodDays });
+      }
+    } catch (error) {
+      console.error('Export report error:', error);
+      res.status(500).json({ message: 'Failed to export report' });
     }
   });
 
