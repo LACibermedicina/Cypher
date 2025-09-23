@@ -38,33 +38,64 @@ export default function Header() {
 
   const handleSupportContact = async () => {
     try {
-      const response: any = await apiRequest('POST', '/api/support/contact', {
-        message: 'Solicitação de suporte através da interface do sistema',
-        userInfo: {
-          name: user?.name,
-          email: user?.email,
-          phone: user?.phone
-        },
-        priority: 'medium'
-      });
+      // Get support configuration first
+      const configResponse = await fetch('/api/support/config');
+      const supportConfig = await configResponse.json();
+      
+      if (supportConfig.whatsappNumber && supportConfig.supportChatbotEnabled) {
+        // Open WhatsApp directly with support number
+        const supportMessage = `Olá! Preciso de suporte no sistema Telemed.%0A%0AUsuário: ${user?.name || 'Não informado'}%0AEmail: ${user?.email || 'Não informado'}%0ATipo: ${user?.role || 'Não informado'}%0A%0APor favor, me ajudem com uma questão do sistema.`;
+        const whatsappUrl = `https://wa.me/55${supportConfig.whatsappNumber}?text=${supportMessage}`;
+        
+        // Try to open WhatsApp
+        window.open(whatsappUrl, '_blank');
+        
+        toast({
+          title: "WhatsApp Aberto",
+          description: "Chat do WhatsApp foi aberto para contato direto com suporte!",
+        });
+        
+        // Also send internal notification for tracking
+        await apiRequest('POST', '/api/support/contact', {
+          message: 'Usuário abriu WhatsApp para suporte direto',
+          userInfo: {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone
+          },
+          priority: 'low'
+        });
+        
+      } else {
+        // Fallback to old method if WhatsApp not available
+        const response: any = await apiRequest('POST', '/api/support/contact', {
+          message: 'Solicitação de suporte através da interface do sistema',
+          userInfo: {
+            name: user?.name,
+            email: user?.email,
+            phone: user?.phone
+          },
+          priority: 'medium'
+        });
 
-      toast({
-        title: "Suporte Contactado",
-        description: response.message || "Mensagem enviada com sucesso!",
-      });
+        toast({
+          title: "Suporte Contactado",
+          description: response.message || "Mensagem enviada com sucesso!",
+        });
 
-      if (response.method === 'whatsapp' && response.autoResponse) {
-        setTimeout(() => {
-          toast({
-            title: "Resposta Automática",
-            description: response.autoResponse,
-          });
-        }, 1000);
+        if (response.method === 'whatsapp' && response.autoResponse) {
+          setTimeout(() => {
+            toast({
+              title: "Resposta Automática",
+              description: response.autoResponse,
+            });
+          }, 1000);
+        }
       }
     } catch (error) {
       toast({
         title: "Erro no Suporte",
-        description: "Não foi possível enviar a mensagem. Tente novamente.",
+        description: "Não foi possível contatar o suporte. Tente novamente.",
         variant: "destructive",
       });
     }
