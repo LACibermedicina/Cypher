@@ -74,7 +74,7 @@ export function useNotifications() {
           priority: message.data.urgent ? 'high' : 'medium',
           timestamp,
           read: false,
-          actionUrl: '/appointments',
+          actionUrl: '/schedule',
           data: message.data
         };
 
@@ -100,7 +100,7 @@ export function useNotifications() {
           priority: 'critical',
           timestamp,
           read: false,
-          actionUrl: '/emergency',
+          actionUrl: '/dashboard',
           data: message.data
         };
 
