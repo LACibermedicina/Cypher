@@ -16,6 +16,7 @@ import MedicalRecords from "@/pages/medical-records";
 import AdminPage from "@/pages/admin";
 import Login from "@/pages/login";
 import PatientJoin from "@/pages/patient-join";
+import VideoConsultation from "@/pages/video-consultation";
 import NotFound from "@/pages/not-found";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
@@ -109,6 +110,12 @@ function Router() {
           <ProtectedRoute requiredRoles={['admin']}>
             <Header />
             <AdminPage />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/consultation/video/:patientId">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <VideoConsultation />
           </ProtectedRoute>
         </Route>
         

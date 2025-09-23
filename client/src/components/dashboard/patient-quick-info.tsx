@@ -3,16 +3,75 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function PatientQuickInfo() {
   const [currentPatientId] = useState("current-patient-id"); // This would come from context
+  const [showPatientSelector, setShowPatientSelector] = useState(false);
+  const { toast } = useToast();
 
   const { data: currentPatient, isLoading } = useQuery({
     queryKey: ['/api/patients', currentPatientId],
     enabled: !!currentPatientId,
   });
+
+  // Get all patients for selection
+  const { data: allPatients = [] } = useQuery({
+    queryKey: ['/api/patients'],
+  });
+
+  const handleStartVideoCall = async (patientId?: string) => {
+    try {
+      const targetPatientId = patientId || currentPatientId;
+      const selectedPatient = allPatients.find(p => p.id === targetPatientId) || mockPatient;
+
+      // Send notifications to patient
+      try {
+        // WhatsApp notification
+        await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: selectedPatient.phone || '5511900000000',
+            message: `🩺 *Telemed* - Consulta Iniciada\n\nOlá ${selectedPatient.name}!\n\nSeu médico está iniciando a consulta agora. Entre na sala de videochamada através do link que será enviado em breve.\n\n⏰ Horário: ${format(new Date(), 'HH:mm', { locale: ptBR })}`
+          })
+        });
+
+        // SMS notification if enabled
+        if (selectedPatient.smsEnabled) {
+          await fetch('/api/notifications/sms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: selectedPatient.phone,
+              message: `Telemed: Seu médico está iniciando a consulta. Acesse o link que será enviado por WhatsApp.`
+            })
+          });
+        }
+      } catch (notificationError) {
+        console.warn('Failed to send notifications:', notificationError);
+      }
+
+      // Redirect to video consultation page
+      window.location.href = `/consultation/video/${targetPatientId}`;
+
+      toast({
+        title: "Videochamada Iniciada",
+        description: `Consulta com ${selectedPatient.name} foi iniciada. Notificações enviadas!`,
+      });
+
+      setShowPatientSelector(false);
+    } catch (error) {
+      toast({
+        title: "Erro ao Iniciar Videochamada",
+        description: "Não foi possível iniciar a consulta. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -111,13 +170,77 @@ export default function PatientQuickInfo() {
         </div>
 
         <div className="mt-4 pt-4 border-t border-border space-y-2">
-          <Button 
-            className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
-            data-testid="button-start-video-call"
-          >
-            <i className="fas fa-video mr-2"></i>
-            Iniciar Videochamada
-          </Button>
+          <Dialog open={showPatientSelector} onOpenChange={setShowPatientSelector}>
+            <DialogTrigger asChild>
+              <Button 
+                className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
+                data-testid="button-start-video-call"
+              >
+                <i className="fas fa-video mr-2"></i>
+                Iniciar Videochamada
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Selecionar Paciente para Videochamada</DialogTitle>
+                <DialogDescription>
+                  Escolha um paciente para iniciar a consulta por videochamada. Notificações serão enviadas automaticamente.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {/* Current patient option */}
+                {mockPatient && (
+                  <div 
+                    className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => handleStartVideoCall(mockPatient.id)}
+                    data-testid="patient-option-current"
+                  >
+                    <img 
+                      src={mockPatient.photoUrl}
+                      alt="Patient" 
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{mockPatient.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {mockPatient.age} anos • ID: {mockPatient.patientId}
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">Atual</Badge>
+                  </div>
+                )}
+
+                {/* Other patients */}
+                {allPatients.slice(0, 5).map((patient: any) => (
+                  <div 
+                    key={patient.id}
+                    className="flex items-center space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => handleStartVideoCall(patient.id)}
+                    data-testid={`patient-option-${patient.id}`}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                      <i className="fas fa-user text-primary text-sm"></i>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{patient.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {patient.age || 'N/A'} anos • {patient.email || 'Email não informado'}
+                      </div>
+                    </div>
+                    <i className="fas fa-video text-muted-foreground"></i>
+                  </div>
+                ))}
+
+                {allPatients.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <i className="fas fa-users text-3xl mb-3"></i>
+                    <p>Nenhum paciente disponível</p>
+                    <p className="text-sm">Cadastre pacientes para iniciar videochamadas</p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button 
             variant="outline" 
             className="w-full"

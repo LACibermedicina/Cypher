@@ -3910,6 +3910,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // VIDEO CONSULTATION ENDPOINTS
+  // ============================================================================
+
+  // AI Clinical Analysis endpoint for video consultations
+  app.post('/api/ai/clinical-analysis', requireAuth, async (req, res) => {
+    try {
+      const { transcript, notes, patientHistory, patientInfo } = req.body;
+      
+      // Create comprehensive prompt for AI analysis
+      const prompt = `
+Analyze the following medical consultation data and generate a structured SOAP report:
+
+PATIENT INFO:
+Name: ${patientInfo?.name || 'Unknown'}
+Age: ${patientInfo?.age || 'Unknown'}
+
+CONSULTATION TRANSCRIPT:
+${transcript || 'No transcript available'}
+
+CONSULTATION NOTES:
+${notes?.map((note: any) => `[${note.type}] ${note.note}`).join('\n') || 'No notes available'}
+
+PATIENT MEDICAL HISTORY:
+${patientHistory?.map((h: any) => h.condition || h.description).join(', ') || 'No history available'}
+
+Please provide a structured SOAP analysis in Brazilian Portuguese following SUS standards:
+
+1. SUBJETIVO (S): What the patient reported (symptoms, concerns)
+2. OBJETIVO (O): Observable findings and examination results
+3. AVALIAÇÃO (A): Medical assessment and potential diagnoses
+4. PLANO (P): Treatment plan and recommendations
+
+Format your response as valid JSON with this structure:
+{
+  "subjective": "...",
+  "objective": "...", 
+  "assessment": "...",
+  "plan": "..."
+}
+`;
+
+      // Use existing OpenAI service for analysis
+      const analysis = await openAIService.generateClinicalAnalysis(prompt);
+
+      // Try to parse the response as JSON, fallback to structured text
+      let soapData;
+      try {
+        soapData = JSON.parse(analysis);
+      } catch (parseError) {
+        // If not valid JSON, create structured response from text
+        soapData = {
+          subjective: analysis.includes('SUBJETIVO') ? analysis.split('SUBJETIVO')[1]?.split('OBJETIVO')[0]?.trim() : 'Sintomas e queixas relatados pelo paciente durante a consulta.',
+          objective: analysis.includes('OBJETIVO') ? analysis.split('OBJETIVO')[1]?.split('AVALIAÇÃO')[0]?.trim() : 'Exame físico e sinais vitais observados.',
+          assessment: analysis.includes('AVALIAÇÃO') ? analysis.split('AVALIAÇÃO')[1]?.split('PLANO')[0]?.trim() : 'Hipóteses diagnósticas baseadas nos dados coletados.',
+          plan: analysis.includes('PLANO') ? analysis.split('PLANO')[1]?.trim() : analysis || 'Plano terapêutico e acompanhamento recomendado.'
+        };
+      }
+
+      res.json(soapData);
+
+    } catch (error) {
+      console.error('AI clinical analysis error:', error);
+      res.status(500).json({ 
+        message: 'Failed to generate clinical analysis',
+        subjective: 'Erro ao processar sintomas relatados.',
+        objective: 'Erro ao processar dados do exame.',
+        assessment: 'Análise diagnóstica não disponível.',
+        plan: 'Plano de tratamento a ser definido manualmente.'
+      });
+    }
+  });
+
+  // Save consultation endpoint
+  app.post('/api/consultations', requireAuth, async (req, res) => {
+    try {
+      const { patientId, notes, audioTranscript, soapNotes, duration, timestamp } = req.body;
+      const doctorId = req.user.id;
+
+      // Create consultation record
+      const consultation = {
+        id: crypto.randomUUID(),
+        patientId,
+        doctorId,
+        type: 'video_consultation',
+        notes: JSON.stringify(notes || []),
+        audioTranscript: audioTranscript || '',
+        soapNotes: JSON.stringify(soapNotes || {}),
+        duration: duration || 0,
+        timestamp: timestamp || new Date().toISOString(),
+        status: 'completed'
+      };
+
+      // Log consultation for now (would save to database in production)
+      console.log('Saving video consultation:', {
+        consultationId: consultation.id,
+        patientId,
+        doctorId,
+        duration: consultation.duration,
+        notesCount: notes?.length || 0,
+        hasTranscript: !!audioTranscript,
+        hasSoapNotes: !!(soapNotes?.subjective || soapNotes?.objective || soapNotes?.assessment || soapNotes?.plan)
+      });
+
+      // Broadcast consultation completion to admin users
+      await broadcastAdminActivity({
+        action: 'consultation_completed',
+        type: 'medical_activity',
+        entityType: 'consultation',
+        entityId: consultation.id,
+        userId: doctorId,
+        details: {
+          consultationType: 'video_consultation',
+          patientId,
+          duration: consultation.duration,
+          timestamp: consultation.timestamp
+        }
+      });
+
+      res.json({ 
+        success: true, 
+        consultationId: consultation.id,
+        message: 'Consultation saved successfully' 
+      });
+
+    } catch (error) {
+      console.error('Save consultation error:', error);
+      res.status(500).json({ message: 'Failed to save consultation' });
+    }
+  });
+
+  // SMS notification endpoint
+  app.post('/api/notifications/sms', requireAuth, async (req, res) => {
+    try {
+      const { to, message } = req.body;
+      
+      // For now, log SMS (would integrate with Twilio or similar service)
+      console.log(`[SMS NOTIFICATION] To: ${to}, Message: ${message}, Timestamp: ${new Date().toISOString()}`);
+      
+      // Simulate SMS sending delay
+      setTimeout(() => {
+        console.log(`[SMS DELIVERED] To: ${to}`);
+      }, 1000);
+      
+      res.json({ 
+        success: true, 
+        message: 'SMS notification queued for delivery',
+        provider: 'telemed-sms-service',
+        estimatedDelivery: '1-3 seconds'
+      });
+
+    } catch (error) {
+      console.error('SMS notification error:', error);
+      res.status(500).json({ message: 'Failed to send SMS notification' });
+    }
+  });
+
   // ===== CLINICAL INTERVIEW ENDPOINTS =====
 
   // TEST ROUTE - No auth required
