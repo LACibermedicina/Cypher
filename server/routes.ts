@@ -4155,6 +4155,34 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
+  // Recent consultation transcriptions endpoint
+  app.get('/api/consultations/recent-transcriptions', requireAuth, async (req, res) => {
+    try {
+      // Mock recent transcriptions (would fetch from database in production)
+      const mockTranscriptions = [
+        {
+          id: 'trans-1',
+          date: new Date().toISOString().split('T')[0],
+          patientName: 'Maria Santos',
+          text: 'Paciente relata dor de cabeça há 3 dias, intensidade moderada. Nega febre ou náuseas. Histórico familiar de enxaqueca.',
+          preview: 'Dor de cabeça há 3 dias, intensidade moderada...'
+        },
+        {
+          id: 'trans-2', 
+          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          patientName: 'João Silva',
+          text: 'Consulta de retorno para controle da hipertensão. Paciente aderente ao tratamento. Pressão arterial controlada.',
+          preview: 'Controle da hipertensão, paciente aderente...'
+        }
+      ];
+
+      res.json(mockTranscriptions);
+    } catch (error) {
+      console.error('Recent transcriptions error:', error);
+      res.status(500).json({ message: 'Failed to fetch recent transcriptions' });
+    }
+  });
+
   // ===== CLINICAL INTERVIEW ENDPOINTS =====
 
   // TEST ROUTE - No auth required
