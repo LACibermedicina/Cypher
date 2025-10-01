@@ -4751,6 +4751,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rate appointment (patient rating for doctor)
+  app.post('/api/appointments/:id/rate', requireAuth, async (req: any, res) => {
+    try {
+      const appointmentId = req.params.id;
+      const { rating, feedback } = req.body;
+      
+      // Validate rating value
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+      }
+      
+      // Get appointment
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ message: 'Appointment not found' });
+      }
+      
+      // Only completed appointments can be rated
+      if (appointment.status !== 'completed') {
+        return res.status(400).json({ message: 'Only completed appointments can be rated' });
+      }
+      
+      // Authorization: only the patient can rate
+      const user = req.user;
+      const patient = await db.select().from(patients).where(eq(patients.id, appointment.patientId)).limit(1);
+      const isPatient = patient.length > 0 && patient[0].userId === user.id;
+      const isAdmin = user.role === 'admin';
+      
+      if (!isPatient && !isAdmin) {
+        return res.status(403).json({ message: 'Only the patient can rate this appointment' });
+      }
+      
+      // Check if appointment is already rated
+      if (appointment.rating) {
+        return res.status(400).json({ message: 'This appointment has already been rated' });
+      }
+      
+      // Update appointment with rating and feedback
+      const updatedAppointment = await storage.updateAppointment(appointmentId, {
+        rating: parseInt(rating),
+        feedback: feedback || null,
+      });
+      
+      // Broadcast rating to doctor
+      broadcastToDoctor(appointment.doctorId, {
+        type: 'appointment_rated',
+        data: {
+          appointmentId,
+          rating,
+          feedback,
+          patientName: patient[0]?.name || 'Paciente',
+        }
+      });
+      
+      res.json({
+        success: true,
+        appointment: updatedAppointment,
+      });
+    } catch (error) {
+      console.error('Rate appointment error:', error);
+      res.status(500).json({ message: 'Failed to rate appointment' });
+    }
+  });
+
   // AI WhatsApp-style Chat Analysis for Chatbot
   app.post('/api/ai/whatsapp-analysis', requireAuth, async (req, res) => {
     try {

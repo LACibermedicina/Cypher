@@ -25,8 +25,11 @@ export default function TodaySchedule() {
   const { user } = useAuth();
   
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [newScheduledDate, setNewScheduledDate] = useState("");
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState("");
 
   const { data: appointments, isLoading } = useQuery<Appointment[]>({
     queryKey: user?.id ? ['/api/appointments/today', user.id] : ['appointments-today-placeholder'],
@@ -51,6 +54,21 @@ export default function TodaySchedule() {
   const rescheduleAppointmentMutation = useMutation({
     mutationFn: async ({ id, scheduledAt, notes }: { id: string; scheduledAt: string; notes?: string }) => {
       const response = await apiRequest('POST', `/api/appointments/${id}/reschedule`, { scheduledAt, notes });
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate the today appointments query
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/today', user.id] });
+      }
+      // Also invalidate general appointments queries
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+  });
+
+  const rateAppointmentMutation = useMutation({
+    mutationFn: async ({ id, rating, feedback }: { id: string; rating: number; feedback?: string }) => {
+      const response = await apiRequest('POST', `/api/appointments/${id}/rate`, { rating, feedback });
       return await response.json();
     },
     onSuccess: () => {
@@ -137,6 +155,51 @@ export default function TodaySchedule() {
           toast({
             title: "Erro ao reagendar",
             description: error.message || "Não foi possível reagendar a consulta.",
+            variant: "destructive",
+          });
+        }
+      }
+    );
+  };
+
+  const handleOpenRating = (appointment: any) => {
+    setSelectedAppointment(appointment);
+    setRating(0);
+    setFeedback("");
+    setRatingDialogOpen(true);
+  };
+
+  const handleSubmitRating = () => {
+    if (!selectedAppointment || rating === 0) {
+      toast({
+        title: "Avaliação incompleta",
+        description: "Por favor, selecione uma nota de 1 a 5 estrelas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    rateAppointmentMutation.mutate(
+      {
+        id: selectedAppointment.id,
+        rating,
+        feedback: feedback || undefined,
+      },
+      {
+        onSuccess: () => {
+          setRatingDialogOpen(false);
+          setSelectedAppointment(null);
+          setRating(0);
+          setFeedback("");
+          toast({
+            title: "Avaliação enviada",
+            description: "Obrigado pela sua avaliação!",
+          });
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Erro ao avaliar",
+            description: error.message || "Não foi possível enviar a avaliação.",
             variant: "destructive",
           });
         }
@@ -275,10 +338,37 @@ export default function TodaySchedule() {
                   )}
 
                   {appointment.status === 'completed' && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <i className="fas fa-check mr-1"></i>
-                      Concluído
-                    </Badge>
+                    <>
+                      {appointment.rating ? (
+                        <div className="flex items-center space-x-2">
+                          <Badge className="bg-green-100 text-green-800">
+                            <i className="fas fa-check mr-1"></i>
+                            Concluído
+                          </Badge>
+                          <div className="flex items-center text-yellow-500">
+                            {[...Array(5)].map((_, i) => (
+                              <i key={i} className={`fas fa-star ${i < appointment.rating ? '' : 'opacity-30'}`}></i>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Badge className="bg-green-100 text-green-800">
+                            <i className="fas fa-check mr-1"></i>
+                            Concluído
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenRating(appointment)}
+                            data-testid={`button-rate-${appointment.id}`}
+                          >
+                            <i className="fas fa-star mr-1"></i>
+                            Avaliar
+                          </Button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -329,6 +419,70 @@ export default function TodaySchedule() {
             data-testid="button-confirm-reschedule"
           >
             {rescheduleAppointmentMutation.isPending ? "Reagendando..." : "Confirmar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Rating Dialog */}
+    <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
+      <DialogContent data-testid="dialog-rating">
+        <DialogHeader>
+          <DialogTitle>Avaliar Consulta</DialogTitle>
+          <DialogDescription>
+            Como foi sua experiência com o médico?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Nota (1 a 5 estrelas)</Label>
+            <div className="flex space-x-2 justify-center py-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setRating(star)}
+                  className="transition-transform hover:scale-110"
+                  data-testid={`button-star-${star}`}
+                >
+                  <i 
+                    className={`fas fa-star text-3xl ${star <= rating ? 'text-yellow-500' : 'text-gray-300'}`}
+                  ></i>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="feedback">Comentário (opcional)</Label>
+            <textarea
+              id="feedback"
+              className="w-full min-h-[100px] px-3 py-2 border border-input rounded-md bg-background"
+              placeholder="Conte-nos sobre sua experiência..."
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              data-testid="textarea-feedback"
+            />
+          </div>
+          {selectedAppointment && (
+            <div className="text-sm text-muted-foreground">
+              <p>Médico: Dr. {selectedAppointment.doctor?.name || 'Nome não disponível'}</p>
+              <p>Data: {format(new Date(selectedAppointment.scheduledAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setRatingDialogOpen(false)}
+            data-testid="button-cancel-rating"
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleSubmitRating}
+            disabled={rateAppointmentMutation.isPending || rating === 0}
+            data-testid="button-submit-rating"
+          >
+            {rateAppointmentMutation.isPending ? "Enviando..." : "Enviar Avaliação"}
           </Button>
         </div>
       </DialogContent>
