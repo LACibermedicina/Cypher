@@ -61,6 +61,17 @@ Preferred communication style: Simple, everyday language.
 - **Frontend**: Integrated into `/profile` page with preview, upload/cancel/delete buttons, loading states, toast notifications
 - **Database**: Uses existing `profilePicture` field (text nullable) in users table, stores relative path
 
+### Dashboard Real-Data Integration (October 1, 2025)
+- **Removed hardcoded data**: Eliminated DEFAULT_DOCTOR_ID constant and all mock data references
+- **Role-based statistics**: 
+  - **Doctors**: See personal metrics (their own appointments, signatures, patients)
+  - **Admins**: See aggregated system-wide stats (all appointments of the day, total patients)
+  - **Patients**: See their own appointment count and records
+- **Frontend improvements**: Query gating with `enabled: !!user?.id` prevents premature API calls
+- **Backend authorization**: Endpoint requires authentication, validates user ownership (user can only access their own stats unless admin)
+- **API Endpoint**: `GET /api/dashboard/stats/:userId` with role-specific response logic
+- **Security**: Proper authentication, ownership validation, 403 Forbidden for unauthorized access
+
 ### Video Consultation Feature (October 1, 2025)
 - **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
 - **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar

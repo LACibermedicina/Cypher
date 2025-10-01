@@ -1170,6 +1170,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reschedule appointment
+  app.post('/api/appointments/:id/reschedule', requireAuth, async (req: any, res) => {
+    try {
+      const appointmentId = req.params.id;
+      const { scheduledAt, notes } = req.body;
+      
+      // Get original appointment
+      const originalAppointment = await storage.getAppointment(appointmentId);
+      if (!originalAppointment) {
+        return res.status(404).json({ message: 'Appointment not found' });
+      }
+      
+      // Validate that appointment can be rescheduled
+      if (originalAppointment.status === 'completed') {
+        return res.status(400).json({ message: 'Cannot reschedule completed appointment' });
+      }
+      
+      if (originalAppointment.status === 'cancelled') {
+        return res.status(400).json({ message: 'Cannot reschedule cancelled appointment' });
+      }
+      
+      // Validate new date is in the future
+      const newDate = new Date(scheduledAt);
+      if (newDate <= new Date()) {
+        return res.status(400).json({ message: 'Cannot reschedule to a past date' });
+      }
+      
+      // Authorization: only doctor, admin, or the patient can reschedule
+      const user = req.user;
+      const isDoctor = user.id === originalAppointment.doctorId;
+      const isAdmin = user.role === 'admin';
+      const patient = await db.select().from(patients).where(eq(patients.id, originalAppointment.patientId)).limit(1);
+      const isPatient = patient.length > 0 && patient[0].userId === user.id;
+      
+      if (!isDoctor && !isAdmin && !isPatient) {
+        return res.status(403).json({ message: 'Not authorized to reschedule this appointment' });
+      }
+      
+      // Create new appointment with same details but new date
+      const newAppointment = await storage.createAppointment({
+        patientId: originalAppointment.patientId,
+        doctorId: originalAppointment.doctorId,
+        scheduledAt: newDate,
+        type: originalAppointment.type,
+        status: 'scheduled',
+        notes: notes || `Reagendada de ${new Date(originalAppointment.scheduledAt).toLocaleString('pt-BR')}`,
+        aiScheduled: originalAppointment.aiScheduled,
+        rescheduledFromId: originalAppointment.id,
+      });
+      
+      // Update original appointment
+      await storage.updateAppointment(appointmentId, {
+        status: 'rescheduled',
+        rescheduledToId: newAppointment.id,
+      });
+      
+      // Broadcast updates
+      broadcastToDoctor(originalAppointment.doctorId, { 
+        type: 'appointment_rescheduled', 
+        data: { 
+          originalId: originalAppointment.id,
+          newAppointment 
+        } 
+      });
+      
+      res.json({
+        success: true,
+        originalAppointment: { ...originalAppointment, status: 'rescheduled', rescheduledToId: newAppointment.id },
+        newAppointment,
+      });
+    } catch (error) {
+      console.error('Reschedule appointment error:', error);
+      res.status(500).json({ message: 'Failed to reschedule appointment' });
+    }
+  });
+
   // WhatsApp Messages API
   app.get('/api/whatsapp/messages/:patientId', async (req, res) => {
     try {
