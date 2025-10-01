@@ -13,6 +13,12 @@
     "admin": "Admin",
     "logout": "Sair"
   },
+  "greeting": {
+    "hello": "Olá"
+  },
+  "support": {
+    "contact": "Falar com Suporte"
+  },
   "common": {
     "loading": "Carregando...",
     "error": "Erro",

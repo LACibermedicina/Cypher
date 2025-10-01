@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import LanguageSelector from "@/components/ui/language-selector";
@@ -45,8 +45,9 @@ export default function Header() {
       
       if (supportConfig.whatsappNumber && supportConfig.supportChatbotEnabled) {
         // Open WhatsApp directly with support number
-        const supportMessage = `Olá! Preciso de suporte no sistema Telemed.%0A%0AUsuário: ${user?.name || 'Não informado'}%0AEmail: ${user?.email || 'Não informado'}%0ATipo: ${user?.role || 'Não informado'}%0A%0APor favor, me ajudem com uma questão do sistema.`;
-        const whatsappUrl = `https://wa.me/55${supportConfig.whatsappNumber}?text=${supportMessage}`;
+        // Privacy-conscious message without PII in URL
+        const supportMessage = `Olá! Preciso de suporte no sistema Telemed.`;
+        const whatsappUrl = `https://wa.me/55${supportConfig.whatsappNumber}?text=${encodeURIComponent(supportMessage)}`;
         
         // Try to open WhatsApp
         window.open(whatsappUrl, '_blank');
@@ -220,28 +221,134 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden w-10 h-10 hover:bg-primary/10"
+                  data-testid="button-hamburger"
+                >
+                  <i className="fas fa-bars text-lg text-foreground"></i>
+                </Button>
+              </SheetTrigger>
+              
+              <SheetContent side="right" className="w-80 px-0">
+                <SheetHeader className="px-6 pb-6 border-b">
+                  <SheetTitle className="text-left">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md">
+                        <i className="fas fa-user-md text-white text-lg"></i>
+                      </div>
+                      {user && (
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {t("greeting.hello")}, {user.name}!
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {getRoleDisplay(user.role)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </SheetTitle>
+                  <SheetDescription className="sr-only">
+                    Menu de navegação principal e informações do usuário
+                  </SheetDescription>
+                </SheetHeader>
+                
+                <nav className="flex flex-col p-6 space-y-2">
+                  {navItems.map((item) => {
+                    const isActive = location === item.path || (location === "/" && item.path === "/dashboard");
+                    return (
+                      <Link
+                        key={item.path}
+                        href={item.path}
+                        data-testid={`link-mobile-nav-${item.path.slice(1) || 'dashboard'}`}
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <div
+                          className={`flex items-center space-x-4 p-4 rounded-xl transition-all duration-200 ${
+                            isActive
+                              ? "text-white shadow-lg"
+                              : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                          }`}
+                          style={{
+                            background: isActive
+                              ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
+                              : "transparent"
+                          }}
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            isActive ? "bg-white/20" : "bg-muted"
+                          }`}>
+                            <i className={`${item.icon} ${isActive ? "text-white" : "text-muted-foreground"}`}></i>
+                          </div>
+                          <span className="font-medium">{item.label}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                {/* Mobile User Info */}
+                <div className="absolute bottom-6 left-6 right-6 p-4 bg-muted/50 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
+                          {user ? getUserInitials(user.name) : 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-sm" data-testid="text-mobile-user-name">
+                          {user?.name || 'Usuário'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleLogout}
+                      className="text-muted-foreground hover:text-destructive"
+                      data-testid="button-mobile-logout"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+
             <Link href="/" data-testid="link-logo">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md">
-                  <i className="fas fa-user-md text-white text-lg"></i>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-medical-primary bg-clip-text text-transparent">
-                    {t("app.name")}
-                  </h1>
-                  <p className="text-xs text-muted-foreground font-medium">{t("app.subtitle")}</p>
-                </div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md hover:shadow-lg transition-shadow cursor-pointer">
+                <i className="fas fa-user-md text-white text-lg"></i>
               </div>
             </Link>
+
+            {user && (
+              <div className="hidden md:block">
+                <p className="text-sm font-semibold text-foreground" data-testid="text-greeting">
+                  {t("greeting.hello")}, {user.name}!
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {getRoleDisplay(user.role)}
+                </p>
+              </div>
+            )}
+
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="px-4 py-2 text-xs font-semibold hover:bg-accent/10 transition-colors"
+              variant="ghost" 
+              size="icon" 
+              className="w-10 h-10 hover:bg-accent/10 transition-colors"
               data-testid="button-support"
               onClick={handleSupportContact}
+              title={t("support.contact")}
             >
-              <i className="fas fa-headset mr-2 text-accent"></i>
-              Falar com Suporte
+              <i className="fas fa-headset text-lg text-accent"></i>
             </Button>
           </div>
 
@@ -276,102 +383,6 @@ export default function Header() {
               </Link>
             ))}
           </nav>
-
-          {/* Mobile Navigation Sheet */}
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden w-10 h-10 p-0 hover:bg-primary/10"
-                data-testid="button-mobile-menu"
-              >
-                <i className="fas fa-bars text-lg text-foreground"></i>
-                <span className="sr-only">{t("navigation.menu")}</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80 px-0">
-              <SheetHeader className="px-6 pb-6 border-b">
-                <SheetTitle className="text-left">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md">
-                      <i className="fas fa-user-md text-white text-lg"></i>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-medical-primary bg-clip-text text-transparent">
-                        {t("app.name")}
-                      </h2>
-                      <p className="text-xs text-muted-foreground font-medium">{t("app.subtitle")}</p>
-                    </div>
-                  </div>
-                </SheetTitle>
-              </SheetHeader>
-              
-              <nav className="flex flex-col p-6 space-y-2">
-                {navItems.map((item) => {
-                  const isActive = location === item.path || (location === "/" && item.path === "/dashboard");
-                  return (
-                    <Link
-                      key={item.path}
-                      href={item.path}
-                      data-testid={`link-mobile-nav-${item.path.slice(1) || 'dashboard'}`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <div
-                        className={`flex items-center space-x-4 p-4 rounded-xl transition-all duration-200 ${
-                          isActive
-                            ? "text-white shadow-lg"
-                            : "text-muted-foreground hover:text-primary hover:bg-primary/5"
-                        }`}
-                        style={{
-                          background: isActive
-                            ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
-                            : "transparent"
-                        }}
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                          isActive ? "bg-white/20" : "bg-muted"
-                        }`}>
-                          <i className={`${item.icon} ${isActive ? "text-white" : "text-muted-foreground"}`}></i>
-                        </div>
-                        <span className="font-medium">{item.label}</span>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </nav>
-
-              {/* Mobile User Info */}
-              <div className="absolute bottom-6 left-6 right-6 p-4 bg-muted/50 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="w-12 h-12">
-                      <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
-                        {user ? getUserInitials(user.name) : 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-sm" data-testid="text-mobile-user-name">
-                        {user?.name || 'Usuário'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="text-muted-foreground hover:text-destructive"
-                    data-testid="button-mobile-logout"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />

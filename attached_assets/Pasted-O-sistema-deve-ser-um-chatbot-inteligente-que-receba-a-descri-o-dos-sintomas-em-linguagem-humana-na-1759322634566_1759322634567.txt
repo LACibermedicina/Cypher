@@ -1,0 +1,18 @@
+O sistema deve ser um chatbot inteligente que receba a descrição dos sintomas em linguagem humana natural do paciente, interpretando e analisando essas informações para oferecer uma avaliação preliminar dos sintomas com base em dados clínicos do DSM-5 e CID-10. Em casos onde a informação necessária não esteja disponível nessas fontes, o sistema deve consultar outras fontes confiáveis médicas online para referências diagnósticas.
+Funcionalidades
+Análise de Sintomas via Linguagem Natural: O chatbot utiliza modelos de IA avançados (OpenAI GPT ou Perplexity AI) para entender a descrição livre dos sintomas, realizando perguntas adicionais para refinar e completar a avaliação.
+Consulta a Fontes Diagnósticas: O sistema acessa automaticamente os bancos de dados do DSM-5 e CID-10 (disponíveis online) para diagnosticar ou sugerir possíveis diagnósticos baseados nos sintomas relatados.
+Fallback para Consulta Médica Online: Se os sintomas não puderem ser avaliados ou diagnosticados com segurança pelas bases de dados e IA, o chatbot recomenda o contato com um médico online disponível, ou em falta desse, redireciona o paciente para um WhatsApp de consultas previamente registrado pelo administrador do sistema.
+Agendamento de Consultas: Integração para o agendamento direto de consultas médicas, podendo confirmar horários e enviar lembretes para o paciente via chatbot.
+Respostas Automatizadas para Dúvidas: Atendimento a dúvidas comuns sobre agendamento, diagnóstico preliminar e procedimentos através de respostas automatizadas baseadas em NLP.
+Tecnologias e Integrações
+Utilização dos modelos de linguagem GPT (OpenAI) ou Perplexity AI, que combinam geração de texto com acesso a dados atualizados da web.
+Integração com APIs que disponibilizam informações do DSM-5 e CID-10 para consulta diagnóstica automática.
+Módulo de fallback para conexão com médicos online via chat ou redirecionamento para WhatsApp, garantindo suporte humano quando necessário.
+Ferramentas de agendamento integradas (Google Calendar API ou sistema similar) para marcação automática.
+Suporte para múltiplos canais de comunicação, incluindo web, mobile app, e WhatsApp, para facilitar acesso do paciente.
+Restrições e Segurança
+Garantir privacidade e proteção de dados do paciente conforme regulamentações locais (LGPD, GDPR).
+Enfatizar que o chatbot não substitui avaliação médica presencial, sendo uma ferramenta de triagem e suporte.
+Controle administrativo para atualizar contatos médicos e configurar o WhatsApp de suporte.
+Este sistema proporciona automatização de triagem e agendamento, melhora a experiência do paciente e facilita o trabalho dos profissionais da saúde, usando IA combinada com bases clínicas reconhecidas e canais de atendimento confiáveis

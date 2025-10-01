@@ -32,17 +32,13 @@ export default function LanguageSelector() {
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          size="sm" 
-          className="flex items-center space-x-2 hover:bg-accent hover:text-accent-foreground"
+          size="icon" 
+          className="w-10 h-10 flex items-center justify-center hover:bg-accent hover:text-accent-foreground"
           data-testid="language-selector-trigger"
         >
-          <span className="text-lg" role="img" aria-label={`${currentLanguage.name} flag`}>
+          <span className="text-xl" role="img" aria-label={`${currentLanguage.name} flag`}>
             {currentLanguage.flag}
           </span>
-          <span className="hidden sm:inline text-sm font-medium">
-            {currentLanguage.nativeName}
-          </span>
-          <i className="fas fa-chevron-down text-xs ml-1"></i>
         </Button>
       </DropdownMenuTrigger>
       

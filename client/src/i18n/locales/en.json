@@ -13,6 +13,12 @@
     "admin": "Admin",
     "logout": "Logout"
   },
+  "greeting": {
+    "hello": "Hello"
+  },
+  "support": {
+    "contact": "Contact Support"
+  },
   "common": {
     "loading": "Loading...",
     "error": "Error",
