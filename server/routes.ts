@@ -7656,11 +7656,15 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
   // Send message to AI chatbot
   app.post('/api/chatbot/message', async (req: Request, res: Response) => {
     try {
-      const { message, role, userId } = req.body;
+      const { message } = req.body;
 
       if (!message) {
         return res.status(400).json({ message: 'Message is required' });
       }
+
+      // Get user role and ID from authenticated session (server-side only!)
+      const userRole = req.user?.role || 'visitor';
+      const userId = req.user?.id;
 
       // Get rescheduling margin from system settings
       const reschedulingMargin = await storage.getSystemSetting('rescheduling_margin_hours');
@@ -7668,7 +7672,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
 
       // Get chatbot references for knowledge base
       const references = await storage.getChatbotReferences({
-        allowedRoles: [role || 'visitor'],
+        allowedRoles: [userRole],
         useForDiagnostics: true
       });
 
@@ -7676,8 +7680,8 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       let type = 'text';
       let metadata: any = {};
 
-      // Role-based responses
-      if (role === 'admin') {
+      // Role-based responses (using server-side authenticated role)
+      if (userRole === 'admin') {
         // Admin sees all appointments across all doctors
         if (message.toLowerCase().includes('consulta') || message.toLowerCase().includes('agendamento')) {
           const appointments = await storage.getAppointments();
@@ -7700,7 +7704,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         } else {
           response = `Como administrador, você pode consultar:\n• Ver todas as consultas\n• Pacientes em espera\n• Estatísticas do sistema\n• Configurações\n\nO que você gostaria de verificar?`;
         }
-      } else if (role === 'doctor' && userId) {
+      } else if (userRole === 'doctor' && userId) {
         // Doctor sees only their appointments
         if (message.toLowerCase().includes('consulta') || message.toLowerCase().includes('agenda')) {
           const appointments = await storage.getAppointments();
@@ -7723,8 +7727,8 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         } else {
           response = `Como médico, posso mostrar:\n• Suas consultas agendadas\n• Pacientes que agendaram com você\n• Consultas em andamento\n\nO que você gostaria de ver?`;
         }
-      } else if (role === 'patient' || role === 'visitor') {
-        // Patient/visitor can schedule appointments
+      } else if (userRole === 'patient') {
+        // Authenticated patients can schedule appointments
         if (message.toLowerCase().includes('agendar') || message.toLowerCase().includes('consulta')) {
           // Get available doctors
           const users = await storage.getUsers();
@@ -7758,8 +7762,37 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
           response = `✅ Consulta solicitada! Para confirmar o agendamento, clique no botão "Confirmar Agendamento" acima.`;
         } else if (message.toLowerCase().includes('sintoma')) {
           response = `🩺 **Análise de Sintomas**\n\nPor favor, descreva seus sintomas com detalhes:\n• O que você está sentindo?\n• Há quanto tempo?\n• Intensidade (leve, moderada, severa)?\n\n⚠️ Lembre-se: Esta é apenas uma orientação inicial. Em caso de emergência, ligue 192 (SAMU).`;
+        } else if (message.toLowerCase().includes('minhas consultas') || message.toLowerCase().includes('ver consultas')) {
+          const appointments = await storage.getAppointments();
+          const myAppointments = appointments.filter(apt => apt.patientId === userId);
+          response = `📋 **Suas Consultas**\n\nVocê tem ${myAppointments.length} consulta(s) agendada(s).`;
         } else {
-          response = `Olá! Posso ajudar você a:\n• Agendar uma consulta\n• Analisar sintomas\n• Ver suas consultas\n\nComo posso ajudar?`;
+          response = `Olá! Posso ajudar você a:\n• Agendar uma consulta\n• Ver suas consultas agendadas\n• Analisar sintomas\n\nComo posso ajudar?`;
+        }
+      } else if (userRole === 'visitor') {
+        // Visitors cannot schedule - need to login/register first
+        if (message.toLowerCase().includes('agendar') || message.toLowerCase().includes('consulta')) {
+          response = `📋 **Para Agendar Consultas**\n\n`;
+          response += `Para agendar uma consulta, você precisa:\n`;
+          response += `1. Fazer login como paciente\n`;
+          response += `2. Ou registrar-se como novo paciente\n\n`;
+          response += `⏰ Margem de agendamento do sistema: ${marginHours}h\n\n`;
+          response += `Após o login, você poderá agendar consultas com nossos médicos!`;
+          
+          type = 'action';
+          metadata = {
+            action: 'require_login',
+            message: 'Por favor, faça login ou registre-se para agendar consultas.'
+          };
+        } else if (message.toLowerCase().includes('sintoma')) {
+          response = `🩺 **Análise de Sintomas**\n\nPor favor, descreva seus sintomas com detalhes:\n• O que você está sentindo?\n• Há quanto tempo?\n• Intensidade (leve, moderada, severa)?\n\n⚠️ Lembre-se: Esta é apenas uma orientação inicial. Em caso de emergência, ligue 192 (SAMU).\n\n💡 Para agendamentos, faça login ou registre-se!`;
+        } else {
+          response = `Olá! Sou o assistente virtual da Telemed.\n\n`;
+          response += `Como visitante, posso ajudar com:\n`;
+          response += `• Análise de sintomas\n`;
+          response += `• Informações sobre serviços\n`;
+          response += `• Orientações gerais\n\n`;
+          response += `💡 Para agendar consultas, faça login ou registre-se!`;
         }
       } else {
         response = `Olá! Sou o assistente virtual da Telemed. Como posso ajudar você hoje?`;
@@ -7781,10 +7814,20 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
   // Schedule appointment via chatbot
   app.post('/api/chatbot/schedule', async (req: Request, res: Response) => {
     try {
-      const { date, doctorId, type, userId } = req.body;
+      // Require authentication
+      if (!req.user) {
+        return res.status(401).json({ message: 'Autenticação necessária para agendar consultas' });
+      }
 
-      if (!date || !doctorId || !userId) {
-        return res.status(400).json({ message: 'Missing required fields' });
+      // Only patients can schedule appointments via chatbot
+      if (req.user.role !== 'patient') {
+        return res.status(403).json({ message: 'Apenas pacientes podem agendar consultas' });
+      }
+
+      const { date, doctorId, type } = req.body;
+
+      if (!date || !doctorId) {
+        return res.status(400).json({ message: 'Data e médico são obrigatórios' });
       }
 
       // Get rescheduling margin
@@ -7802,9 +7845,9 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         });
       }
 
-      // Create appointment
+      // Create appointment (use authenticated user ID)
       const appointment = await storage.createAppointment({
-        patientId: userId,
+        patientId: req.user.id,
         doctorId,
         scheduledFor: scheduledDate.toISOString(),
         type: type || 'Consulta Geral',

@@ -116,9 +116,7 @@ Como posso ajudar hoje?`;
       const res = await fetch('/api/chatbot/message', {
         method: 'POST',
         body: JSON.stringify({
-          message: input,
-          role: user?.role || 'visitor',
-          userId: user?.id
+          message: input
         }),
         headers: {
           'Content-Type': 'application/json'
@@ -198,10 +196,7 @@ Deseja confirmar este agendamento?`,
       
       const res = await fetch('/api/chatbot/schedule', {
         method: 'POST',
-        body: JSON.stringify({
-          ...appointment,
-          userId: user?.id
-        }),
+        body: JSON.stringify(appointment),
         headers: {
           'Content-Type': 'application/json'
         },
@@ -209,7 +204,8 @@ Deseja confirmar este agendamento?`,
       });
 
       if (!res.ok) {
-        throw new Error('Failed to schedule appointment');
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Failed to schedule appointment');
       }
 
       const confirmMessage: Message = {
@@ -228,9 +224,10 @@ Deseja confirmar este agendamento?`,
       });
 
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Não foi possível agendar a consulta.";
       toast({
         title: "Erro",
-        description: "Não foi possível agendar a consulta. Tente novamente.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
