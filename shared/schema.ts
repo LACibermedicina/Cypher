@@ -306,12 +306,19 @@ export const chatbotReferences = pgTable("chatbot_references", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   content: text("content").notNull(),
-  category: text("category").notNull(), // medical, procedural, emergency, general
+  category: text("category").notNull(), // medical, procedural, emergency, general, diagnostic
   keywords: text("keywords").array(), // Keywords for AI matching
   priority: integer("priority").default(1), // Higher priority = used first
   source: text("source"), // Reference source (medical guidelines, etc.)
+  sourceType: text("source_type").notNull().default("text"), // text, pdf, url, internet
+  fileUrl: text("file_url"), // URL to uploaded PDF or file
+  fileName: text("file_name"), // Original file name
+  fileSize: integer("file_size"), // File size in bytes
+  pdfExtractedText: text("pdf_extracted_text"), // Full text extracted from PDF
   isActive: boolean("is_active").default(true),
   language: text("language").default("pt"), // Language of content
+  allowedRoles: text("allowed_roles").array().default(sql`ARRAY['admin', 'doctor', 'patient']::text[]`), // Which roles can use this reference
+  useForDiagnostics: boolean("use_for_diagnostics").default(false), // Use for diagnostic consultations
   lastUsed: timestamp("last_used"),
   usageCount: integer("usage_count").default(0),
   createdBy: uuid("created_by").references(() => users.id),
@@ -336,6 +343,20 @@ export const supportConfig = pgTable("support_config", {
   autoResponderEnabled: boolean("auto_responder_enabled").default(true),
   autoResponderMessage: text("auto_responder_message").default("Obrigado por entrar em contato! Nossa equipe responderá em breve."),
   isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// System Settings - General application configuration
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: text("setting_value").notNull(),
+  settingType: text("setting_type").notNull().default("string"), // string, number, boolean, json
+  description: text("description"),
+  category: text("category").notNull(), // scheduling, ai, notifications, general
+  isEditable: boolean("is_editable").default(true),
+  updatedBy: uuid("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -887,6 +908,12 @@ export const insertSupportConfigSchema = createInsertSchema(supportConfig).omit(
   updatedAt: true,
 });
 
+export const insertSystemSettingsSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Prescription system insert schemas
 export const insertMedicationSchema = createInsertSchema(medications).omit({
   id: true,
@@ -981,6 +1008,9 @@ export type InsertClinicalInterview = z.infer<typeof insertClinicalInterviewSche
 
 export type SupportConfig = typeof supportConfig.$inferSelect;
 export type InsertSupportConfig = z.infer<typeof insertSupportConfigSchema>;
+
+export type SystemSettings = typeof systemSettings.$inferSelect;
+export type InsertSystemSettings = z.infer<typeof insertSystemSettingsSchema>;
 
 // Prescription system types
 export type Medication = typeof medications.$inferSelect;

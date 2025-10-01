@@ -9,10 +9,10 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 
 // TMC Credit System Validation Schemas
 const tmcTransferSchema = z.object({
@@ -7337,6 +7337,317 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Export report error:', error);
       res.status(500).json({ message: 'Failed to export report' });
+    }
+  });
+
+  // System Settings API
+  app.get('/api/system-settings', async (req: Request, res: Response) => {
+    try {
+      if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Admin or Doctor access required' });
+      }
+
+      const { category } = req.query;
+      let query = db.select().from(systemSettings);
+      
+      if (category) {
+        query = query.where(eq(systemSettings.category, category.toString())) as any;
+      }
+      
+      const settings = await query;
+      res.json(settings);
+    } catch (error) {
+      console.error('Get system settings error:', error);
+      res.status(500).json({ message: 'Failed to get system settings' });
+    }
+  });
+
+  app.get('/api/system-settings/:key', async (req: Request, res: Response) => {
+    try {
+      if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Admin or Doctor access required' });
+      }
+      
+      const { key } = req.params;
+      const setting = await db.select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, key))
+        .limit(1);
+      
+      if (setting.length === 0) {
+        return res.status(404).json({ message: 'Setting not found' });
+      }
+      
+      res.json(setting[0]);
+    } catch (error) {
+      console.error('Get system setting error:', error);
+      res.status(500).json({ message: 'Failed to get system setting' });
+    }
+  });
+
+  app.put('/api/system-settings/:key', async (req: Request, res: Response) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { key } = req.params;
+      
+      // Check if setting exists and is editable
+      const existing = await db.select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, key))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        return res.status(404).json({ message: 'Setting not found' });
+      }
+      
+      if (!existing[0].isEditable) {
+        return res.status(403).json({ message: 'This setting cannot be edited' });
+      }
+
+      // Validate request body
+      const updateSchema = z.object({
+        settingValue: z.string(),
+        description: z.string().optional(),
+      });
+      
+      const validatedData = updateSchema.parse(req.body);
+
+      const updated = await db.update(systemSettings)
+        .set({ 
+          ...validatedData,
+          updatedBy: req.user.id,
+          updatedAt: new Date()
+        })
+        .where(eq(systemSettings.settingKey, key))
+        .returning();
+
+      res.json(updated[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      console.error('Update system setting error:', error);
+      res.status(500).json({ message: 'Failed to update system setting' });
+    }
+  });
+
+  app.post('/api/system-settings', async (req: Request, res: Response) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      // Validate request body
+      const createSchema = z.object({
+        settingKey: z.string().min(1),
+        settingValue: z.string().min(1),
+        settingType: z.enum(['string', 'number', 'boolean', 'json']),
+        description: z.string().optional(),
+        category: z.enum(['scheduling', 'ai', 'notifications', 'general']),
+        isEditable: z.boolean().default(true),
+      });
+      
+      const validatedData = createSchema.parse(req.body);
+
+      const newSetting = await db.insert(systemSettings)
+        .values({
+          ...validatedData,
+          updatedBy: req.user.id
+        })
+        .returning();
+
+      res.status(201).json(newSetting[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      console.error('Create system setting error:', error);
+      res.status(500).json({ message: 'Failed to create system setting' });
+    }
+  });
+
+  app.delete('/api/system-settings/:key', async (req: Request, res: Response) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      const { key } = req.params;
+      
+      // Check if setting exists and is editable
+      const existing = await db.select()
+        .from(systemSettings)
+        .where(eq(systemSettings.settingKey, key))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        return res.status(404).json({ message: 'Setting not found' });
+      }
+      
+      if (!existing[0].isEditable) {
+        return res.status(403).json({ message: 'This setting cannot be deleted' });
+      }
+
+      await db.delete(systemSettings)
+        .where(eq(systemSettings.settingKey, key));
+
+      res.json({ message: 'Setting deleted successfully' });
+    } catch (error) {
+      console.error('Delete system setting error:', error);
+      res.status(500).json({ message: 'Failed to delete system setting' });
+    }
+  });
+
+  // Chatbot References API (Knowledge Sources)
+  app.get('/api/chatbot-references', async (req: Request, res: Response) => {
+    try {
+      const { category, useForDiagnostics, language } = req.query;
+      const userRole = req.user?.role || 'visitor';
+      
+      let query = db.select().from(chatbotReferences)
+        .where(and(
+          eq(chatbotReferences.isActive, true),
+          sql`${userRole} = ANY(${chatbotReferences.allowedRoles})`
+        ));
+      
+      if (category) {
+        query = query.where(eq(chatbotReferences.category, category.toString())) as any;
+      }
+      
+      if (useForDiagnostics === 'true') {
+        query = query.where(eq(chatbotReferences.useForDiagnostics, true)) as any;
+      }
+      
+      if (language) {
+        query = query.where(eq(chatbotReferences.language, language.toString())) as any;
+      }
+      
+      const references = await query;
+      res.json(references);
+    } catch (error) {
+      console.error('Get chatbot references error:', error);
+      res.status(500).json({ message: 'Failed to get chatbot references' });
+    }
+  });
+
+  app.post('/api/chatbot-references', async (req: Request, res: Response) => {
+    try {
+      if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Admin or Doctor access required' });
+      }
+
+      // Validate request body
+      const createSchema = z.object({
+        title: z.string().min(1),
+        content: z.string().min(1),
+        category: z.enum(['medical', 'procedural', 'emergency', 'general', 'diagnostic']),
+        keywords: z.array(z.string()).optional(),
+        priority: z.number().int().min(1).default(1),
+        source: z.string().optional(),
+        sourceType: z.enum(['text', 'pdf', 'url', 'internet']).default('text'),
+        fileUrl: z.string().url().optional(),
+        fileName: z.string().optional(),
+        fileSize: z.number().int().optional(),
+        pdfExtractedText: z.string().optional(),
+        language: z.string().default('pt'),
+        allowedRoles: z.array(z.enum(['admin', 'doctor', 'patient', 'visitor', 'researcher'])).default(['admin', 'doctor', 'patient']),
+        useForDiagnostics: z.boolean().default(false),
+        isActive: z.boolean().default(true),
+      });
+      
+      const validatedData = createSchema.parse(req.body);
+
+      const newReference = await db.insert(chatbotReferences)
+        .values({
+          ...validatedData,
+          createdBy: req.user.id,
+          updatedBy: req.user.id
+        })
+        .returning();
+
+      res.status(201).json(newReference[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      console.error('Create chatbot reference error:', error);
+      res.status(500).json({ message: 'Failed to create chatbot reference' });
+    }
+  });
+
+  app.put('/api/chatbot-references/:id', async (req: Request, res: Response) => {
+    try {
+      if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Admin or Doctor access required' });
+      }
+
+      // Validate request body
+      const updateSchema = z.object({
+        title: z.string().min(1).optional(),
+        content: z.string().min(1).optional(),
+        category: z.enum(['medical', 'procedural', 'emergency', 'general', 'diagnostic']).optional(),
+        keywords: z.array(z.string()).optional(),
+        priority: z.number().int().min(1).optional(),
+        source: z.string().optional(),
+        sourceType: z.enum(['text', 'pdf', 'url', 'internet']).optional(),
+        fileUrl: z.string().url().optional(),
+        fileName: z.string().optional(),
+        fileSize: z.number().int().optional(),
+        pdfExtractedText: z.string().optional(),
+        language: z.string().optional(),
+        allowedRoles: z.array(z.enum(['admin', 'doctor', 'patient', 'visitor', 'researcher'])).optional(),
+        useForDiagnostics: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+      });
+      
+      const validatedData = updateSchema.parse(req.body);
+
+      const { id } = req.params;
+      const updated = await db.update(chatbotReferences)
+        .set({
+          ...validatedData,
+          updatedBy: req.user.id,
+          updatedAt: new Date()
+        })
+        .where(eq(chatbotReferences.id, id))
+        .returning();
+
+      if (updated.length === 0) {
+        return res.status(404).json({ message: 'Reference not found' });
+      }
+
+      res.json(updated[0]);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Invalid request data', errors: error.errors });
+      }
+      console.error('Update chatbot reference error:', error);
+      res.status(500).json({ message: 'Failed to update chatbot reference' });
+    }
+  });
+
+  app.delete('/api/chatbot-references/:id', async (req: Request, res: Response) => {
+    try {
+      if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+        return res.status(403).json({ message: 'Admin or Doctor access required' });
+      }
+
+      const { id } = req.params;
+      const deleted = await db.delete(chatbotReferences)
+        .where(eq(chatbotReferences.id, id))
+        .returning();
+
+      if (deleted.length === 0) {
+        return res.status(404).json({ message: 'Reference not found' });
+      }
+
+      res.json({ message: 'Reference deleted successfully' });
+    } catch (error) {
+      console.error('Delete chatbot reference error:', error);
+      res.status(500).json({ message: 'Failed to delete chatbot reference' });
     }
   });
 

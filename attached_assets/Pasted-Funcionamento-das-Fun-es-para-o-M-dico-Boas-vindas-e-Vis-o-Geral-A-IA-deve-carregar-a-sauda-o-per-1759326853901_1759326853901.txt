@@ -1,0 +1,148 @@
+Funcionamento das Funções para o Médico
+Boas-vindas e Visão Geral:
+A IA deve carregar a saudação personalizada com nome do médico.
+Mostrar automaticamente o resumo das consultas e vídeo chamadas agendadas para o dia.
+Atualizações em tempo real conforme novas consultas agendadas ou canceladas.
+Indicadores de Sistema e Credenciamento:
+Exibir status de segurança e conformidade LGPD com alertas se necessário.
+Validar assinatura digital CFM via certificado ICP-Brasil com status e aviso de renovação.
+Integrar sistema de crédito TMC, mostrando saldo e valor aproximado convertido, atualizados em tempo real.
+Acesso Rápido às Funções Clínicas:
+Botões funcionais para iniciar consulta, prescrever, cadastrar paciente e ver relatórios.
+Cada ação deve abrir uma interface rápida e simplificada, com validação automática dos dados.
+A IA deve sugerir prescrições baseadas em diagnósticos anteriores e protocolos clínicos.
+Gerenciamento de Consultas Ativas:
+A IA deve agrupar e listar consultas conforme status (aguardando, online, presencial).
+Disponibilizar botão “Atender” que inicia vídeo ou consulta presencial com full histórico.
+Classificar complexidade da consulta para ajuste de tempo e recursos.
+Sistema de Prescrição Digital:
+Receitas geradas digitalmente, assinadas por certificado e armazenadas de forma segura.
+Status visível para o médico (pendente, assinado), com opção para revisão e alteração.
+IA pode alertar interações medicamentosas e sugerir alertas ao paciente.
+Análise de Desempenho:
+Gráficos dinâmicos de atendimentos diários e ganhos mensais em TMC.
+IA pode sugerir metas e recomendações baseadas em desempenho histórico.
+Gestão do Sistema de Créditos TMC:
+Visualização clara do saldo, histórico de créditos e débitos.
+Função para transferir créditos para outros usuários ou plataformas autorizadas.
+Sistema inteligente para reconhecer regras de bonificação e comissões.
+Prontuários de Pacientes:
+Lista rápida com dados clínicos essenciais e histórico resumido.
+Acesso direto ao prontuário completo e atualização automática após consultas.
+Segurança e Compliance:
+Validação contínua de certificados digitais e autenticações biométricas.
+Alertas automáticos para atualizações, renovações e conformidade regulatória.
+Páginas Iniciais e Funções para Outros Níveis de Usuário
+1. Paciente
+Página Inicial:
+Saudação personalizada.
+Lista de consultas agendadas com datas, horários e links para vídeo chamadas.
+Histórico de prescrições digitais com status (pendente, assinado).
+Saldo TMC (caso receba créditos por participação ou programas).
+Informações sobre segurança e privacidade (LGPD).
+Opções Convenientes:
+Agendar ou cancelar consultas.
+Iniciar vídeo chamada no horário marcado.
+Visualizar e baixar receitas digitais.
+Consultar prontuário e histórico médico.
+Acessar área de dúvidas e suporte.
+Possibilidade de transferir créditos TMC recebidos.
+2. Visitante
+Página Inicial:
+Informação institucional sobre o sistema de telemedicina.
+Opção para cadastro inicial (paciente, médico ou outro).
+Acesso a FAQs, normas de segurança e política de privacidade.
+Informações sobre benefícios e funcionamento da moeda TMC.
+Opções Convenientes:
+Criar conta paciente ou solicitar cadastro médico.
+Navegar sobre funcionalidades e planos do sistema.
+Visualizar regulamentos associados (LGPD, CFM).
+Contatar suporte para informações.
+3. Administrador
+Página Inicial:
+Dashboard com resumo geral: número de usuários ativos (médicos, pacientes), consultas em curso e performance financeira em TMC.
+Alertas de conformidade, atualizações e renovação de certificados.
+Controle do sistema de créditos TMC geral e relatórios administrativos.
+Monitoramento de segurança da plataforma e logs de acesso.
+Opções Convenientes:
+Gerenciar contas de usuários, permissões e níveis de acesso.
+Aprovar ou bloquear acessos.
+Auditar transações e uso do sistema de moedas TMC.
+Configurar regras de bônus, limites e comissões.
+Gerenciar atualizações do sistema e certificados.
+Visualizar métricas detalhadas de desempenho e compliance.
+Especificações para Desenvolvimento pela IA
+A IA deve implementar controle de acesso baseado em autenticação robusta e níveis definidos para cada tipo de usuário, garantindo que cada perfil visualize e manipule apenas as informações permitidas.
+Deve haver sincronização de dados em tempo real para todas as interfaces, especialmente para compromissos, prescrições e sistema de créditos.
+O sistema de moedas digitais TMC deve operar integrado à plataforma financeira, com registro seguro de transações, histórico acessível e mecanismos transparentes para bônus e comissões.
+O sistema deve suportar notificações automáticas personalizadas (lembrança de consulta, alerta de prescrição, aviso de saldo TMC) para todos os níveis.
+Ferramentas de AI devem auxiliar em recomendações clínicas (para médicos), suporte ao paciente, análise de dados (para administradores) e assistência para visitantes (chatbots informativos).
+Interface intuitiva, responsiva e acessível (computadores e dispositivos móveis) deve ser priorizada em todas as páginas iniciais.
+Essa arquitetura garante um sistema de telemedicina eficiente, seguro e user-friendly, com funções adaptadas a cada usuário e integrada ao sistema de créditos digitais TMC.Para o desenvolvimento do sistema de telemedicina, a IA deve construir as funções conforme especificado para cada tipo de usuário (médico, paciente, visitante e administrador), garantindo interfaces iniciais e funcionalidades adaptadas aos seus papéis e restrições. A seguir, descrição detalhada do funcionamento e da página inicial para cada perfil.
+Médico
+Funcionamento das funções
+Boas-vindas e resumo: Atualização dinâmica do número de consultas agendadas e vídeo chamadas pendentes no dia.
+Segurança e credenciais: Verificação contínua de validade da assinatura digital CFM e conformidade LGPD; alertas visuais e renovação facilitada.
+Créditos TMC: Exibição do saldo atualizado e conversão para real, com histórico e possibilidade de transferir créditos.
+Consultas e prescrições: Interface rápida para iniciar consulta (presencial ou online), prescrever medicamentos com assinatura digital vinculada, e criar prontuários.
+Consultas ativas: Listagem com status (aguardando, online, presencial), detalhes do paciente e botão “Atender” para iniciar atendimento multimodal.
+Desempenho e métricas: Gráficos interativos semanais/mensais para monitorar atendimentos e ganhos em TMC.
+Segurança biométrica: Controle de autenticação digital e facial, com alertas para expiração dos certificados.
+Página inicial
+Saudação personalizada e resumo do dia.
+Indicadores de segurança e certificados.
+Saldo e ganhos em TMC.
+Menu de ações rápidas: iniciar consulta, prescrever, cadastrar paciente, relatórios.
+Lista de consultas ativas com acesso direto.
+Visualização de prescrições pendentes e assinadas.
+Gráficos de desempenho e créditos.
+Paciente
+Funcionamento das funções
+Visualizar agenda de consultas agendadas com links para vídeo chamadas.
+Consultar histórico de receitas digitais.
+Atender recomendações (ex.: marcadores para retorno).
+Consultar saldo de TMC (se aplicável, por participação ou recompensas).
+Área de dúvidas, suporte e privacidade (LGPD).
+Agendamento e cancelamento facilitados via interface amigável.
+Página inicial
+Saudação personalizada.
+Próximas consultas com horário e link.
+Histórico de prescrições e status.
+Saldo TMC e movimentações (quando houver).
+Botões para agendar consulta, consultar prontuário, contatar suporte.
+Informações sobre segurança e proteção de dados.
+Visitante
+Funcionamento das funções
+Acesso limitado para conhecer o sistema.
+Guia para criação de conta (paciente ou médico).
+Visualização das políticas de privacidade, LGPD, certificados.
+FAQs, benefícios e regras do sistema de créditos TMC.
+Contato para suporte e dúvidas.
+Página inicial
+Apresentação institucional do serviço.
+Opção de cadastro e login.
+Navegação em FAQ e regulamentações.
+Links para informações sobre TMC e segurança.
+Contato e suporte.
+Administrador
+Funcionamento das funções
+Dashboard com indicadores do sistema (usuários ativos, consultas, faturamento TMC).
+Gestão de contas e permissões.
+Auditoria de transações TMC, com histórico e controle de comissões.
+Monitoramento de segurança e certificações.
+Configuração de regras para créditos, bônus e limites.
+Alertas para conformidade regulatória e renovação de certificados.
+Página inicial
+Resumo de usuários e atividades.
+Relatórios financeiros e de compliance.
+Controle e aprovação de contas.
+Acesso a configurações do sistema de créditos TMC.
+Painel de segurança e logs.
+Especificações para IA no desenvolvimento
+Implementar controle de acesso rigoroso por perfil, garantindo privacidade e segurança.
+Sincronização em tempo real para agendas, prescrições, e créditos.
+Sistema digital TMC seguro, com registro transparente e possibilidade de transferência de créditos.
+Notificações automáticas personalizadas para cada perfil.
+Uso de IA para sugestões clínicas (médicos), suporte ao paciente, análises administrativas e chatbot informativos para visitantes.
+Interfaces responsivas e intuitivas, compatíveis com desktop e dispositivos móveis.
+Essa estrutura modular e protegida garante operações eficientes e usabilidade adaptada a cada usuário, com integração transparente da moeda digital TMC em todo o sistema.
