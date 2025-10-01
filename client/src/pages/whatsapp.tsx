@@ -64,7 +64,8 @@ export default function WhatsApp() {
     }
   }, [wsMessages, queryClient]);
 
-  const selectedPatient = (patients || []).find((p: any) => p.id === selectedPatientId);
+  const patientsList = Array.isArray(patients) ? patients : [];
+  const selectedPatient = patientsList.find((p: any) => p.id === selectedPatientId);
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedPatient) return;
@@ -75,7 +76,7 @@ export default function WhatsApp() {
     });
   };
 
-  const patientsWithMessages = (patients || []).filter((p: any) => p.whatsappNumber || p.phone);
+  const patientsWithMessages = patientsList.filter((p: any) => p.whatsappNumber || p.phone);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -210,7 +211,7 @@ export default function WhatsApp() {
                     <div className="flex items-center justify-center h-full">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : !(messages || []).length ? (
+                  ) : !Array.isArray(messages) || messages.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
                         <i className="fas fa-comments text-4xl text-muted-foreground mb-3"></i>
@@ -220,7 +221,7 @@ export default function WhatsApp() {
                     </div>
                   ) : (
                     <div className="p-4 space-y-4">
-                      {(messages || []).map((message: any) => (
+                      {messages.map((message: any) => (
                         <div
                           key={message.id}
                           className={`flex ${message.isFromAI || message.toNumber === selectedPatient.whatsappNumber ? 'justify-start' : 'justify-end'}`}

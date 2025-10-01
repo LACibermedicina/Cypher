@@ -57,7 +57,7 @@ export default function WhatsAppIntegration() {
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : !(recentMessages || []).length ? (
+          ) : !Array.isArray(recentMessages) || recentMessages.length === 0 ? (
             <div className="text-center py-8">
               <i className="fab fa-whatsapp text-4xl text-muted-foreground mb-3"></i>
               <h3 className="text-lg font-semibold text-muted-foreground mb-2">

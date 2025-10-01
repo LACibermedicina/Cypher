@@ -762,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Save AI response
-        await storage.createWhatsappMessage({
+        const aiMessage = await storage.createWhatsappMessage({
           patientId: patient.id,
           fromNumber: message.to,
           toNumber: message.from,
@@ -774,7 +774,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Mark original message as read
         await whatsAppService.markMessageAsRead(message.messageId);
 
-        // Broadcast real-time update to authenticated doctor only
+        console.log(`📥 WhatsApp message received from ${message.from} (patient: ${patient.id})`);
+
+        // Broadcast incoming patient message to all connected clients
+        wss.clients.forEach((client) => {
+          if (client.readyState === 1) { // OPEN
+            client.send(JSON.stringify({
+              type: 'whatsapp_message',
+              data: whatsappMessage
+            }));
+          }
+        });
+
+        // Broadcast AI response to all connected clients
+        wss.clients.forEach((client) => {
+          if (client.readyState === 1) { // OPEN
+            client.send(JSON.stringify({
+              type: 'whatsapp_message',
+              data: aiMessage
+            }));
+          }
+        });
+
+        // Also broadcast to doctor specifically (for doctor-specific UI updates)
         broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
           type: 'whatsapp_message',
           data: { patient, message: whatsappMessage, aiResponse },
@@ -924,14 +946,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/whatsapp/send', async (req, res) => {
     try {
       const { to, message } = req.body;
+      
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      // Find patient by WhatsApp number to get patientId
+      let patient = await storage.getPatientByWhatsapp(to);
+      if (!patient) {
+        // Try to find by phone
+        const allPatients = await storage.getAllPatients();
+        patient = allPatients.find(p => p.phone === to || p.whatsappNumber === to);
+      }
+
+      // Send message via WhatsApp API
       const success = await whatsAppService.sendMessage(to, message);
       
-      if (success) {
+      if (success && patient) {
+        // Save sent message to database
+        const savedMessage = await storage.createWhatsappMessage({
+          patientId: patient.id,
+          fromNumber: process.env.WHATSAPP_PHONE_NUMBER_ID || 'system',
+          toNumber: to,
+          message: message,
+          messageType: 'text',
+          isFromAI: false,
+          processed: true
+        });
+
+        console.log(`📤 WhatsApp message sent to ${to} (patient: ${patient.id})`);
+
+        // Broadcast WebSocket notification for real-time update
+        wss.clients.forEach((client) => {
+          if (client.readyState === 1) { // OPEN
+            client.send(JSON.stringify({
+              type: 'whatsapp_message',
+              data: savedMessage
+            }));
+          }
+        });
+
+        res.json({ success: true, messageId: savedMessage.id });
+      } else if (success) {
+        // Message sent but patient not found in database
+        console.log(`📤 WhatsApp message sent to ${to} (patient not in database)`);
         res.json({ success: true });
       } else {
         res.status(500).json({ message: 'Failed to send message' });
       }
     } catch (error) {
+      console.error('WhatsApp send error:', error);
       res.status(500).json({ message: 'Failed to send message' });
     }
   });
