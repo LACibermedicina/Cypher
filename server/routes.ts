@@ -72,6 +72,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error('Failed to initialize doctor, using DEFAULT_DOCTOR_ID as fallback');
   }
   
+  // Global middleware to populate req.user from JWT cookie (if present)
+  app.use(async (req: any, res: any, next: any) => {
+    try {
+      const token = req.cookies?.authToken;
+      if (token) {
+        const jwtSecret = process.env.SESSION_SECRET;
+        if (jwtSecret) {
+          try {
+            const payload = jwt.verify(token, jwtSecret, {
+              issuer: 'telemed-system',
+              audience: 'web-app',
+              algorithms: ['HS256']
+            }) as any;
+            
+            const user = await storage.getUser(payload.userId);
+            if (user) {
+              req.user = user;
+            }
+          } catch (jwtError) {
+            // Token invalid or expired - continue without user
+          }
+        }
+      }
+    } catch (error) {
+      // Silently fail - don't block the request
+    }
+    next();
+  });
+  
   // WebSocket server for real-time updates with authentication
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
@@ -933,9 +962,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { to, message } = req.body;
       
+      // Manual authentication check (requireAuth middleware defined later in file)
       if (!req.user) {
+        console.log('WhatsApp send failed: No req.user - authentication token may be missing or invalid');
         return res.status(401).json({ message: 'Authentication required' });
       }
+
+      console.log(`WhatsApp send request from user ${req.user.id} (role: ${req.user.role})`);
 
       // Find patient by WhatsApp number to get patientId
       let patient = await storage.getPatientByWhatsapp(to);
