@@ -51,6 +51,16 @@ Preferred communication style: Simple, everyday language.
 - UI adapts by role: patients see view-only interface, doctors/admins can create prescriptions
 - "Nova Prescrição" button hidden for patients via conditional rendering
 
+### Profile Picture Upload System (October 1, 2025)
+- **File Storage**: Images saved to `client/public/uploads/profiles/` with unique filenames (`profile-{timestamp}-{random}.ext`)
+- **Validation**: Server-side MIME type checking (jpeg, jpg, png, gif, webp), 5MB size limit
+- **Security**: Authenticated endpoints only, automatic cleanup of old images on replacement
+- **API Endpoints**: 
+  - `POST /api/users/upload-profile-picture` - Upload new profile picture with Multer middleware
+  - `DELETE /api/users/delete-profile-picture` - Remove current profile picture
+- **Frontend**: Integrated into `/profile` page with preview, upload/cancel/delete buttons, loading states, toast notifications
+- **Database**: Uses existing `profilePicture` field (text nullable) in users table, stores relative path
+
 ### Video Consultation Feature (October 1, 2025)
 - **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
 - **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar
