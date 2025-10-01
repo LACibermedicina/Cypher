@@ -8,15 +8,18 @@ import ExamResults from "@/components/dashboard/exam-results";
 import RealTimeStatus from "@/components/dashboard/real-time-status";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { DEFAULT_DOCTOR_ID, type DashboardStats } from "@shared/schema";
+import { useAuth } from "@/contexts/AuthContext";
+import { type DashboardStats } from "@shared/schema";
 
 export default function Dashboard() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats', DEFAULT_DOCTOR_ID],
+    queryKey: user?.id ? ['/api/dashboard/stats', user.id] : ['dashboard-stats-placeholder'],
+    enabled: !!user?.id,
   });
 
-  if (statsLoading) {
+  if (statsLoading || !user) {
     return <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
     </div>;

@@ -1601,32 +1601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard Stats API
-  app.get('/api/dashboard/stats/:doctorId', async (req, res) => {
-    try {
-      const doctorId = req.params.doctorId;
-      const today = new Date();
-      
-      const [todayAppointments, unprocessedMessages, pendingSignatures, patients] = await Promise.all([
-        storage.getTodayAppointments(doctorId),
-        storage.getUnprocessedWhatsappMessages(),
-        storage.getPendingSignatures(doctorId),
-        storage.getAllPatients(),
-      ]);
-
-      const aiScheduledToday = todayAppointments.filter(apt => apt.aiScheduled).length;
-
-      res.json({
-        todayConsultations: todayAppointments.length,
-        whatsappMessages: unprocessedMessages.length,
-        aiScheduling: aiScheduledToday,
-        secureRecords: patients.length,
-      });
-    } catch (error) {
-      console.error('Dashboard stats error:', error);
-      res.status(500).json({ message: 'Failed to get dashboard stats' });
-    }
-  });
+  // Dashboard Stats API (Moved to after requireAuth definition)
 
 
   // WhatsApp Messages API
@@ -4605,6 +4580,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isSchedulingRequest: false,
         requiresHumanIntervention: true
       });
+    }
+  });
+
+  // Dashboard Stats API - Use authenticated user data
+  app.get('/api/dashboard/stats/:userId', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.params.userId;
+      const authenticatedUser = req.user;
+      
+      // Ensure user can only access their own stats (admins can access any)
+      if (authenticatedUser.id !== userId && authenticatedUser.role !== 'admin') {
+        return res.status(403).json({ message: 'Unauthorized access' });
+      }
+      
+      const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user.length) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      const userRole = user[0].role;
+      
+      // Only doctors and admins should see appointment stats
+      if (userRole === 'doctor') {
+        const [todayAppointments, unprocessedMessages, pendingSignatures, patients] = await Promise.all([
+          storage.getTodayAppointments(userId),
+          storage.getUnprocessedWhatsappMessages(),
+          storage.getPendingSignatures(userId),
+          storage.getAllPatients(),
+        ]);
+
+        const aiScheduledToday = todayAppointments.filter(apt => apt.aiScheduled).length;
+
+        res.json({
+          todayConsultations: todayAppointments.length,
+          whatsappMessages: unprocessedMessages.length,
+          aiScheduling: aiScheduledToday,
+          secureRecords: patients.length,
+        });
+      } else if (userRole === 'admin') {
+        // Admins see aggregated system-wide stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const [allAppointments, unprocessedMessages, patients] = await Promise.all([
+          db.select().from(appointments).where(
+            and(
+              gte(appointments.date, today.toISOString()),
+              lt(appointments.date, tomorrow.toISOString())
+            )
+          ),
+          storage.getUnprocessedWhatsappMessages(),
+          storage.getAllPatients(),
+        ]);
+
+        const aiScheduledToday = allAppointments.filter(apt => apt.aiScheduled).length;
+
+        res.json({
+          todayConsultations: allAppointments.length,
+          whatsappMessages: unprocessedMessages.length,
+          aiScheduling: aiScheduledToday,
+          secureRecords: patients.length,
+        });
+      } else if (userRole === 'patient') {
+        // Patient sees their own appointments and records
+        const patientData = await db.select().from(patients).where(eq(patients.userId, userId)).limit(1);
+        const patientAppointments = patientData.length ? 
+          await db.select().from(appointments).where(eq(appointments.patientId, patientData[0].id)) : [];
+        
+        res.json({
+          todayConsultations: patientAppointments.filter(apt => {
+            const aptDate = new Date(apt.date);
+            const today = new Date();
+            return aptDate.toDateString() === today.toDateString();
+          }).length,
+          whatsappMessages: 0,
+          aiScheduling: 0,
+          secureRecords: patientAppointments.length,
+        });
+      } else {
+        // Other roles get default empty stats
+        res.json({
+          todayConsultations: 0,
+          whatsappMessages: 0,
+          aiScheduling: 0,
+          secureRecords: 0,
+        });
+      }
+    } catch (error) {
+      console.error('Dashboard stats error:', error);
+      res.status(500).json({ message: 'Failed to get dashboard stats' });
     }
   });
 
