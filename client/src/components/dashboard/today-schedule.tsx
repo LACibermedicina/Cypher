@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DEFAULT_DOCTOR_ID, appointments } from "@shared/schema";
+import { appointments } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Appointment = typeof appointments.$inferSelect & {
   patient?: { name: string; id: string };
@@ -21,13 +22,15 @@ export default function TodaySchedule() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   
   const [rescheduleDialogOpen, setRescheduleDialogOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [newScheduledDate, setNewScheduledDate] = useState("");
 
   const { data: appointments, isLoading } = useQuery<Appointment[]>({
-    queryKey: ['/api/appointments/today', DEFAULT_DOCTOR_ID],
+    queryKey: user?.id ? ['/api/appointments/today', user.id] : ['appointments-today-placeholder'],
+    enabled: !!user?.id,
   });
 
   const updateAppointmentMutation = useMutation({
@@ -37,7 +40,24 @@ export default function TodaySchedule() {
     },
     onSuccess: () => {
       // Invalidate the today appointments query
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments/today', DEFAULT_DOCTOR_ID] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/today', user.id] });
+      }
+      // Also invalidate general appointments queries
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    },
+  });
+
+  const rescheduleAppointmentMutation = useMutation({
+    mutationFn: async ({ id, scheduledAt, notes }: { id: string; scheduledAt: string; notes?: string }) => {
+      const response = await apiRequest('POST', `/api/appointments/${id}/reschedule`, { scheduledAt, notes });
+      return await response.json();
+    },
+    onSuccess: () => {
+      // Invalidate the today appointments query
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/today', user.id] });
+      }
       // Also invalidate general appointments queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
     },
@@ -98,18 +118,26 @@ export default function TodaySchedule() {
   const handleReschedule = () => {
     if (!selectedAppointment || !newScheduledDate) return;
     
-    updateAppointmentMutation.mutate(
+    rescheduleAppointmentMutation.mutate(
       {
         id: selectedAppointment.id,
-        data: { scheduledAt: new Date(newScheduledDate).toISOString() }
+        scheduledAt: new Date(newScheduledDate).toISOString(),
+        notes: `Reagendada pelo usuário`
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           setRescheduleDialogOpen(false);
           setSelectedAppointment(null);
           toast({
             title: "Consulta reagendada",
-            description: "A consulta foi reagendada com sucesso.",
+            description: `A consulta foi reagendada para ${format(new Date(data.newAppointment.scheduledAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.`,
+          });
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Erro ao reagendar",
+            description: error.message || "Não foi possível reagendar a consulta.",
+            variant: "destructive",
           });
         }
       }
@@ -297,10 +325,10 @@ export default function TodaySchedule() {
           </Button>
           <Button 
             onClick={handleReschedule}
-            disabled={updateAppointmentMutation.isPending}
+            disabled={rescheduleAppointmentMutation.isPending}
             data-testid="button-confirm-reschedule"
           >
-            {updateAppointmentMutation.isPending ? "Reagendando..." : "Confirmar"}
+            {rescheduleAppointmentMutation.isPending ? "Reagendando..." : "Confirmar"}
           </Button>
         </div>
       </DialogContent>
