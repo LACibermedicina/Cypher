@@ -89,16 +89,28 @@ export default function VideoConsultation() {
     uid: number;
   }>({
     queryKey: ['agora-token', consultationId],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        '/api/video-consultations/agora-token',
+        {
+          channelName: consultationId,
+          role: 'publisher',
+        }
+      );
+      return response.json();
+    },
     enabled: !!consultationId,
   });
 
   // Create consultation note mutation
   const createNoteMutation = useMutation({
     mutationFn: async (data: { type: string; content: string; metadata?: any }) => {
-      return apiRequest('/api/video-consultations/' + consultationId + '/notes', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return apiRequest(
+        'POST',
+        '/api/video-consultations/' + consultationId + '/notes',
+        data
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId, 'notes'] });
@@ -108,9 +120,10 @@ export default function VideoConsultation() {
   // Start consultation mutation
   const startConsultationMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('/api/video-consultations/' + consultationId + '/start', {
-        method: 'POST',
-      });
+      return apiRequest(
+        'POST',
+        '/api/video-consultations/' + consultationId + '/start'
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId] });
@@ -120,10 +133,11 @@ export default function VideoConsultation() {
   // End consultation mutation
   const endConsultationMutation = useMutation({
     mutationFn: async (data: { duration: number; meetingNotes: string }) => {
-      return apiRequest('/api/video-consultations/' + consultationId + '/end', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return apiRequest(
+        'POST',
+        '/api/video-consultations/' + consultationId + '/end',
+        data
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId] });

@@ -34,6 +34,17 @@ Preferred communication style: Simple, everyday language.
 - UI adapts by role: patients see view-only interface, doctors/admins can create prescriptions
 - "Nova Prescrição" button hidden for patients via conditional rendering
 
+### Video Consultation Feature (October 1, 2025)
+- **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
+- **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar
+- **Multi-tab Panel**: Chat messages, AI Diagnostic queries, and Doctor notes with real-time synchronization
+- **Interactive Controls**: Camera toggle, microphone toggle, recording start/stop, fullscreen mode, end call
+- **Data Persistence**: All chat messages, AI queries, and notes saved to `consultation_notes` table
+- **Recording Segments**: Support for video segment URLs stored in `consultation_recordings` table
+- **API Endpoints**: Token generation (`POST /api/video-consultations/agora-token`), notes management, recordings
+- **Route**: `/consultation/video/:patientId` - Accessible to authenticated doctors
+- **Known Limitation**: AI response pipeline not yet implemented (queries saved but no automated response generation)
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -85,6 +96,7 @@ Security implementation focuses on healthcare compliance:
 - **Neon Database**: Serverless PostgreSQL hosting for production deployment
 - **OpenAI API**: GPT-5 model integration for clinical decision support and natural language processing
 - **WhatsApp Business API**: Official Meta WhatsApp integration for patient messaging
+- **Agora.io**: Real-time video/audio communication SDK for telemedicine consultations
 - **Font Awesome**: Icon library for medical and UI icons throughout the application
 
 ### Development and Build Tools
