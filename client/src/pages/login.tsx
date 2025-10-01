@@ -399,7 +399,7 @@ export default function Login() {
           <div className="flex items-center justify-center mb-4">
             <div className="w-20 h-20 flex items-center justify-center">
               <img 
-                src="/attached_assets/logo icon_1759355903911.jpg" 
+                src="/attached_assets/logo icon_1759356248811.jpg" 
                 alt="Telemed Logo" 
                 className="w-full h-full object-contain"
               />

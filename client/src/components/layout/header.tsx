@@ -237,7 +237,7 @@ export default function Header() {
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 flex items-center justify-center">
                         <img 
-                          src="/attached_assets/logo icon_1759355903911.jpg" 
+                          src="/attached_assets/logo icon_1759356248811.jpg" 
                           alt="Telemed Logo" 
                           className="w-full h-full object-contain"
                         />
@@ -344,7 +344,7 @@ export default function Header() {
             <Link href="/" data-testid="link-logo">
               <div className="w-10 h-10 flex items-center justify-center cursor-pointer">
                 <img 
-                  src="/attached_assets/logo icon_1759355903911.jpg" 
+                  src="/attached_assets/logo icon_1759356248811.jpg" 
                   alt="Telemed Logo" 
                   className="w-full h-full object-contain"
                 />

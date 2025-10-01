@@ -79,7 +79,7 @@ function SidebarContent() {
       <div className="flex items-center space-x-4 p-6 border-b border-border">
         <div className="w-12 h-12 flex items-center justify-center">
           <img 
-            src="/attached_assets/logo icon_1759355903911.jpg" 
+            src="/attached_assets/logo icon_1759356248811.jpg" 
             alt="Telemed Logo" 
             className="w-full h-full object-contain"
           />
