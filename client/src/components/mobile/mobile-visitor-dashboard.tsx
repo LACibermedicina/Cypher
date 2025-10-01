@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { AIAssistant } from "@/components/chatbot/AIAssistant"
 
 interface Service {
   id: string;
@@ -356,60 +357,8 @@ export function MobileVisitorDashboard() {
       </DialogContent>
     </Dialog>
 
-    {/* AI ChatBot Dialog */}
-    <Dialog open={showChatBot} onOpenChange={setShowChatBot}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center text-sm">
-            <Bot className="w-4 h-4 mr-2 text-purple-600" />
-            Assistente Virtual IA
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-3 rounded-lg">
-            <p className="text-xs text-purple-700">
-              👋 Olá! Sou o assistente virtual da Telemed. Posso ajudar você com:
-            </p>
-            <ul className="mt-1 text-xs text-purple-600 space-y-1">
-              <li>• Agendamento de consultas</li>
-              <li>• Análise inicial de sintomas</li>
-              <li>• Orientações médicas</li>
-            </ul>
-          </div>
-          <div className="min-h-[200px] max-h-[250px] overflow-y-auto bg-gray-50 p-3 rounded-lg">
-            <div className="space-y-2">
-              <div className="bg-white p-2 rounded-lg shadow-sm">
-                <p className="text-xs">Como posso ajudar você hoje?</p>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <Button size="sm" variant="outline" className="text-xs h-6">
-                  Agendar
-                </Button>
-                <Button size="sm" variant="outline" className="text-xs h-6">
-                  Sintomas
-                </Button>
-                <Button size="sm" variant="outline" className="text-xs h-6">
-                  Dúvidas
-                </Button>
-              </div>
-            </div>
-          </div>
-          <div className="flex space-x-2">
-            <Input 
-              placeholder="Digite sua pergunta..."
-              className="flex-1 text-sm"
-              data-testid="input-chatbot-message"
-            />
-            <Button size="sm" data-testid="button-chatbot-send">
-              Enviar
-            </Button>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            💡 Para funcionalidades completas, faça seu registro.
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    {/* AI Assistant */}
+    <AIAssistant open={showChatBot} onOpenChange={setShowChatBot} />
     </>
   );
 }

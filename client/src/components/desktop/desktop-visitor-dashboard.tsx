@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { AIAssistant } from "@/components/chatbot/AIAssistant"
 
 interface Service {
   id: string;
@@ -548,64 +549,8 @@ export function DesktopVisitorDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* AI ChatBot Dialog */}
-      <Dialog open={showChatBot} onOpenChange={setShowChatBot}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Bot className="w-5 h-5 mr-2 text-purple-600" />
-              Assistente Virtual IA - Telemed
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-lg">
-              <p className="text-sm text-purple-700">
-                👋 Olá! Sou o assistente virtual da Telemed. Posso ajudar você com:
-              </p>
-              <ul className="mt-2 text-sm text-purple-600 space-y-1">
-                <li>• Agendamento de consultas médicas</li>
-                <li>• Análise inicial de sintomas</li>
-                <li>• Orientações sobre especialidades médicas</li>
-                <li>• Informações sobre nossos serviços</li>
-              </ul>
-            </div>
-            <div className="min-h-[300px] max-h-[400px] overflow-y-auto bg-gray-50 p-4 rounded-lg">
-              <div className="space-y-3">
-                <div className="bg-white p-3 rounded-lg shadow-sm">
-                  <p className="text-sm">Como posso ajudar você hoje?</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Agendar consulta
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Analisar sintomas
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Dúvidas médicas
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Especialidades
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Input 
-                placeholder="Digite sua pergunta ou descreva seus sintomas..."
-                className="flex-1"
-                data-testid="input-chatbot-message"
-              />
-              <Button data-testid="button-chatbot-send">
-                Enviar
-              </Button>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              💡 Para funcionalidades completas, faça seu registro como paciente ou médico.
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* AI Assistant */}
+      <AIAssistant open={showChatBot} onOpenChange={setShowChatBot} />
     </div>
   );
 }

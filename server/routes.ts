@@ -7651,6 +7651,179 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
+  // ===== Chatbot Routes =====
+
+  // Send message to AI chatbot
+  app.post('/api/chatbot/message', async (req: Request, res: Response) => {
+    try {
+      const { message, role, userId } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ message: 'Message is required' });
+      }
+
+      // Get rescheduling margin from system settings
+      const reschedulingMargin = await storage.getSystemSetting('rescheduling_margin_hours');
+      const marginHours = reschedulingMargin ? parseInt(reschedulingMargin.settingValue) : 24;
+
+      // Get chatbot references for knowledge base
+      const references = await storage.getChatbotReferences({
+        allowedRoles: [role || 'visitor'],
+        useForDiagnostics: true
+      });
+
+      let response = '';
+      let type = 'text';
+      let metadata: any = {};
+
+      // Role-based responses
+      if (role === 'admin') {
+        // Admin sees all appointments across all doctors
+        if (message.toLowerCase().includes('consulta') || message.toLowerCase().includes('agendamento')) {
+          const appointments = await storage.getAppointments();
+          const today = appointments.filter(apt => {
+            const aptDate = new Date(apt.scheduledFor);
+            const now = new Date();
+            return aptDate.toDateString() === now.toDateString();
+          });
+          
+          response = `📊 **Visão Geral de Consultas**\n\n`;
+          response += `Total de consultas: ${appointments.length}\n`;
+          response += `Consultas hoje: ${today.length}\n`;
+          response += `Aguardando: ${appointments.filter(a => a.status === 'scheduled').length}\n`;
+          response += `Em andamento: ${appointments.filter(a => a.status === 'in_progress').length}\n`;
+          response += `Completadas: ${appointments.filter(a => a.status === 'completed').length}\n`;
+        } else if (message.toLowerCase().includes('paciente') && message.toLowerCase().includes('espera')) {
+          const appointments = await storage.getAppointments();
+          const waiting = appointments.filter(a => a.status === 'scheduled');
+          response = `👥 **Pacientes em Espera**\n\nTotal: ${waiting.length} pacientes aguardando atendimento`;
+        } else {
+          response = `Como administrador, você pode consultar:\n• Ver todas as consultas\n• Pacientes em espera\n• Estatísticas do sistema\n• Configurações\n\nO que você gostaria de verificar?`;
+        }
+      } else if (role === 'doctor' && userId) {
+        // Doctor sees only their appointments
+        if (message.toLowerCase().includes('consulta') || message.toLowerCase().includes('agenda')) {
+          const appointments = await storage.getAppointments();
+          const myAppointments = appointments.filter(apt => apt.doctorId === userId);
+          const today = myAppointments.filter(apt => {
+            const aptDate = new Date(apt.scheduledFor);
+            const now = new Date();
+            return aptDate.toDateString() === now.toDateString();
+          });
+          
+          response = `📅 **Suas Consultas**\n\n`;
+          response += `Total: ${myAppointments.length} consultas\n`;
+          response += `Hoje: ${today.length} consultas\n`;
+          response += `Aguardando: ${myAppointments.filter(a => a.status === 'scheduled').length}\n`;
+          response += `Em andamento: ${myAppointments.filter(a => a.status === 'in_progress').length}\n`;
+        } else if (message.toLowerCase().includes('paciente')) {
+          const appointments = await storage.getAppointments();
+          const myAppointments = appointments.filter(apt => apt.doctorId === userId);
+          response = `👥 **Pacientes Agendados**\n\n${myAppointments.length} pacientes agendaram consultas com você.`;
+        } else {
+          response = `Como médico, posso mostrar:\n• Suas consultas agendadas\n• Pacientes que agendaram com você\n• Consultas em andamento\n\nO que você gostaria de ver?`;
+        }
+      } else if (role === 'patient' || role === 'visitor') {
+        // Patient/visitor can schedule appointments
+        if (message.toLowerCase().includes('agendar') || message.toLowerCase().includes('consulta')) {
+          // Get available doctors
+          const users = await storage.getUsers();
+          const doctors = users.filter(u => u.role === 'doctor');
+          
+          if (doctors.length === 0) {
+            response = `Desculpe, não há médicos disponíveis no momento. Por favor, tente novamente mais tarde.`;
+          } else {
+            // Calculate next available slot (respecting rescheduling margin)
+            const now = new Date();
+            const nextSlot = new Date(now.getTime() + (marginHours + 2) * 60 * 60 * 1000);
+            
+            response = `📅 **Agendar Consulta**\n\n`;
+            response += `Temos ${doctors.length} médico(s) disponível(is).\n\n`;
+            response += `⏰ Margem de agendamento: ${marginHours}h\n`;
+            response += `Próximo horário disponível: ${nextSlot.toLocaleString('pt-BR')}\n\n`;
+            response += `Você gostaria de agendar para esta data?\n`;
+            response += `Digite: "Sim, agendar" para confirmar.`;
+            
+            type = 'appointment';
+            metadata = {
+              suggestedAppointment: {
+                date: nextSlot.toISOString(),
+                time: nextSlot.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                type: 'Consulta Geral',
+                doctorId: doctors[0].id
+              }
+            };
+          }
+        } else if (message.toLowerCase().includes('sim') && message.toLowerCase().includes('agendar')) {
+          response = `✅ Consulta solicitada! Para confirmar o agendamento, clique no botão "Confirmar Agendamento" acima.`;
+        } else if (message.toLowerCase().includes('sintoma')) {
+          response = `🩺 **Análise de Sintomas**\n\nPor favor, descreva seus sintomas com detalhes:\n• O que você está sentindo?\n• Há quanto tempo?\n• Intensidade (leve, moderada, severa)?\n\n⚠️ Lembre-se: Esta é apenas uma orientação inicial. Em caso de emergência, ligue 192 (SAMU).`;
+        } else {
+          response = `Olá! Posso ajudar você a:\n• Agendar uma consulta\n• Analisar sintomas\n• Ver suas consultas\n\nComo posso ajudar?`;
+        }
+      } else {
+        response = `Olá! Sou o assistente virtual da Telemed. Como posso ajudar você hoje?`;
+      }
+
+      res.json({
+        response,
+        type,
+        metadata,
+        timestamp: new Date()
+      });
+
+    } catch (error) {
+      console.error('Chatbot message error:', error);
+      res.status(500).json({ message: 'Error processing chatbot message' });
+    }
+  });
+
+  // Schedule appointment via chatbot
+  app.post('/api/chatbot/schedule', async (req: Request, res: Response) => {
+    try {
+      const { date, doctorId, type, userId } = req.body;
+
+      if (!date || !doctorId || !userId) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // Get rescheduling margin
+      const reschedulingMargin = await storage.getSystemSetting('rescheduling_margin_hours');
+      const marginHours = reschedulingMargin ? parseInt(reschedulingMargin.settingValue) : 24;
+
+      // Validate minimum scheduling time
+      const scheduledDate = new Date(date);
+      const now = new Date();
+      const hoursDiff = (scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+      if (hoursDiff < marginHours) {
+        return res.status(400).json({
+          message: `Consultas devem ser agendadas com pelo menos ${marginHours} horas de antecedência.`
+        });
+      }
+
+      // Create appointment
+      const appointment = await storage.createAppointment({
+        patientId: userId,
+        doctorId,
+        scheduledFor: scheduledDate.toISOString(),
+        type: type || 'Consulta Geral',
+        status: 'scheduled',
+        roomId: `room_${Date.now()}`,
+        duration: 30
+      });
+
+      res.json({
+        message: 'Appointment scheduled successfully',
+        appointment
+      });
+
+    } catch (error) {
+      console.error('Chatbot scheduling error:', error);
+      res.status(500).json({ message: 'Error scheduling appointment via chatbot' });
+    }
+  });
+
   return httpServer;
 }
 
