@@ -188,12 +188,13 @@ export function DesktopPatientDashboard() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Avatar className="w-16 h-16">
-              <AvatarImage src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-1.jpg" />
-              <AvatarFallback>MS</AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-medical-primary to-blue-600 text-white font-semibold text-lg">
+                {user?.name ? user.name.split(' ').map(word => word[0]).slice(0, 2).join('').toUpperCase() : 'U'}
+              </AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Olá, Maria!</h1>
-              <p className="text-gray-600">Bem-vinda ao seu portal de saúde digital</p>
+              <h1 className="text-3xl font-bold text-gray-900">Olá, {user?.name || 'Usuário'}!</h1>
+              <p className="text-gray-600">Bem-vindo(a) ao seu portal de saúde digital</p>
               <div className="flex items-center space-x-4 mt-2">
                 <Badge className="bg-green-100 text-green-800 flex items-center space-x-1">
                   <Shield className="w-4 h-4" />
@@ -209,6 +210,11 @@ export function DesktopPatientDashboard() {
             <Badge className={`${healthStatus.color} text-lg px-3 py-1 mb-2`} data-testid="badge-health-status">
               Status de Saúde: {healthStatus.text}
             </Badge>
+            {patientData?.primaryDoctorId ? (
+              <p className="text-xs text-gray-500 mt-1">Definido pelo médico responsável</p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Aguardando atribuição de médico</p>
+            )}
           </div>
         </div>
 

@@ -33,6 +33,8 @@ export const users = pgTable("users", {
 
 export const patients = pgTable("patients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).unique(), // Link to user account (for patient login)
+  primaryDoctorId: uuid("primary_doctor_id").references(() => users.id), // Assigned primary physician
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone").notNull(),

@@ -833,16 +833,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Authentication required' });
       }
       
-      // Find patient by email or phone matching the user
+      // Find patient by userId (new approach using direct link)
       const patients = await storage.getAllPatients();
-      const patient = patients.find(p => 
-        p.email === req.user.email || 
-        p.phone === req.user.phone ||
-        p.whatsappNumber === req.user.whatsappNumber
-      );
+      const patient = patients.find(p => p.userId === req.user.id);
       
+      // Fallback: Find patient by email or phone for legacy data
       if (!patient) {
-        return res.status(404).json({ message: 'Patient profile not found' });
+        const fallbackPatient = patients.find(p => 
+          p.email === req.user.email || 
+          p.phone === req.user.phone ||
+          p.whatsappNumber === req.user.whatsappNumber
+        );
+        
+        if (!fallbackPatient) {
+          return res.status(404).json({ message: 'Patient profile not found' });
+        }
+        
+        // Update the patient record to link userId for next time
+        await storage.updatePatient(fallbackPatient.id, { userId: req.user.id });
+        return res.json({ ...fallbackPatient, userId: req.user.id });
       }
       
       res.json(patient);
