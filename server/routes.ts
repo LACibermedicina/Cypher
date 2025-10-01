@@ -4483,6 +4483,56 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
+  // Update User Profile
+  app.put('/api/auth/profile', requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      // Validation schema for profile updates
+      const profileUpdateSchema = z.object({
+        name: z.string().min(1, "Nome é obrigatório").max(255).optional(),
+        email: z.string().email("Email inválido").optional(),
+        phone: z.string().max(20).optional(),
+        whatsappNumber: z.string().max(20).optional(),
+        medicalLicense: z.string().max(50).optional(),
+        specialization: z.string().max(100).optional(),
+      });
+      
+      // Validate request body
+      const validatedData = profileUpdateSchema.parse(req.body);
+      
+      // Build update object with only provided fields
+      const updateData: any = {};
+      if (validatedData.name !== undefined) updateData.name = validatedData.name;
+      if (validatedData.email !== undefined) updateData.email = validatedData.email;
+      if (validatedData.phone !== undefined) updateData.phone = validatedData.phone;
+      if (validatedData.whatsappNumber !== undefined) updateData.whatsappNumber = validatedData.whatsappNumber;
+      
+      // Only allow doctors to update professional fields
+      if (user.role === 'doctor') {
+        if (validatedData.medicalLicense !== undefined) updateData.medicalLicense = validatedData.medicalLicense;
+        if (validatedData.specialization !== undefined) updateData.specialization = validatedData.specialization;
+      }
+      
+      // Update user in database
+      const updatedUser = await storage.updateUser(user.id, updateData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      // Return updated user without password
+      const { password: _, ...userWithoutPassword } = updatedUser as any;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: 'Dados inválidos', errors: error.errors });
+      }
+      console.error('Profile update error:', error);
+      res.status(500).json({ message: 'Failed to update profile' });
+    }
+  });
+
   // ===== PATIENT MANAGEMENT ENDPOINTS =====
 
   // Update patient (requires authentication)

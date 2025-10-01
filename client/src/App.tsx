@@ -10,6 +10,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import PatientProfile from "@/pages/patient-profile";
+import Profile from "@/pages/profile";
 import Schedule from "@/pages/schedule";
 import WhatsApp from "@/pages/whatsapp";
 import MedicalRecords from "@/pages/medical-records";
@@ -90,6 +91,13 @@ function Router() {
           <ProtectedRoute>
             <Header />
             <ResponsiveDashboard />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/profile">
+          <ProtectedRoute>
+            <Header />
+            <Profile />
           </ProtectedRoute>
         </Route>
         

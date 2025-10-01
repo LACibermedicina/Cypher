@@ -5,10 +5,16 @@ import { apiRequest } from '@/lib/queryClient';
 interface User {
   id: string;
   username: string;
-  role: 'doctor' | 'admin' | 'patient';
+  role: 'doctor' | 'admin' | 'patient' | 'visitor' | 'researcher';
   name: string;
   email?: string;
   phone?: string;
+  whatsappNumber?: string;
+  medicalLicense?: string;
+  specialization?: string;
+  tmcCredits?: number;
+  digitalCertificate?: string;
+  profilePicture?: string;
 }
 
 interface AuthContextType {
@@ -17,6 +23,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 
@@ -111,12 +118,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    setUser(prevUser => prevUser ? { ...prevUser, ...userData } : null);
+  };
+
   const value: AuthContextType = {
     user,
     isLoading,
     login,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!user
   };
 

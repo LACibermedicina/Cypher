@@ -14,7 +14,7 @@ import { LogOut, User, Settings } from "lucide-react";
 import NotificationCenter from "@/components/notifications/notification-center";
 
 export default function Header() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -429,11 +429,11 @@ export default function Header() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
+                <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-profile">
                   <User className="mr-2 h-4 w-4" />
                   {t("auth.profile")}
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled>
+                <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-settings">
                   <Settings className="mr-2 h-4 w-4" />
                   {t("auth.settings")}
                 </DropdownMenuItem>
