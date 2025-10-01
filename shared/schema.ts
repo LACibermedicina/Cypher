@@ -43,6 +43,7 @@ export const patients = pgTable("patients", {
   medicalHistory: jsonb("medical_history"),
   whatsappNumber: text("whatsapp_number"),
   photoUrl: text("photo_url"),
+  healthStatus: text("health_status").default("a_determinar").notNull(), // excelente, bom, regular, critico, a_determinar
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -490,6 +491,19 @@ export const drugInteractions = pgTable("drug_interactions", {
   evidence: text("evidence").default("theoretical"), // theoretical, possible, probable, established
   isActive: boolean("is_active").default(true),
   source: text("source"), // Reference source
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Patient personal agenda and notes
+export const patientNotes = pgTable("patient_notes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  patientId: uuid("patient_id").references(() => patients.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(), // Who created the note (patient or admin)
+  date: timestamp("date").notNull(), // Date the note refers to
+  title: text("title"),
+  content: text("content").notNull(),
+  isPrivate: boolean("is_private").default(true), // Only patient and admin can see
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -945,6 +959,12 @@ export const insertDrugInteractionSchema = createInsertSchema(drugInteractions).
   updatedAt: true,
 });
 
+export const insertPatientNoteSchema = createInsertSchema(patientNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1027,6 +1047,9 @@ export type InsertPrescriptionTemplate = z.infer<typeof insertPrescriptionTempla
 
 export type DrugInteraction = typeof drugInteractions.$inferSelect;
 export type InsertDrugInteraction = z.infer<typeof insertDrugInteractionSchema>;
+
+export type PatientNote = typeof patientNotes.$inferSelect;
+export type InsertPatientNote = z.infer<typeof insertPatientNoteSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {
