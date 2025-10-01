@@ -235,8 +235,12 @@ export default function Header() {
                 <SheetHeader className="px-6 pb-6 border-b">
                   <SheetTitle className="text-left">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md">
-                        <i className="fas fa-user-md text-white text-lg"></i>
+                      <div className="w-10 h-10 flex items-center justify-center">
+                        <img 
+                          src="/attached_assets/logo icon_1759355903911.jpg" 
+                          alt="Telemed Logo" 
+                          className="w-full h-full object-contain"
+                        />
                       </div>
                       {user && (
                         <div>
@@ -338,8 +342,12 @@ export default function Header() {
             </Sheet>
 
             <Link href="/" data-testid="link-logo">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-medical-primary flex items-center justify-center shadow-md hover:shadow-lg transition-shadow cursor-pointer">
-                <i className="fas fa-user-md text-white text-lg"></i>
+              <div className="w-10 h-10 flex items-center justify-center cursor-pointer">
+                <img 
+                  src="/attached_assets/logo icon_1759355903911.jpg" 
+                  alt="Telemed Logo" 
+                  className="w-full h-full object-contain"
+                />
               </div>
             </Link>
 

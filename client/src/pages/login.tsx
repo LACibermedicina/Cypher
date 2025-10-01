@@ -397,8 +397,12 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center">
-              <Stethoscope className="h-8 w-8 text-white" />
+            <div className="w-20 h-20 flex items-center justify-center">
+              <img 
+                src="/attached_assets/logo icon_1759355903911.jpg" 
+                alt="Telemed Logo" 
+                className="w-full h-full object-contain"
+              />
             </div>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">

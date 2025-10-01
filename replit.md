@@ -10,6 +10,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Brand Update (October 1, 2025)
+- **Logo**: Updated application logomarca to custom design (`attached_assets/logo icon_1759355903911.jpg`)
+- **Applied to**: Header (desktop & mobile menu), Sidebar, Login page
+- **Implementation**: Direct image reference replacing previous icon-based logos
+
+### TMC Credits System & PayPal Integration (October 1, 2025)
+- **Promotional Credits**: New users receive 10 credits automatically (configurable via systemSettings)
+- **Automatic Charging**: 1 credit/minute for video consultations, 1 credit per AI diagnostic query
+- **Doctor Commissions**: Automatic 30% commission transfer to doctors from consultation charges
+- **Cashbox System**: Admin-managed revenue tracking with balance, totalRevenue, totalExpenses, serverCosts
+- **PayPal Integration**: Secure credit purchases with server-side validation
+  - Pricing tiers: $1=10, $5=60 (+20%), $10=150 (+50%), $20=350 (+75% bonus)
+  - Double-spending prevention via order tracking
+  - Complete transaction audit trail
+- **Security**: Server validates PayPal order status, calculates credits backend-only, prevents replay attacks
+- **Endpoints**: `POST /api/credits/purchase`, `GET /api/credits/balance`, PayPal blueprint routes
+
 ### Authorization Foundation (October 1, 2025)
 - **Schema updates**: Added `userId` (unique, FK to users) and `primaryDoctorId` (FK to users) to patients table
 - **User-Patient linking**: `/api/patients/me` endpoint now uses userId for direct lookup with email/phone fallback for legacy data

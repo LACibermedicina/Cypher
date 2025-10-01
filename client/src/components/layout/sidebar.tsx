@@ -77,8 +77,12 @@ function SidebarContent() {
     <div className="flex h-full flex-col">
       {/* Modern Logo and Brand */}
       <div className="flex items-center space-x-4 p-6 border-b border-border">
-        <div className="w-12 h-12 bg-gradient-to-br from-primary to-medical-primary rounded-xl flex items-center justify-center shadow-lg">
-          <i className="fas fa-user-md text-white text-lg"></i>
+        <div className="w-12 h-12 flex items-center justify-center">
+          <img 
+            src="/attached_assets/logo icon_1759355903911.jpg" 
+            alt="Telemed Logo" 
+            className="w-full h-full object-contain"
+          />
         </div>
         <div>
           <h2 className="text-lg font-bold bg-gradient-to-r from-primary to-medical-primary bg-clip-text text-transparent">
