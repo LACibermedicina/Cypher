@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
+import telemedLogo from "@/assets/logo-icon.jpg";
 
 interface SidebarProps {
   className?: string;
@@ -79,7 +80,7 @@ function SidebarContent() {
       <div className="flex items-center space-x-4 p-6 border-b border-border">
         <div className="w-12 h-12 flex items-center justify-center">
           <img 
-            src="/attached_assets/logo icon_1759356248811.jpg" 
+            src={telemedLogo} 
             alt="Telemed Logo" 
             className="w-full h-full object-contain"
           />

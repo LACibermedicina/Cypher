@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { User, UserCheck, Stethoscope } from "lucide-react";
+import telemedLogo from "@/assets/logo-icon.jpg";
 
 // Create schemas using translation function
 const createLoginSchema = (t: any) => z.object({
@@ -399,7 +400,7 @@ export default function Login() {
           <div className="flex items-center justify-center mb-4">
             <div className="w-20 h-20 flex items-center justify-center">
               <img 
-                src="/attached_assets/logo icon_1759356248811.jpg" 
+                src={telemedLogo} 
                 alt="Telemed Logo" 
                 className="w-full h-full object-contain"
               />

@@ -58,6 +58,9 @@ const tmcValidateCreditsSchema = z.object({
 });
 import crypto from "crypto";
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -74,6 +77,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   } else {
     console.error('Failed to initialize doctor, using DEFAULT_DOCTOR_ID as fallback');
   }
+  
+  // Configure Multer for profile picture uploads
+  const uploadsDir = path.join(process.cwd(), 'client', 'public', 'uploads', 'profiles');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  
+  const storage_multer = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, `profile-${uniqueSuffix}${ext}`);
+    }
+  });
+  
+  const upload = multer({
+    storage: storage_multer,
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /jpeg|jpg|png|gif|webp/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = allowedTypes.test(file.mimetype);
+      
+      if (extname && mimetype) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+      }
+    }
+  });
   
   // Global middleware to populate req.user from JWT cookie (if present)
   app.use(async (req: any, res: any, next: any) => {
@@ -4425,6 +4463,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Logout error:', error);
       res.status(500).json({ message: 'Logout failed' });
+    }
+  });
+
+  // ============================================================================
+  // PROFILE PICTURE UPLOAD ENDPOINTS
+  // ============================================================================
+  
+  // Upload profile picture
+  app.post('/api/users/upload-profile-picture', requireAuth, upload.single('profilePicture'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const user = req.user;
+      const filename = req.file.filename;
+      const profilePictureUrl = `/uploads/profiles/${filename}`;
+      
+      // Delete old profile picture if exists
+      if (user.profilePicture) {
+        const oldFilePath = path.join(uploadsDir, path.basename(user.profilePicture));
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+      }
+      
+      // Update user profile picture in database
+      await db.update(users)
+        .set({ profilePicture: profilePictureUrl })
+        .where(eq(users.id, user.id));
+      
+      console.log(`✅ Profile picture uploaded for user ${user.id}: ${profilePictureUrl}`);
+      
+      res.json({
+        message: 'Profile picture uploaded successfully',
+        profilePictureUrl
+      });
+    } catch (error) {
+      console.error('Profile picture upload error:', error);
+      res.status(500).json({ message: 'Failed to upload profile picture' });
+    }
+  });
+  
+  // Delete profile picture
+  app.delete('/api/users/delete-profile-picture', requireAuth, async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      if (user.profilePicture) {
+        // Delete file from filesystem
+        const filePath = path.join(uploadsDir, path.basename(user.profilePicture));
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        
+        // Remove from database
+        await db.update(users)
+          .set({ profilePicture: null })
+          .where(eq(users.id, user.id));
+        
+        console.log(`✅ Profile picture deleted for user ${user.id}`);
+      }
+      
+      res.json({ message: 'Profile picture deleted successfully' });
+    } catch (error) {
+      console.error('Profile picture delete error:', error);
+      res.status(500).json({ message: 'Failed to delete profile picture' });
     }
   });
 
