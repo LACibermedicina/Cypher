@@ -43,6 +43,10 @@ export default function VideoConsultation({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLocalVideoVisible, setIsLocalVideoVisible] = useState(true);
   const [isMediaReady, setIsMediaReady] = useState(false);
+  
+  // Waiting room state - track if doctor is present in the consultation
+  const [doctorPresent, setDoctorPresent] = useState(patientToken ? false : true); // Patients start in waiting room, doctors are always "present"
+  const [waitingRoomMessage, setWaitingRoomMessage] = useState("Aguardando o médico entrar na consulta...");
 
   // Video element refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -251,6 +255,27 @@ export default function VideoConsultation({
 
   const handleSignalingMessage = async (data: any) => {
     const { type, offer, answer, candidate } = data;
+    
+    // Handle waiting room - user-joined notification
+    if (type === 'user-joined') {
+      console.log('User joined:', data);
+      if (data.userType === 'doctor') {
+        setDoctorPresent(true);
+        setWaitingRoomMessage("Médico entrou! Iniciando videochamada...");
+        
+        toast({
+          title: "Médico presente",
+          description: "O médico entrou na consulta. Iniciando videochamada...",
+        });
+        
+        // Auto-start video call when doctor joins
+        if (patientToken && callStatus === 'pre-call') {
+          setTimeout(() => startVideoCall(), 1000);
+        }
+      }
+      return;
+    }
+    
     const peerConnection = peerConnectionRef.current;
     
     if (!peerConnection) return;
@@ -561,6 +586,64 @@ export default function VideoConsultation({
             </div>
           )}
         </div>
+      </div>
+    );
+  }
+  
+  // Waiting room - show when patient is waiting for doctor
+  if (patientToken && !doctorPresent && callStatus === 'pre-call') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 z-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white/10 backdrop-blur-lg border-white/20 text-white">
+          <CardHeader className="text-center pb-6">
+            <div className="mx-auto w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 animate-pulse">
+              <VideoIcon className="h-10 w-10 text-blue-300" />
+            </div>
+            <CardTitle className="text-2xl text-white">Sala de Espera</CardTitle>
+            <p className="text-blue-200 mt-2">
+              {waitingRoomMessage}
+            </p>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            {/* Patient info */}
+            <div className="text-center space-y-4">
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse"></div>
+                <p className="text-white font-medium">Aguardando médico...</p>
+              </div>
+              
+              {/* Local video preview */}
+              {isMediaReady && (
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-gray-900/50 border border-white/20">
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                    data-testid="video-waiting-room-preview"
+                  />
+                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    {patientName}
+                  </div>
+                </div>
+              )}
+              
+              <p className="text-sm text-blue-200">
+                Sua câmera e microfone estão prontos. 
+                A consulta iniciará automaticamente quando o médico entrar.
+              </p>
+            </div>
+            
+            {/* Animated waiting indicator */}
+            <div className="flex justify-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"></div>
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{animationDelay: '0.1s'}}></div>
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{animationDelay: '0.2s'}}></div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
