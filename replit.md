@@ -10,6 +10,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Authorization Foundation (October 1, 2025)
+- **Schema updates**: Added `userId` (unique, FK to users) and `primaryDoctorId` (FK to users) to patients table
+- **User-Patient linking**: `/api/patients/me` endpoint now uses userId for direct lookup with email/phone fallback for legacy data
+- **Auto-linking**: When fallback match is found, automatically updates patient record with userId
+- **Frontend updates**: Patient dashboard now references `primaryDoctorId` instead of deprecated `assignedDoctorId`
+- **Next steps**: Implement centralized `authorizePatientAccess` helper for RBAC across all patient data endpoints
+
 ### Patient Agenda Feature
 - **New table**: `patient_notes` with fields: id, patientId, userId, date, title, content, isPrivate, createdAt, updatedAt
 - **RBAC**: Only patients and admins can create/view/edit notes; doctors explicitly denied
@@ -20,6 +27,7 @@ Preferred communication style: Simple, everyday language.
 ### Enhanced Patient Dashboard
 - Added quick navigation buttons: "Agendar Consulta" (scheduling), "Minha Agenda" (personal notes), "Minhas Prescrições" (prescriptions), "Chat Médico" (WhatsApp redirect)
 - Health status now displayed dynamically based on physician assessment
+- Dashboard now displays actual logged-in patient name and data (fixed hardcoded "Olá, Maria!" greeting)
 
 ### Prescriptions Page Access
 - Route now allows patient access at `/prescriptions`
