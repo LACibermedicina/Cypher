@@ -2,7 +2,7 @@ import {
   users, patients, appointments, medicalRecords, whatsappMessages, 
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
-  tmcTransactions, tmcConfig, supportConfig,
+  tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -10,7 +10,8 @@ import {
   type DigitalSignature, type InsertDigitalSignature, type VideoConsultation, type InsertVideoConsultation,
   type PrescriptionShare, type InsertPrescriptionShare, type LabOrder, type InsertLabOrder,
   type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
-  type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig
+  type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig,
+  type SystemSettings, type InsertSystemSettings, type ChatbotReference, type InsertChatbotReference
 } from "@shared/schema";
 
 // Import TMC types from schema
@@ -160,6 +161,19 @@ export interface IStorage {
   updateTmcConfig(id: string, config: Partial<InsertTmcConfig>): Promise<TmcConfig | undefined>;
   getFunctionCost(functionName: string): Promise<number>;
   validateSufficientCredits(userId: string, functionName: string): Promise<boolean>;
+
+  // System Settings
+  getSystemSetting(settingKey: string): Promise<SystemSettings | undefined>;
+  getAllSystemSettings(): Promise<SystemSettings[]>;
+  createSystemSetting(setting: InsertSystemSettings): Promise<SystemSettings>;
+  updateSystemSetting(settingKey: string, settingValue: string): Promise<SystemSettings | undefined>;
+
+  // Chatbot References
+  getChatbotReferences(filters?: { allowedRoles?: string[], useForDiagnostics?: boolean, category?: string }): Promise<ChatbotReference[]>;
+  getChatbotReference(id: string): Promise<ChatbotReference | undefined>;
+  createChatbotReference(reference: InsertChatbotReference): Promise<ChatbotReference>;
+  updateChatbotReference(id: string, reference: Partial<InsertChatbotReference>): Promise<ChatbotReference | undefined>;
+  deleteChatbotReference(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1410,6 +1424,75 @@ export class DatabaseStorage implements IStorage {
     }
     
     return config;
+  }
+
+  // System Settings Implementation
+  async getSystemSetting(settingKey: string): Promise<SystemSettings | undefined> {
+    const [setting] = await db.select().from(systemSettings)
+      .where(eq(systemSettings.settingKey, settingKey));
+    return setting || undefined;
+  }
+
+  async getAllSystemSettings(): Promise<SystemSettings[]> {
+    return await db.select().from(systemSettings)
+      .orderBy(systemSettings.settingKey);
+  }
+
+  async createSystemSetting(insertSetting: InsertSystemSettings): Promise<SystemSettings> {
+    const [setting] = await db.insert(systemSettings).values(insertSetting).returning();
+    return setting;
+  }
+
+  async updateSystemSetting(settingKey: string, settingValue: string): Promise<SystemSettings | undefined> {
+    const [setting] = await db.update(systemSettings)
+      .set({ settingValue, updatedAt: sql`now()` })
+      .where(eq(systemSettings.settingKey, settingKey))
+      .returning();
+    return setting || undefined;
+  }
+
+  // Chatbot References Implementation
+  async getChatbotReferences(filters?: { allowedRoles?: string[], useForDiagnostics?: boolean, category?: string }): Promise<ChatbotReference[]> {
+    let query = db.select().from(chatbotReferences).where(eq(chatbotReferences.isActive, true));
+
+    // Apply filters if provided
+    if (filters?.category) {
+      query = query.where(eq(chatbotReferences.category, filters.category)) as any;
+    }
+
+    if (filters?.useForDiagnostics !== undefined) {
+      query = query.where(eq(chatbotReferences.useForDiagnostics, filters.useForDiagnostics)) as any;
+    }
+
+    // Note: allowedRoles filter would require additional logic based on schema structure
+    // For now, returning all active references matching other filters
+
+    return await query.orderBy(chatbotReferences.title) as any;
+  }
+
+  async getChatbotReference(id: string): Promise<ChatbotReference | undefined> {
+    const [reference] = await db.select().from(chatbotReferences)
+      .where(eq(chatbotReferences.id, id));
+    return reference || undefined;
+  }
+
+  async createChatbotReference(insertReference: InsertChatbotReference): Promise<ChatbotReference> {
+    const [reference] = await db.insert(chatbotReferences).values(insertReference).returning();
+    return reference;
+  }
+
+  async updateChatbotReference(id: string, updateReference: Partial<InsertChatbotReference>): Promise<ChatbotReference | undefined> {
+    const [reference] = await db.update(chatbotReferences)
+      .set({ ...updateReference, updatedAt: sql`now()` })
+      .where(eq(chatbotReferences.id, id))
+      .returning();
+    return reference || undefined;
+  }
+
+  async deleteChatbotReference(id: string): Promise<boolean> {
+    const result = await db.delete(chatbotReferences)
+      .where(eq(chatbotReferences.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
   }
 }
 
