@@ -2,7 +2,7 @@ import {
   users, patients, appointments, medicalRecords, whatsappMessages, 
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
-  tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences,
+  tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences, patientNotes,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -11,7 +11,8 @@ import {
   type PrescriptionShare, type InsertPrescriptionShare, type LabOrder, type InsertLabOrder,
   type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
   type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig,
-  type SystemSettings, type InsertSystemSettings, type ChatbotReference, type InsertChatbotReference
+  type SystemSettings, type InsertSystemSettings, type ChatbotReference, type InsertChatbotReference,
+  type PatientNote, type InsertPatientNote
 } from "@shared/schema";
 
 // Import TMC types from schema
@@ -174,6 +175,13 @@ export interface IStorage {
   createChatbotReference(reference: InsertChatbotReference): Promise<ChatbotReference>;
   updateChatbotReference(id: string, reference: Partial<InsertChatbotReference>): Promise<ChatbotReference | undefined>;
   deleteChatbotReference(id: string): Promise<boolean>;
+
+  // Patient Notes (Personal Agenda)
+  getPatientNotes(patientId: string, userId: string, userRole: string): Promise<PatientNote[]>;
+  getPatientNotesByDate(patientId: string, date: Date, userId: string, userRole: string): Promise<PatientNote[]>;
+  createPatientNote(note: InsertPatientNote): Promise<PatientNote>;
+  updatePatientNote(id: string, note: Partial<InsertPatientNote>): Promise<PatientNote | undefined>;
+  deletePatientNote(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1492,6 +1500,71 @@ export class DatabaseStorage implements IStorage {
   async deleteChatbotReference(id: string): Promise<boolean> {
     const result = await db.delete(chatbotReferences)
       .where(eq(chatbotReferences.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Patient Notes Implementation
+  async getPatientNotes(patientId: string, userId: string, userRole: string): Promise<PatientNote[]> {
+    // Patient can see their own notes, admin can see all notes
+    if (userRole === 'admin') {
+      return await db.select().from(patientNotes)
+        .where(eq(patientNotes.patientId, patientId))
+        .orderBy(desc(patientNotes.date));
+    } else if (userRole === 'patient') {
+      // Patient sees their own notes
+      return await db.select().from(patientNotes)
+        .where(and(
+          eq(patientNotes.patientId, patientId),
+          eq(patientNotes.userId, userId)
+        ))
+        .orderBy(desc(patientNotes.date));
+    }
+    return [];
+  }
+
+  async getPatientNotesByDate(patientId: string, date: Date, userId: string, userRole: string): Promise<PatientNote[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    if (userRole === 'admin') {
+      return await db.select().from(patientNotes)
+        .where(and(
+          eq(patientNotes.patientId, patientId),
+          gte(patientNotes.date, startOfDay),
+          lte(patientNotes.date, endOfDay)
+        ))
+        .orderBy(patientNotes.date);
+    } else if (userRole === 'patient') {
+      return await db.select().from(patientNotes)
+        .where(and(
+          eq(patientNotes.patientId, patientId),
+          eq(patientNotes.userId, userId),
+          gte(patientNotes.date, startOfDay),
+          lte(patientNotes.date, endOfDay)
+        ))
+        .orderBy(patientNotes.date);
+    }
+    return [];
+  }
+
+  async createPatientNote(insertNote: InsertPatientNote): Promise<PatientNote> {
+    const [note] = await db.insert(patientNotes).values(insertNote).returning();
+    return note;
+  }
+
+  async updatePatientNote(id: string, updateNote: Partial<InsertPatientNote>): Promise<PatientNote | undefined> {
+    const [note] = await db.update(patientNotes)
+      .set({ ...updateNote, updatedAt: sql`now()` })
+      .where(eq(patientNotes.id, id))
+      .returning();
+    return note || undefined;
+  }
+
+  async deletePatientNote(id: string): Promise<boolean> {
+    const result = await db.delete(patientNotes)
+      .where(eq(patientNotes.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
 }
