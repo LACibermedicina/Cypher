@@ -10,6 +10,7 @@ import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
 import * as tmcCreditsService from "./services/tmc-credits";
+import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -8424,6 +8425,151 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Chatbot scheduling error:', error);
       res.status(500).json({ message: 'Error scheduling appointment via chatbot' });
+    }
+  });
+
+  // ===== PAYPAL INTEGRATION ROUTES =====
+  // PayPal integration blueprint routes - DO NOT MODIFY
+  
+  app.get("/paypal/setup", async (req, res) => {
+    await loadPaypalDefault(req, res);
+  });
+
+  app.post("/paypal/order", async (req, res) => {
+    await createPaypalOrder(req, res);
+  });
+
+  app.post("/paypal/order/:orderID/capture", async (req, res) => {
+    await capturePaypalOrder(req, res);
+  });
+
+  // Custom endpoint for purchasing TMC credits via PayPal
+  app.post('/api/credits/purchase', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { paypalOrderId } = req.body;
+
+      if (!paypalOrderId) {
+        return res.status(400).json({ message: 'PayPal order ID is required' });
+      }
+
+      // CRITICAL: Verify the PayPal order server-side before issuing credits
+      const { body: orderBody } = await (async () => {
+        const { OrdersController, Client, Environment } = await import("@paypal/paypal-server-sdk");
+        const client = new Client({
+          clientCredentialsAuthCredentials: {
+            oAuthClientId: process.env.PAYPAL_CLIENT_ID!,
+            oAuthClientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+          },
+          environment: process.env.NODE_ENV === "production" ? Environment.Production : Environment.Sandbox,
+        });
+        const ordersController = new OrdersController(client);
+        return await ordersController.showOrderDetails(paypalOrderId);
+      })();
+
+      const orderData = JSON.parse(String(orderBody));
+      
+      // Validate order status is COMPLETED
+      if (orderData.status !== 'COMPLETED') {
+        return res.status(400).json({ 
+          message: 'Payment not completed',
+          status: orderData.status 
+        });
+      }
+
+      // Extract payment amount from PayPal order
+      const purchaseUnit = orderData.purchase_units[0];
+      const paidAmount = parseFloat(purchaseUnit.amount.value);
+      const currency = purchaseUnit.amount.currency_code;
+
+      // Calculate credits based on payment (server-side, NOT from client)
+      // Credit pricing: $1 = 10 credits, $5 = 60 credits, $10 = 150 credits, $20 = 350 credits
+      let creditsToAdd = 0;
+      if (paidAmount >= 20) {
+        creditsToAdd = Math.floor((paidAmount / 20) * 350);
+      } else if (paidAmount >= 10) {
+        creditsToAdd = Math.floor((paidAmount / 10) * 150);
+      } else if (paidAmount >= 5) {
+        creditsToAdd = Math.floor((paidAmount / 5) * 60);
+      } else {
+        creditsToAdd = Math.floor(paidAmount * 10);
+      }
+
+      // Check if order was already processed to prevent double-spending
+      const existingTransaction = await db.select()
+        .from(tmcTransactions)
+        .where(sql`metadata->>'paypalOrderId' = ${paypalOrderId}`)
+        .limit(1);
+
+      if (existingTransaction.length > 0) {
+        return res.status(400).json({ 
+          message: 'This payment has already been processed',
+          orderId: paypalOrderId
+        });
+      }
+      
+      // Add credits to user
+      const newBalance = await tmcCreditsService.creditUser(
+        req.user.id,
+        creditsToAdd,
+        'paypal_purchase',
+        {
+          functionUsed: 'credit_purchase',
+          paidAmount,
+          currency,
+          paypalOrderId,
+          paypalStatus: orderData.status,
+          paypalPayerId: orderData.payer?.payer_id
+        }
+      );
+
+      // Add to cashbox revenue
+      await tmcCreditsService.addCashboxRevenue(
+        creditsToAdd,
+        `PayPal purchase - ${paidAmount} ${currency}`,
+        undefined,
+        req.user.id
+      );
+
+      console.log(`✅ Credits purchased: ${creditsToAdd} credits for ${paidAmount} ${currency} (Order: ${paypalOrderId})`);
+
+      res.json({
+        success: true,
+        newBalance,
+        creditsAdded: creditsToAdd,
+        amountPaid: paidAmount,
+        currency,
+        message: 'Credits purchased successfully'
+      });
+    } catch (error: any) {
+      console.error('Credit purchase error:', error);
+      if (error.message?.includes('PayPal')) {
+        return res.status(400).json({ message: 'PayPal verification failed', error: error.message });
+      }
+      res.status(500).json({ message: 'Failed to process credit purchase' });
+    }
+  });
+
+  // Get user credit balance and transaction history
+  app.get('/api/credits/balance', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const balance = await tmcCreditsService.getUserBalance(req.user.id);
+      const transactions = await tmcCreditsService.getUserTransactions(req.user.id, 20);
+
+      res.json({
+        balance,
+        transactions
+      });
+    } catch (error) {
+      console.error('Get credit balance error:', error);
+      res.status(500).json({ message: 'Failed to get credit balance' });
     }
   });
 
