@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { LogOut, User, Settings } from "lucide-react";
 import NotificationCenter from "@/components/notifications/notification-center";
 import telemedLogo from "@/assets/logo-icon.jpg";
+import userIcon from "@/assets/user-icon.png";
 
 export default function Header() {
   const [location, navigate] = useLocation();
@@ -478,12 +479,16 @@ export default function Header() {
             ) : (
               <Button
                 variant="ghost"
-                size="icon"
-                className="w-10 h-10 rounded-xl hover:bg-primary/10 transition-colors"
+                className="flex items-center space-x-2 px-3 py-2 rounded-xl hover:bg-primary/10 transition-colors"
                 data-testid="button-login"
                 onClick={() => navigate('/login')}
                 title={t("auth.login")}
               >
+                <img 
+                  src={userIcon} 
+                  alt="User Icon" 
+                  className="w-5 h-5"
+                />
                 <i className="fas fa-sign-in-alt text-lg text-primary"></i>
               </Button>
             )}
