@@ -12,7 +12,7 @@ import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator"
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or } from "drizzle-orm";
 import { generateAgoraToken, getAgoraAppId } from "./agora";
 
 // TMC Credit System Validation Schemas
@@ -1613,6 +1613,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Video Consultation API Routes
   
+  // Get or create video consultation for a patient (used by video page)
+  app.post('/api/video-consultations/start-with-patient/:patientId', async (req, res) => {
+    try {
+      // Require authentication
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      // Require doctor role
+      if (req.user.role !== 'doctor' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only doctors can start video consultations' });
+      }
+      
+      const patientId = req.params.patientId;
+      const doctorId = req.user.id;
+      
+      // Check if patient exists
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
+      }
+      
+      // Check if there's already an active or waiting consultation for this patient-doctor pair
+      const existingConsultations = await db.select().from(videoConsultations)
+        .where(and(
+          eq(videoConsultations.patientId, patientId),
+          eq(videoConsultations.doctorId, doctorId),
+          or(
+            eq(videoConsultations.status, 'waiting'),
+            eq(videoConsultations.status, 'active')
+          )
+        ))
+        .orderBy(desc(videoConsultations.createdAt))
+        .limit(1);
+      
+      if (existingConsultations.length > 0) {
+        // Return existing consultation (idempotent)
+        return res.status(200).json(existingConsultations[0]);
+      }
+      
+      // Create new consultation
+      const consultation = await storage.createVideoConsultation({
+        patientId,
+        doctorId,
+        status: 'waiting',
+      });
+      
+      res.status(201).json(consultation);
+    } catch (error) {
+      console.error('Start video consultation with patient error:', error);
+      res.status(400).json({ message: 'Failed to start video consultation', error });
+    }
+  });
+  
   // Create a new video consultation session
   app.post('/api/video-consultations', async (req, res) => {
     try {
@@ -1629,21 +1683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get video consultation by ID
-  app.get('/api/video-consultations/:id', async (req, res) => {
-    try {
-      const consultation = await storage.getVideoConsultation(req.params.id);
-      if (!consultation) {
-        return res.status(404).json({ message: 'Video consultation not found' });
-      }
-      res.json(consultation);
-    } catch (error) {
-      console.error('Get video consultation error:', error);
-      res.status(500).json({ message: 'Failed to get video consultation' });
-    }
-  });
-
-  // Get video consultations by appointment
+  // Get video consultations by appointment (specific route before /:id)
   app.get('/api/video-consultations/appointment/:appointmentId', async (req, res) => {
     try {
       const consultations = await storage.getVideoConsultationsByAppointment(req.params.appointmentId);
@@ -1654,7 +1694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get active video consultations for a doctor
+  // Get active video consultations for a doctor (specific route before /:id)
   app.get('/api/video-consultations/active/:doctorId', async (req, res) => {
     try {
       const consultations = await storage.getActiveVideoConsultations(req.params.doctorId);
@@ -1662,6 +1702,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get active consultations error:', error);
       res.status(500).json({ message: 'Failed to get active consultations' });
+    }
+  });
+
+  // Generate Agora token for video consultation (specific route before /:id)
+  app.post('/api/video-consultations/agora-token', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { channelName, role } = req.body;
+
+      if (!channelName || !role) {
+        return res.status(400).json({ message: 'Channel name and role are required' });
+      }
+
+      // Use user ID as UID for Agora (convert to number using hash)
+      const uid = Math.abs(req.user.id.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0));
+
+      const token = generateAgoraToken({
+        channelName,
+        uid,
+        role: role as 'publisher' | 'subscriber',
+        expirationTimeInSeconds: 3600 // 1 hour
+      });
+
+      res.json({
+        token,
+        appId: getAgoraAppId(),
+        channelName,
+        uid
+      });
+    } catch (error) {
+      console.error('Generate Agora token error:', error);
+      res.status(500).json({ message: 'Failed to generate token' });
+    }
+  });
+
+  // Get video consultation by ID (generic route - must come after specific routes)
+  app.get('/api/video-consultations/:id', async (req, res) => {
+    try {
+      const consultation = await storage.getVideoConsultation(req.params.id);
+      if (!consultation) {
+        return res.status(404).json({ message: 'Video consultation not found' });
+      }
+      res.json(consultation);
+    } catch (error) {
+      console.error('Get video consultation error:', error);
+      res.status(500).json({ message: 'Failed to get video consultation' });
     }
   });
 
@@ -1860,41 +1949,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get transcription status error:', error);
       res.status(500).json({ message: 'Failed to get transcription status' });
-    }
-  });
-
-  // Generate Agora token for video consultation
-  app.post('/api/video-consultations/agora-token', async (req: any, res) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: 'Authentication required' });
-      }
-
-      const { channelName, role } = req.body;
-
-      if (!channelName || !role) {
-        return res.status(400).json({ message: 'Channel name and role are required' });
-      }
-
-      // Use user ID as UID for Agora (convert to number using hash)
-      const uid = Math.abs(req.user.id.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0));
-
-      const token = generateAgoraToken({
-        channelName,
-        uid,
-        role: role as 'publisher' | 'subscriber',
-        expirationTimeInSeconds: 3600 // 1 hour
-      });
-
-      res.json({
-        token,
-        appId: getAgoraAppId(),
-        channelName,
-        uid
-      });
-    } catch (error) {
-      console.error('Generate Agora token error:', error);
-      res.status(500).json({ message: 'Failed to generate token' });
     }
   });
 

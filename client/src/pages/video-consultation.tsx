@@ -46,7 +46,8 @@ export default function VideoConsultation() {
   const [, params] = useRoute('/consultation/video/:patientId');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const consultationId = params?.patientId || '';
+  const patientId = params?.patientId || '';
+  const [consultationId, setConsultationId] = useState<string>('');
 
   // Agora states
   const [client, setClient] = useState<IAgoraRTCClient | null>(null);
@@ -68,6 +69,26 @@ export default function VideoConsultation() {
 
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
+
+  // Start or get consultation for this patient
+  const { data: consultationData } = useQuery<{ id: string }>({
+    queryKey: ['start-consultation', patientId],
+    queryFn: async () => {
+      const response = await apiRequest(
+        'POST',
+        `/api/video-consultations/start-with-patient/${patientId}`
+      );
+      return response.json();
+    },
+    enabled: !!patientId,
+  });
+
+  // Update consultationId when consultation is created/fetched
+  useEffect(() => {
+    if (consultationData?.id) {
+      setConsultationId(consultationData.id);
+    }
+  }, [consultationData]);
 
   // Fetch consultation details
   const { data: consultation } = useQuery({

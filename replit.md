@@ -41,8 +41,10 @@ Preferred communication style: Simple, everyday language.
 - **Interactive Controls**: Camera toggle, microphone toggle, recording start/stop, fullscreen mode, end call
 - **Data Persistence**: All chat messages, AI queries, and notes saved to `consultation_notes` table
 - **Recording Segments**: Support for video segment URLs stored in `consultation_recordings` table
-- **API Endpoints**: Token generation (`POST /api/video-consultations/agora-token`), notes management, recordings
-- **Route**: `/consultation/video/:patientId` - Accessible to authenticated doctors
+- **API Endpoints**: Token generation (`POST /api/video-consultations/agora-token`), consultation creation/retrieval (`POST /api/video-consultations/start-with-patient/:patientId`), notes management, recordings
+- **Route**: `/consultation/video/:patientId` - Accessible to authenticated doctors only
+- **Security**: Endpoint requires authentication and doctor/admin role; idempotent (returns existing active/waiting consultation for patient-doctor pair)
+- **Database Schema**: Added `agora_channel_name` and `agora_app_id` columns to `video_consultations` table
 - **Known Limitation**: AI response pipeline not yet implemented (queries saved but no automated response generation)
 
 ## System Architecture
