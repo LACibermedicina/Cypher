@@ -32,7 +32,10 @@ export default function WhatsApp() {
     mutationFn: (data: { to: string; message: string }) => 
       apiRequest('POST', '/api/whatsapp/send', data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/messages'] });
+      // Invalidate only the specific patient's messages
+      if (selectedPatientId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/messages', selectedPatientId] });
+      }
       setNewMessage("");
       toast({
         title: "Mensagem enviada",
@@ -60,7 +63,13 @@ export default function WhatsApp() {
   useEffect(() => {
     const whatsappMessages = wsMessages.filter(msg => msg.type === 'whatsapp_message');
     if (whatsappMessages.length > 0) {
-      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/messages'] });
+      // Invalidate only the specific patient's messages if it matches the selected patient
+      whatsappMessages.forEach(wsMsg => {
+        const patientId = wsMsg.data?.patientId;
+        if (patientId) {
+          queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/messages', patientId] });
+        }
+      });
     }
   }, [wsMessages, queryClient]);
 
@@ -221,17 +230,23 @@ export default function WhatsApp() {
                     </div>
                   ) : (
                     <div className="p-4 space-y-4">
-                      {messages.map((message: any) => (
+                      {messages.map((message: any) => {
+                        // Message from patient if fromNumber matches patient's whatsapp/phone
+                        const patientNumber = selectedPatient.whatsappNumber || selectedPatient.phone;
+                        const isFromPatient = message.fromNumber === patientNumber;
+                        const isOutgoing = !message.isFromAI && !isFromPatient;
+                        
+                        return (
                         <div
                           key={message.id}
-                          className={`flex ${message.isFromAI || message.toNumber === selectedPatient.whatsappNumber ? 'justify-start' : 'justify-end'}`}
+                          className={`flex ${message.isFromAI || isFromPatient ? 'justify-start' : 'justify-end'}`}
                           data-testid={`message-${message.id}`}
                         >
                           <div
                             className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                               message.isFromAI
                                 ? 'message-bubble-ai border border-border'
-                                : message.toNumber === selectedPatient.whatsappNumber
+                                : isFromPatient
                                 ? 'bg-muted'
                                 : 'message-bubble-user text-white'
                             }`}
@@ -248,7 +263,7 @@ export default function WhatsApp() {
                               {message.message}
                             </p>
                             <p className={`text-xs mt-1 ${
-                              message.isFromAI || message.toNumber === selectedPatient.whatsappNumber 
+                              message.isFromAI || isFromPatient 
                                 ? 'text-muted-foreground' 
                                 : 'text-white/80'
                             }`}>
@@ -264,7 +279,8 @@ export default function WhatsApp() {
                             )}
                           </div>
                         </div>
-                      ))}
+                      );
+                      })}
                       <div ref={messagesEndRef} />
                     </div>
                   )}

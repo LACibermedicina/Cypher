@@ -776,30 +776,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`📥 WhatsApp message received from ${message.from} (patient: ${patient.id})`);
 
-        // Broadcast incoming patient message to all connected clients
-        wss.clients.forEach((client) => {
-          if (client.readyState === 1) { // OPEN
-            client.send(JSON.stringify({
-              type: 'whatsapp_message',
-              data: whatsappMessage
-            }));
-          }
-        });
-
-        // Broadcast AI response to all connected clients
-        wss.clients.forEach((client) => {
-          if (client.readyState === 1) { // OPEN
-            client.send(JSON.stringify({
-              type: 'whatsapp_message',
-              data: aiMessage
-            }));
-          }
-        });
-
-        // Also broadcast to doctor specifically (for doctor-specific UI updates)
-        broadcastToDoctor(actualDoctorId || DEFAULT_DOCTOR_ID, {
+        // Broadcast only to the assigned doctor (security: don't expose PHI to visitors/other doctors)
+        const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
+        broadcastToDoctor(doctorId, {
           type: 'whatsapp_message',
-          data: { patient, message: whatsappMessage, aiResponse },
+          data: { 
+            patientId: patient.id,
+            doctorId: doctorId,
+            incomingMessage: whatsappMessage,
+            aiMessage: aiMessage
+          },
         });
       }
 
@@ -976,13 +962,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         console.log(`📤 WhatsApp message sent to ${to} (patient: ${patient.id})`);
 
-        // Broadcast WebSocket notification for real-time update
-        wss.clients.forEach((client) => {
-          if (client.readyState === 1) { // OPEN
-            client.send(JSON.stringify({
-              type: 'whatsapp_message',
-              data: savedMessage
-            }));
+        // Broadcast only to the authenticated doctor (security: don't expose PHI to visitors/other doctors)
+        const doctorId = req.user.id;
+        broadcastToDoctor(doctorId, {
+          type: 'whatsapp_message',
+          data: {
+            message: savedMessage,
+            patientId: patient.id,
+            doctorId: doctorId
           }
         });
 
