@@ -9,6 +9,7 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
+import * as tmcCreditsService from "./services/tmc-credits";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -4194,6 +4195,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         specialization: role === 'doctor' ? specialization : undefined,
         digitalCertificate: role === 'doctor' ? `cert-${Date.now()}` : undefined,
       });
+      
+      // Add promotional credits for new user (except admin)
+      if (role !== 'admin') {
+        try {
+          await tmcCreditsService.addPromotionalCredits(newUser.id, username);
+          console.log(`✅ Added promotional credits to new user: ${username}`);
+        } catch (error) {
+          console.error('Failed to add promotional credits:', error);
+          // Don't fail registration if credits fail
+        }
+      }
       
       // Generate JWT token
       const jwtSecret = process.env.SESSION_SECRET;

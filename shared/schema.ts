@@ -56,11 +56,15 @@ export const appointments = pgTable("appointments", {
   doctorId: uuid("doctor_id").references(() => users.id).notNull(),
   scheduledAt: timestamp("scheduled_at").notNull(),
   type: text("type").notNull(), // consultation, followup, emergency
-  status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled
+  status: text("status").notNull().default("scheduled"), // scheduled, completed, cancelled, rescheduled
   notes: text("notes"),
   aiScheduled: boolean("ai_scheduled").default(false),
   videoCallUrl: text("video_call_url"),
   audioTranscript: text("audio_transcript"),
+  rating: integer("rating"), // 1-5 stars rating from patient (CHECK constraint added in DB)
+  feedback: text("feedback"), // Patient feedback text
+  rescheduledFromId: uuid("rescheduled_from_id"), // Original appointment ID if rescheduled (no FK to avoid circular ref)
+  rescheduledToId: uuid("rescheduled_to_id"), // New appointment ID if rescheduled (no FK to avoid circular ref)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -330,6 +334,34 @@ export const tmcConfig = pgTable("tmc_config", {
   updatedBy: uuid("updated_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Cashbox - Admin managed system treasury
+export const cashbox = pgTable("cashbox", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  balance: integer("balance").notNull().default(0), // Current balance in credits
+  totalRevenue: integer("total_revenue").notNull().default(0), // Total revenue collected
+  totalExpenses: integer("total_expenses").notNull().default(0), // Total expenses paid
+  serverCosts: integer("server_costs").notNull().default(0), // Server maintenance costs
+  description: text("description"), // Description of the cashbox entry
+  metadata: jsonb("metadata"), // Additional details (user count, consultation count, etc.)
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Cashbox Transactions - Track all cashbox movements
+export const cashboxTransactions = pgTable("cashbox_transactions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // revenue, expense, server_cost, adjustment
+  amount: integer("amount").notNull(), // Amount in credits
+  description: text("description").notNull(),
+  relatedTransactionId: uuid("related_transaction_id").references(() => tmcTransactions.id), // Link to user transaction
+  balanceBefore: integer("balance_before").notNull(),
+  balanceAfter: integer("balance_after").notNull(),
+  metadata: jsonb("metadata"), // Additional transaction details
+  performedBy: uuid("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Chatbot Configuration and References
@@ -939,6 +971,17 @@ export const insertTmcConfigSchema = createInsertSchema(tmcConfig).omit({
   updatedAt: true,
 });
 
+export const insertCashboxSchema = createInsertSchema(cashbox).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCashboxTransactionSchema = createInsertSchema(cashboxTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertChatbotReferenceSchema = createInsertSchema(chatbotReferences).omit({
   id: true,
   createdAt: true,
@@ -1063,6 +1106,12 @@ export type InsertTmcTransaction = z.infer<typeof insertTmcTransactionSchema>;
 
 export type TmcConfig = typeof tmcConfig.$inferSelect;
 export type InsertTmcConfig = z.infer<typeof insertTmcConfigSchema>;
+
+export type Cashbox = typeof cashbox.$inferSelect;
+export type InsertCashbox = z.infer<typeof insertCashboxSchema>;
+
+export type CashboxTransaction = typeof cashboxTransactions.$inferSelect;
+export type InsertCashboxTransaction = z.infer<typeof insertCashboxTransactionSchema>;
 
 export type ChatbotReference = typeof chatbotReferences.$inferSelect;
 export type InsertChatbotReference = z.infer<typeof insertChatbotReferenceSchema>;
