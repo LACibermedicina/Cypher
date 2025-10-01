@@ -44,6 +44,14 @@ export default function PatientAgenda() {
   // Fetch notes for selected date
   const { data: notes = [], isLoading } = useQuery<PatientNote[]>({
     queryKey: ['/api/patient-notes', patientData?.id, selectedDate],
+    queryFn: async () => {
+      if (!patientData?.id) return [];
+      const response = await fetch(`/api/patient-notes?patientId=${patientData.id}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch notes');
+      return response.json();
+    },
     enabled: !!patientData?.id && !!selectedDate,
   });
 
@@ -142,12 +150,12 @@ export default function PatientAgenda() {
     }
   };
 
-  if (!user || user.role !== 'patient') {
+  if (!user || (user.role !== 'patient' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Card>
           <CardContent className="p-6">
-            <p>Acesso restrito a pacientes</p>
+            <p>Acesso restrito a pacientes e administradores</p>
           </CardContent>
         </Card>
       </div>

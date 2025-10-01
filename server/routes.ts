@@ -910,20 +910,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/patient-notes', async (req: any, res) => {
     try {
+      console.log('[patient-notes POST] Request body:', req.body);
+      console.log('[patient-notes POST] User:', req.user);
+      
       if (!req.user) {
         return res.status(401).json({ message: 'Authentication required' });
       }
 
-      // Only patient or admin can create notes
+      // Only patient or admin can create notes - explicitly deny all other roles
       if (req.user.role !== 'patient' && req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'Access denied' });
+        return res.status(403).json({ message: 'Access denied - only patients and admins can create notes' });
       }
 
-      const note = await storage.createPatientNote(req.body);
+      // Whitelist only allowed fields to prevent mass assignment
+      const { title, content, date, isPrivate } = req.body;
+      
+      // Convert date string to Date object if needed
+      const processedDate = date && typeof date === 'string' ? new Date(date) : date;
+      
+      let noteData: any = {
+        title,
+        content,
+        date: processedDate,
+        isPrivate: isPrivate !== undefined ? isPrivate : true,
+      };
+      
+      if (req.user.role === 'patient') {
+        // Patients can only create notes for themselves
+        noteData.patientId = req.user.id;
+        noteData.userId = req.user.id;
+      } else if (req.user.role === 'admin') {
+        // Admin must specify a patientId
+        const { patientId } = req.body;
+        if (!patientId) {
+          return res.status(400).json({ message: 'Admin must specify patientId' });
+        }
+        noteData.patientId = patientId;
+        noteData.userId = req.user.id;
+      }
+
+      console.log('[patient-notes POST] Note data:', noteData);
+      const note = await storage.createPatientNote(noteData);
+      console.log('[patient-notes POST] Note created:', note);
       res.status(201).json(note);
     } catch (error) {
-      console.error('Error creating patient note:', error);
-      res.status(500).json({ message: 'Failed to create note' });
+      console.error('[patient-notes POST] Error creating patient note:', error);
+      res.status(500).json({ message: 'Failed to create note', error: error.message });
     }
   });
 
@@ -933,11 +965,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Authentication required' });
       }
 
-      const note = await storage.updatePatientNote(req.params.id, req.body);
-      if (!note) {
+      // Only patient or admin can update notes
+      if (req.user.role !== 'patient' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Verify ownership before update
+      const existingNote = await storage.getPatientNoteById(req.params.id);
+      if (!existingNote) {
         return res.status(404).json({ message: 'Note not found' });
       }
 
+      // Only the patient who owns the note or admin can update
+      if (req.user.role === 'patient' && existingNote.patientId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Whitelist only editable fields to prevent reassignment of IDs
+      const { title, content, date, isPrivate } = req.body;
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = title;
+      if (content !== undefined) updateData.content = content;
+      if (date !== undefined) {
+        // Convert date string to Date object if needed
+        updateData.date = typeof date === 'string' ? new Date(date) : date;
+      }
+      if (isPrivate !== undefined) updateData.isPrivate = isPrivate;
+
+      const note = await storage.updatePatientNote(req.params.id, updateData);
       res.json(note);
     } catch (error) {
       console.error('Error updating patient note:', error);
@@ -951,11 +1006,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'Authentication required' });
       }
 
-      const success = await storage.deletePatientNote(req.params.id);
-      if (!success) {
+      // Only patient or admin can delete notes
+      if (req.user.role !== 'patient' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      // Verify ownership before delete
+      const existingNote = await storage.getPatientNoteById(req.params.id);
+      if (!existingNote) {
         return res.status(404).json({ message: 'Note not found' });
       }
 
+      // Only the patient who owns the note or admin can delete
+      if (req.user.role === 'patient' && existingNote.patientId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const success = await storage.deletePatientNote(req.params.id);
       res.json({ success: true });
     } catch (error) {
       console.error('Error deleting patient note:', error);
@@ -6718,10 +6785,15 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       let query = db.select()
         .from(prescriptions);
       
-      // For doctors, filter to their own prescriptions; for admins, show all
+      // Filter based on user role
       if (req.user?.role === 'doctor') {
+        // Doctors see only their own prescriptions
         query = query.where(eq(prescriptions.doctorId, req.user.id));
+      } else if (req.user?.role === 'patient') {
+        // Patients see only their own prescriptions
+        query = query.where(eq(prescriptions.patientId, req.user.id));
       }
+      // Admins see all prescriptions (no filter)
       
       const results = await query
         .orderBy(desc(prescriptions.createdAt))
@@ -6759,6 +6831,15 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       
       if (!prescription.length) {
         return res.status(404).json({ message: 'Prescription not found' });
+      }
+
+      // Access control: Only doctor who created, patient who received, or admin can view
+      const prescriptionData = prescription[0];
+      if (req.user?.role === 'doctor' && prescriptionData.doctorId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      if (req.user?.role === 'patient' && prescriptionData.patientId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
       }
       
       // Get prescription items with medication details

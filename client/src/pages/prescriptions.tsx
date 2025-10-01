@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Search, Plus, FileText, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/contexts/AuthContext';
 import CreatePrescriptionForm from '@/components/prescriptions/create-prescription-form';
 import PrescriptionDetail from '@/components/prescriptions/prescription-detail';
 import { format } from 'date-fns';
@@ -26,10 +27,13 @@ interface Prescription {
 
 export default function PrescriptionsPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPrescription, setSelectedPrescription] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const isPatient = user?.role === 'patient';
 
   // Get recent prescriptions
   const { data: recentPrescriptions, isLoading, refetch } = useQuery<Prescription[]>({
@@ -105,31 +109,38 @@ export default function PrescriptionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Sistema de Prescrições</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isPatient ? 'Minhas Prescrições' : 'Sistema de Prescrições'}
+          </h1>
           <p className="text-muted-foreground mt-2">
-            Gerencie prescrições médicas com validação e integração farmácia
+            {isPatient 
+              ? 'Visualize e baixe suas prescrições médicas' 
+              : 'Gerencie prescrições médicas com validação e integração farmácia'
+            }
           </p>
         </div>
         
-        <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center space-x-2" data-testid="button-create-prescription">
-              <Plus className="h-4 w-4" />
-              <span>Nova Prescrição</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Criar Nova Prescrição</DialogTitle>
-            </DialogHeader>
-            <CreatePrescriptionForm 
-              onSuccess={() => {
-                setIsCreateModalOpen(false);
-                refetch();
-              }} 
-            />
-          </DialogContent>
-        </Dialog>
+        {!isPatient && (
+          <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center space-x-2" data-testid="button-create-prescription">
+                <Plus className="h-4 w-4" />
+                <span>Nova Prescrição</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Criar Nova Prescrição</DialogTitle>
+              </DialogHeader>
+              <CreatePrescriptionForm 
+                onSuccess={() => {
+                  setIsCreateModalOpen(false);
+                  refetch();
+                }} 
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Search and Filters */}

@@ -179,6 +179,7 @@ export interface IStorage {
   // Patient Notes (Personal Agenda)
   getPatientNotes(patientId: string, userId: string, userRole: string): Promise<PatientNote[]>;
   getPatientNotesByDate(patientId: string, date: Date, userId: string, userRole: string): Promise<PatientNote[]>;
+  getPatientNoteById(id: string): Promise<PatientNote | undefined>;
   createPatientNote(note: InsertPatientNote): Promise<PatientNote>;
   updatePatientNote(id: string, note: Partial<InsertPatientNote>): Promise<PatientNote | undefined>;
   deletePatientNote(id: string): Promise<boolean>;
@@ -1547,6 +1548,11 @@ export class DatabaseStorage implements IStorage {
         .orderBy(patientNotes.date);
     }
     return [];
+  }
+
+  async getPatientNoteById(id: string): Promise<PatientNote | undefined> {
+    const [note] = await db.select().from(patientNotes).where(eq(patientNotes.id, id)).limit(1);
+    return note || undefined;
   }
 
   async createPatientNote(insertNote: InsertPatientNote): Promise<PatientNote> {
