@@ -72,6 +72,15 @@ Preferred communication style: Simple, everyday language.
 - **API Endpoint**: `GET /api/dashboard/stats/:userId` with role-specific response logic
 - **Security**: Proper authentication, ownership validation, 403 Forbidden for unauthorized access
 
+### Appointment Rescheduling System (October 1, 2025)
+- **Endpoint**: `POST /api/appointments/:id/reschedule` with authentication required
+- **Authorization**: Only doctor, admin, or the patient themselves can reschedule
+- **Validations**: Cannot reschedule completed/cancelled appointments, no past dates allowed
+- **Business Logic**: Creates new appointment with same details but new date, updates original to "rescheduled" status, links both via `rescheduledFromId`/`rescheduledToId`
+- **Frontend**: Modal dialog in dashboard with datetime picker, formatted success messages, automatic list refresh
+- **WebSocket**: Broadcasts reschedule event to doctor for real-time updates
+- **Security**: Role-based access control, proper authorization checks, validated input
+
 ### Video Consultation Feature (October 1, 2025)
 - **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
 - **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar
