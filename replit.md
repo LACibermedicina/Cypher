@@ -81,6 +81,16 @@ Preferred communication style: Simple, everyday language.
 - **WebSocket**: Broadcasts reschedule event to doctor for real-time updates
 - **Security**: Role-based access control, proper authorization checks, validated input
 
+### Post-Consultation Rating System (October 1, 2025)
+- **Endpoint**: `POST /api/appointments/:id/rate` with authentication required
+- **Authorization**: Only the patient (or admin) can rate their own completed appointments
+- **Validations**: Rating must be 1-5 stars, only completed appointments can be rated, prevents duplicate ratings
+- **Data Fields**: `rating` (integer 1-5 required), `feedback` (text optional)
+- **Frontend**: TodaySchedule component shows "Avaliar" button for unrated completed appointments
+- **Rating UI**: Interactive star selection dialog with optional feedback textarea, visual star display for rated appointments
+- **WebSocket**: Broadcasts rating notification to the attending doctor for real-time updates
+- **Security**: Ownership validation ensures patients can only rate their own appointments, prevents rating manipulation
+
 ### Video Consultation Feature (October 1, 2025)
 - **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
 - **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar

@@ -14,7 +14,7 @@ import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./payp
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq, desc, sql, and, or } from "drizzle-orm";
+import { eq, desc, sql, and, or, isNotNull } from "drizzle-orm";
 import { generateAgoraToken, getAgoraAppId } from "./agora";
 
 // TMC Credit System Validation Schemas
@@ -4812,6 +4812,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Rate appointment error:', error);
       res.status(500).json({ message: 'Failed to rate appointment' });
+    }
+  });
+
+  // Get doctor rating statistics
+  app.get('/api/doctors/:doctorId/rating-stats', async (req, res) => {
+    try {
+      const doctorId = req.params.doctorId;
+      
+      // Get all completed appointments with ratings for this doctor
+      const ratedAppointments = await db
+        .select()
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.doctorId, doctorId),
+            eq(appointments.status, 'completed'),
+            isNotNull(appointments.rating)
+          )
+        );
+      
+      if (ratedAppointments.length === 0) {
+        return res.json({
+          averageRating: 0,
+          totalRatings: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        });
+      }
+      
+      // Calculate average rating
+      const totalRating = ratedAppointments.reduce((sum, apt) => sum + (apt.rating || 0), 0);
+      const averageRating = totalRating / ratedAppointments.length;
+      
+      // Calculate rating distribution
+      const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      ratedAppointments.forEach((apt) => {
+        if (apt.rating) {
+          ratingDistribution[apt.rating]++;
+        }
+      });
+      
+      res.json({
+        averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+        totalRatings: ratedAppointments.length,
+        ratingDistribution
+      });
+    } catch (error) {
+      console.error('Get doctor rating stats error:', error);
+      res.status(500).json({ message: 'Failed to get rating statistics' });
     }
   });
 

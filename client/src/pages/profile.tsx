@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,20 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { User, Mail, Phone, CreditCard, Shield, Save, Upload, Trash2 } from "lucide-react";
+import { User, Mail, Phone, CreditCard, Shield, Save, Upload, Trash2, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+interface RatingStats {
+  averageRating: number;
+  totalRatings: number;
+  ratingDistribution: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
+}
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -29,6 +41,12 @@ export default function Profile() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Fetch doctor rating statistics (only for doctors)
+  const { data: ratingStats } = useQuery<RatingStats>({
+    queryKey: user?.id ? [`/api/doctors/${user.id}/rating-stats`] : ['rating-stats-placeholder'],
+    enabled: !!user?.id && user?.role === 'doctor',
+  });
 
   const updateProfileMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -311,6 +329,31 @@ export default function Profile() {
                     FIPS Ativo
                   </span>
                 </div>
+              )}
+              
+              {user?.role === 'doctor' && ratingStats && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        <span className="text-sm">Avaliação Média</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="font-semibold text-lg" data-testid="text-average-rating">
+                          {ratingStats.averageRating > 0 ? ratingStats.averageRating.toFixed(1) : 'N/A'}
+                        </span>
+                        {ratingStats.averageRating > 0 && (
+                          <i className="fas fa-star text-yellow-500 text-sm"></i>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground text-center">
+                      {ratingStats.totalRatings} {ratingStats.totalRatings === 1 ? 'avaliação' : 'avaliações'}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </CardContent>
