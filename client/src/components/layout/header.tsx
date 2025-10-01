@@ -6,7 +6,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescri
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import LanguageSelector from "@/components/ui/language-selector";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -16,7 +15,6 @@ import NotificationCenter from "@/components/notifications/notification-center";
 export default function Header() {
   const [location, navigate] = useLocation();
   const { t } = useTranslation();
-  const isMobile = useIsMobile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -292,34 +290,50 @@ export default function Header() {
                 </nav>
 
                 {/* Mobile User Info */}
-                <div className="absolute bottom-6 left-6 right-6 p-4 bg-muted/50 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
-                          {user ? getUserInitials(user.name) : 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold text-sm" data-testid="text-mobile-user-name">
-                          {user?.name || 'Usuário'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
-                        </p>
+                {user ? (
+                  <div className="absolute bottom-6 left-6 right-6 p-4 bg-muted/50 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="w-12 h-12">
+                          <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
+                            {getUserInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-semibold text-sm" data-testid="text-mobile-user-name">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {getRoleDisplay(user.role)}
+                          </p>
+                        </div>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLogout}
+                        className="text-muted-foreground hover:text-destructive"
+                        data-testid="button-mobile-logout"
+                      >
+                        <LogOut className="h-4 w-4" />
+                      </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="absolute bottom-6 left-6 right-6">
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleLogout}
-                      className="text-muted-foreground hover:text-destructive"
-                      data-testid="button-mobile-logout"
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        navigate('/login');
+                      }}
+                      className="w-full"
+                      data-testid="button-mobile-login"
                     >
-                      <LogOut className="h-4 w-4" />
+                      <i className="fas fa-sign-in-alt mr-2"></i>
+                      {t("auth.login")}
                     </Button>
                   </div>
-                </div>
+                )}
               </SheetContent>
             </Sheet>
 
@@ -386,68 +400,84 @@ export default function Header() {
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />
-            <NotificationCenter />
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
-              data-testid="button-emergency"
-              onClick={handleEmergencyContact}
-            >
-              <i className="fas fa-ambulance mr-2"></i>
-              Emergência Médica
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="flex items-center space-x-3 p-2 rounded-xl hover:bg-primary/5 transition-colors"
-                  data-testid="button-user-menu"
+            
+            {user ? (
+              <>
+                <NotificationCenter />
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
+                  data-testid="button-emergency"
+                  onClick={handleEmergencyContact}
                 >
-                  <Avatar className="w-9 h-9">
-                    <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold text-sm">
-                      {user ? getUserInitials(user.name) : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-sm font-semibold" data-testid="text-user-name">
-                      {user?.name || 'Usuário'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {user?.role ? getRoleDisplay(user.role) : 'Usuário'}
-                    </p>
-                  </div>
+                  <i className="fas fa-ambulance mr-2"></i>
+                  Emergência Médica
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>
-                  <div>
-                    <p className="font-semibold">{user?.name || 'Usuário'}</p>
-                    <p className="text-xs text-muted-foreground font-normal">
-                      {user?.email || user?.username}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-profile">
-                  <User className="mr-2 h-4 w-4" />
-                  {t("auth.profile")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-settings">
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t("auth.settings")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={handleLogout}
-                  className="text-destructive focus:text-destructive"
-                  data-testid="button-desktop-logout"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t("auth.logout")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex items-center space-x-3 p-2 rounded-xl hover:bg-primary/5 transition-colors"
+                      data-testid="button-user-menu"
+                    >
+                      <Avatar className="w-9 h-9">
+                        <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold text-sm">
+                          {getUserInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="hidden sm:block text-left">
+                        <p className="text-sm font-semibold" data-testid="text-user-name">
+                          {user.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {getRoleDisplay(user.role)}
+                        </p>
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div>
+                        <p className="font-semibold">{user.name}</p>
+                        <p className="text-xs text-muted-foreground font-normal">
+                          {user.email || user.username}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-profile">
+                      <User className="mr-2 h-4 w-4" />
+                      {t("auth.profile")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/profile')} data-testid="button-settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      {t("auth.settings")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={handleLogout}
+                      className="text-destructive focus:text-destructive"
+                      data-testid="button-desktop-logout"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t("auth.logout")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-10 h-10 rounded-xl hover:bg-primary/10 transition-colors"
+                data-testid="button-login"
+                onClick={() => navigate('/login')}
+                title={t("auth.login")}
+              >
+                <i className="fas fa-sign-in-alt text-lg text-primary"></i>
+              </Button>
+            )}
           </div>
         </div>
       </div>
