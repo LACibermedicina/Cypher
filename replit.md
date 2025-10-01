@@ -8,6 +8,24 @@ Telemed is an AI-powered telemedicine platform designed for modern healthcare de
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (October 2025)
+
+### Patient Agenda Feature
+- **New table**: `patient_notes` with fields: id, patientId, userId, date, title, content, isPrivate, createdAt, updatedAt
+- **RBAC**: Only patients and admins can create/view/edit notes; doctors explicitly denied
+- **Security**: Field whitelisting on POST/PATCH, server-side ID enforcement, ownership verification
+- **Frontend**: Calendar-based interface at `/patient-agenda` for patients to create/view/edit personal health notes
+- **Known limitation**: Admin UI lacks patient selector - functional for patients only
+
+### Enhanced Patient Dashboard
+- Added quick navigation buttons: "Agendar Consulta" (scheduling), "Minha Agenda" (personal notes), "Minhas Prescrições" (prescriptions), "Chat Médico" (WhatsApp redirect)
+- Health status now displayed dynamically based on physician assessment
+
+### Prescriptions Page Access
+- Route now allows patient access at `/prescriptions`
+- UI adapts by role: patients see view-only interface, doctors/admins can create prescriptions
+- "Nova Prescrição" button hidden for patients via conditional rendering
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -48,6 +66,10 @@ Security implementation focuses on healthcare compliance:
 - **Medical Records Management**: Comprehensive patient data handling with exam result analysis
 - **Appointment Scheduling**: AI-powered scheduling with support for different appointment types
 - **Digital Document Signing**: FIPS-compliant digital signature workflow for prescriptions and medical documents
+- **Patient Health Status**: Physicians can determine patient health status after consultations (excellent/good/regular/critical/to_be_determined)
+- **Patient Personal Agenda**: Private note-taking system for patients to track health information by date
+- **Enhanced Patient Dashboard**: Quick navigation buttons to scheduling, agenda, prescriptions, and WhatsApp team chat
+- **Prescription Management**: Role-based access - patients view/download, doctors create/manage
 
 ## External Dependencies
 
