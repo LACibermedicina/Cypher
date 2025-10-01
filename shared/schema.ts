@@ -254,6 +254,8 @@ export const videoConsultations = pgTable("video_consultations", {
   patientId: uuid("patient_id").references(() => patients.id).notNull(),
   doctorId: uuid("doctor_id").references(() => users.id).notNull(),
   sessionId: text("session_id").notNull().unique().default(sql`gen_random_uuid()`), // Auto-generated WebRTC session identifier
+  agoraChannelName: text("agora_channel_name"), // Agora channel for video/audio
+  agoraAppId: text("agora_app_id"), // Agora application ID
   status: text("status").notNull().default("waiting"), // waiting, active, ended, cancelled
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
@@ -269,6 +271,32 @@ export const videoConsultations = pgTable("video_consultations", {
   encryptionEnabled: boolean("encryption_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Consultation notes: chat messages, AI queries, doctor notes during video consultation
+export const consultationNotes = pgTable("consultation_notes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  consultationId: uuid("consultation_id").references(() => videoConsultations.id).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(), // Who created the note/message
+  type: text("type").notNull(), // chat, ai_query, doctor_note, ai_response
+  content: text("content").notNull(),
+  metadata: jsonb("metadata"), // Additional data (AI query parameters, chat sender info, etc.)
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Consultation recordings: video segments and their metadata
+export const consultationRecordings = pgTable("consultation_recordings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  consultationId: uuid("consultation_id").references(() => videoConsultations.id).notNull(),
+  segmentUrl: text("segment_url").notNull(), // URL to video segment
+  startTime: timestamp("start_time").notNull(), // When this segment started
+  endTime: timestamp("end_time"), // When this segment ended
+  duration: integer("duration"), // Duration in seconds
+  segmentType: text("segment_type").default("video"), // video, audio, screen_share
+  fileSize: integer("file_size"), // Size in bytes
+  isProcessed: boolean("is_processed").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // TMC Credit System
@@ -889,6 +917,17 @@ export const insertVideoConsultationSchema = createInsertSchema(videoConsultatio
   updatedAt: true,
 });
 
+export const insertConsultationNoteSchema = createInsertSchema(consultationNotes).omit({
+  id: true,
+  timestamp: true,
+  createdAt: true,
+});
+
+export const insertConsultationRecordingSchema = createInsertSchema(consultationRecordings).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTmcTransactionSchema = createInsertSchema(tmcTransactions).omit({
   id: true,
   createdAt: true,
@@ -1012,6 +1051,12 @@ export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema
 
 export type VideoConsultation = typeof videoConsultations.$inferSelect;
 export type InsertVideoConsultation = z.infer<typeof insertVideoConsultationSchema>;
+
+export type ConsultationNote = typeof consultationNotes.$inferSelect;
+export type InsertConsultationNote = z.infer<typeof insertConsultationNoteSchema>;
+
+export type ConsultationRecording = typeof consultationRecordings.$inferSelect;
+export type InsertConsultationRecording = z.infer<typeof insertConsultationRecordingSchema>;
 
 export type TmcTransaction = typeof tmcTransactions.$inferSelect;
 export type InsertTmcTransaction = z.infer<typeof insertTmcTransactionSchema>;
