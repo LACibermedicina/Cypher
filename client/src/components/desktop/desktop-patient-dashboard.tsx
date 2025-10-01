@@ -29,6 +29,8 @@ import {
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
+import { useQuery } from "@tanstack/react-query"
+import { useLocation } from "wouter"
 
 interface Appointment {
   id: string;
@@ -62,6 +64,27 @@ interface Prescription {
 
 export function DesktopPatientDashboard() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
+
+  // Fetch patient health status
+  const { data: patientData } = useQuery<any>({
+    queryKey: ['/api/patients/me'],
+    enabled: !!user && user.role === 'patient',
+  });
+
+  // Map health status to display text and color
+  const getHealthStatusDisplay = (status: string | undefined) => {
+    const statusMap = {
+      'excelente': { text: 'Excelente', color: 'bg-green-100 text-green-800' },
+      'bom': { text: 'Bom', color: 'bg-blue-100 text-blue-800' },
+      'regular': { text: 'Regular', color: 'bg-yellow-100 text-yellow-800' },
+      'critico': { text: 'Crítico', color: 'bg-red-100 text-red-800' },
+      'a_determinar': { text: 'A Determinar', color: 'bg-gray-100 text-gray-800' },
+    };
+    return statusMap[status as keyof typeof statusMap] || statusMap['a_determinar'];
+  };
+
+  const healthStatus = getHealthStatusDisplay(patientData?.healthStatus);
   
   // Mock data for charts
   const healthTrendData = [
@@ -183,8 +206,8 @@ export function DesktopPatientDashboard() {
           </div>
           
           <div className="text-right">
-            <Badge className="bg-green-100 text-green-800 text-lg px-3 py-1 mb-2">
-              Status de Saúde: Excelente
+            <Badge className={`${healthStatus.color} text-lg px-3 py-1 mb-2`} data-testid="badge-health-status">
+              Status de Saúde: {healthStatus.text}
             </Badge>
           </div>
         </div>
@@ -195,10 +218,11 @@ export function DesktopPatientDashboard() {
             size="lg" 
             className="h-24 flex flex-col items-center justify-center space-y-2 bg-gradient-to-br from-medical-primary to-blue-600 text-white shadow-lg"
             data-testid="button-online-consultation"
+            onClick={() => navigate('/schedule')}
           >
             <Video className="w-8 h-8" />
             <span className="font-medium">Consulta Online</span>
-            <span className="text-xs opacity-90">Conecte-se com médicos instantaneamente</span>
+            <span className="text-xs opacity-90">Agende sua consulta</span>
           </Button>
           
           <Button 
@@ -206,10 +230,11 @@ export function DesktopPatientDashboard() {
             variant="outline"
             className="h-24 flex flex-col items-center justify-center space-y-2 border-medical-secondary text-medical-secondary hover:bg-medical-secondary/10 shadow-lg"
             data-testid="button-my-schedule"
+            onClick={() => navigate('/patient-agenda')}
           >
             <Calendar className="w-8 h-8" />
             <span className="font-medium">Minha Agenda</span>
-            <span className="text-xs opacity-70">Gerencie suas consultas</span>
+            <span className="text-xs opacity-70">Anota\u00E7\u00F5es pessoais</span>
           </Button>
           
           <Button 
@@ -217,6 +242,7 @@ export function DesktopPatientDashboard() {
             variant="outline"
             className="h-24 flex flex-col items-center justify-center space-y-2 border-medical-accent text-medical-accent hover:bg-medical-accent/10 shadow-lg"
             data-testid="button-prescriptions"
+            onClick={() => navigate('/patient-prescriptions')}
           >
             <FileText className="w-8 h-8" />
             <span className="font-medium">Receitas</span>
@@ -228,10 +254,17 @@ export function DesktopPatientDashboard() {
             variant="outline"
             className="h-24 flex flex-col items-center justify-center space-y-2 border-purple-600 text-purple-600 hover:bg-purple-50 shadow-lg"
             data-testid="button-medical-chat"
+            onClick={() => {
+              if (patientData?.whatsappNumber) {
+                window.open(`https://wa.me/${patientData.whatsappNumber.replace(/\D/g, '')}`, '_blank');
+              } else {
+                window.open('https://wa.me/5511999999999', '_blank');
+              }
+            }}
           >
             <MessageCircle className="w-8 h-8" />
             <span className="font-medium">Chat Médico</span>
-            <span className="text-xs opacity-70">Converse com especialistas</span>
+            <span className="text-xs opacity-70">WhatsApp</span>
           </Button>
         </div>
 

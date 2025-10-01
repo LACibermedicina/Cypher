@@ -25,6 +25,7 @@ import Features from "@/pages/features";
 import RegisterSelect from "@/pages/register/index";
 import PatientRegister from "@/pages/register/patient";
 import DoctorRegister from "@/pages/register/doctor";
+import PatientAgenda from "@/pages/patient-agenda";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
 import CommandPalette from "@/components/command-palette";
@@ -160,6 +161,13 @@ function Router() {
         <Route path="/consultation/video/:patientId">
           <ProtectedRoute requiredRoles={['doctor', 'admin']}>
             <VideoConsultation />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/patient-agenda">
+          <ProtectedRoute requiredRoles={['patient', 'admin']}>
+            <Header />
+            <PatientAgenda />
           </ProtectedRoute>
         </Route>
         

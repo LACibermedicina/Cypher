@@ -826,6 +826,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Patients API
+  // Get current patient data for logged-in patient user
+  app.get('/api/patients/me', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      // Find patient by email or phone matching the user
+      const patients = await storage.getAllPatients();
+      const patient = patients.find(p => 
+        p.email === req.user.email || 
+        p.phone === req.user.phone ||
+        p.whatsappNumber === req.user.whatsappNumber
+      );
+      
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient profile not found' });
+      }
+      
+      res.json(patient);
+    } catch (error) {
+      console.error('Error fetching patient data:', error);
+      res.status(500).json({ message: 'Failed to get patient data' });
+    }
+  });
+
   app.get('/api/patients', async (req, res) => {
     try {
       const patients = await storage.getAllPatients();
@@ -857,6 +883,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Patient Notes API (Personal Agenda)
+  app.get('/api/patient-notes', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const patientId = req.query.patientId as string;
+      if (!patientId) {
+        return res.status(400).json({ message: 'Patient ID required' });
+      }
+
+      // Only patient or admin can view notes
+      if (req.user.role !== 'patient' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const notes = await storage.getPatientNotes(patientId, req.user.id, req.user.role);
+      res.json(notes);
+    } catch (error) {
+      console.error('Error fetching patient notes:', error);
+      res.status(500).json({ message: 'Failed to fetch notes' });
+    }
+  });
+
+  app.post('/api/patient-notes', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      // Only patient or admin can create notes
+      if (req.user.role !== 'patient' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const note = await storage.createPatientNote(req.body);
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Error creating patient note:', error);
+      res.status(500).json({ message: 'Failed to create note' });
+    }
+  });
+
+  app.patch('/api/patient-notes/:id', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const note = await storage.updatePatientNote(req.params.id, req.body);
+      if (!note) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+
+      res.json(note);
+    } catch (error) {
+      console.error('Error updating patient note:', error);
+      res.status(500).json({ message: 'Failed to update note' });
+    }
+  });
+
+  app.delete('/api/patient-notes/:id', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const success = await storage.deletePatientNote(req.params.id);
+      if (!success) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting patient note:', error);
+      res.status(500).json({ message: 'Failed to delete note' });
+    }
+  });
 
   // Appointments API
   app.get('/api/appointments/today/:doctorId', async (req, res) => {
