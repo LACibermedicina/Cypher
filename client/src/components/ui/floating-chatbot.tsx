@@ -77,96 +77,29 @@ export default function FloatingChatbot() {
     scrollToBottom();
   }, [messages]);
 
-  // Enhanced AI Chat mutation with structured clinical interview
+  // Enhanced AI Chat mutation using unified chatbot endpoint
   const chatMutation = useMutation({
     mutationFn: async (message: string): Promise<ChatbotResponse> => {
-      // If we have an active interview, continue with it
-      if (activeInterviewId) {
-        try {
-          const interviewResponse = await apiRequest('POST', `/api/clinical-interview/${activeInterviewId}/respond`, {
-            response: message
-          }) as any;
-          
-          return {
-            response: interviewResponse.nextQuestion,
-            isClinicalQuestion: true,
-            interviewId: activeInterviewId,
-            interviewStage: interviewResponse.interview?.stage,
-            urgencyLevel: interviewResponse.interview?.urgencyLevel,
-            diagnosticHypotheses: interviewResponse.interview?.diagnosticHypotheses,
-            isComplete: interviewResponse.isComplete,
-            urgentFlag: interviewResponse.urgentFlag
-          };
-        } catch (error) {
-          console.error('Interview response error:', error);
-          // Reset interview on error
-          setActiveInterviewId(null);
-        }
-      }
-      
-      // Check if user wants to start clinical interview (symptoms mentioned)
-      const clinicalKeywords = [
-        'dor', 'sintoma', 'sinto', 'febre', 'problema', 'doente', 'mal', 
-        'dói', 'preocupado', 'ajuda', 'consulta', 'médico', 'saúde'
-      ];
-      
-      const hasClinicalContent = clinicalKeywords.some(keyword => 
-        message.toLowerCase().includes(keyword)
-      );
-      
-      if (hasClinicalContent && !activeInterviewId) {
-        try {
-          console.log('🔬 Starting clinical interview for message:', message);
-          const startResponse = await apiRequest('POST', '/api/clinical-interview/start', {}) as any;
-          console.log('✅ Clinical interview started:', startResponse);
-          setActiveInterviewId(startResponse.interviewId);
-          
-          return {
-            response: startResponse.currentQuestion,
-            isClinicalQuestion: true,
-            interviewId: startResponse.interviewId,
-            interviewStage: startResponse.stage,
-            urgencyLevel: startResponse.urgencyLevel
-          };
-        } catch (error) {
-          console.error('❌ Interview start error:', error);
-          // Fall back to diagnostic analysis
-        }
-      }
-      
-      // Check for scheduling keywords
-      if (message.toLowerCase().includes('agendar') ||
-          message.toLowerCase().includes('consulta') ||
-          message.toLowerCase().includes('horário') ||
-          message.toLowerCase().includes('marcar')) {
-        
-        try {
-          const schedulingResponse = await apiRequest('POST', '/api/ai/scheduling-analysis', {
-            message,
-            availableSlots: ['09:00', '14:00', '16:00'] // Mock available slots
-          }) as any;
-          
-          return {
-            response: schedulingResponse?.response || 'Posso ajudar com o agendamento. Que horário prefere?',
-            isSchedulingRequest: true,
-            suggestedAction: schedulingResponse?.suggestedAction
-          };
-        } catch (error) {
-          // Fall back to general chat
-        }
-      }
-
-      // General WhatsApp-style AI chat
+      // Use the unified chatbot endpoint that handles all roles
       try {
-        const chatResponse = await apiRequest('POST', '/api/ai/whatsapp-analysis', {
-          message,
-          patientHistory: ''
+        const response = await apiRequest('POST', '/api/chatbot/message', {
+          message
         }) as any;
         
         return {
-          response: chatResponse?.response || 'Como posso ajudá-lo hoje?'
+          response: response.response || 'Como posso ajudá-lo hoje?',
+          isSchedulingRequest: response.type === 'appointment',
+          isClinicalQuestion: response.type === 'clinical',
+          suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
+          diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
+          interviewId: response.metadata?.interviewId,
+          interviewStage: response.metadata?.interviewStage,
+          urgencyLevel: response.metadata?.urgencyLevel,
+          isComplete: response.metadata?.isComplete,
+          urgentFlag: response.metadata?.urgentFlag
         };
       } catch (error) {
+        console.error('❌ Chatbot error:', error);
         throw new Error('Erro ao processar mensagem');
       }
     },

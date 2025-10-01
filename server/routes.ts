@@ -7666,6 +7666,8 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       const userRole = req.user?.role || 'visitor';
       const userId = req.user?.id;
 
+      console.log(`💬 [Chatbot] Message from ${userRole} (${userId || 'no-user'}): "${message}"`);
+
       // Get rescheduling margin from system settings
       const reschedulingMargin = await storage.getSystemSetting('rescheduling_margin_hours');
       const marginHours = reschedulingMargin ? parseInt(reschedulingMargin.settingValue) : 24;
@@ -7797,6 +7799,8 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       } else {
         response = `Olá! Sou o assistente virtual da Telemed. Como posso ajudar você hoje?`;
       }
+
+      console.log(`💬 [Chatbot] Response type="${type}", role="${userRole}", responseLength=${response.length}`);
 
       res.json({
         response,
