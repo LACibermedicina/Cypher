@@ -1,527 +1,540 @@
-import { useState, useEffect, useRef } from "react";
-import { useRoute } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState, useEffect, useRef } from 'react';
+import { useLocation, useRoute } from 'wouter';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import AgoraRTC, {
+  IAgoraRTCClient,
+  IAgoraRTCRemoteUser,
+  ICameraVideoTrack,
+  IMicrophoneAudioTrack,
+} from 'agora-rtc-sdk-ng';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import {
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Maximize,
+  Minimize,
+  MessageSquare,
+  Brain,
+  FileText,
+  CircleDot,
+  Play,
+  Pause,
+  Send,
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-interface ConsultationNote {
+type ConsultationNote = {
+  id: string;
+  consultationId: string;
+  userId: string;
+  type: 'chat' | 'ai_query' | 'ai_response' | 'doctor_note' | 'annotation';
+  content: string;
+  metadata?: any;
   timestamp: string;
-  note: string;
-  type: 'observation' | 'prescription' | 'lab_request' | 'soap';
-}
+};
 
 export default function VideoConsultation() {
-  const [, params] = useRoute("/consultation/video/:patientId");
-  const patientId = params?.patientId;
+  const [, params] = useRoute('/consultation/video/:patientId');
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const consultationId = params?.patientId || '';
 
-  // State management
+  // Agora states
+  const [client, setClient] = useState<IAgoraRTCClient | null>(null);
+  const [localVideoTrack, setLocalVideoTrack] = useState<ICameraVideoTrack | null>(null);
+  const [localAudioTrack, setLocalAudioTrack] = useState<IMicrophoneAudioTrack | null>(null);
+  const [remoteUsers, setRemoteUsers] = useState<IAgoraRTCRemoteUser[]>([]);
+  const [joined, setJoined] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
+
+  // UI states
+  const [isFullscreen, setIsFullscreen] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
-  const [currentNote, setCurrentNote] = useState("");
-  const [consultationNotes, setConsultationNotes] = useState<ConsultationNote[]>([]);
-  const [audioTranscript, setAudioTranscript] = useState("");
-  const [soapNotes, setSoapNotes] = useState({
-    subjective: "",
-    objective: "",
-    assessment: "",
-    plan: ""
+  const [recordingStartTime, setRecordingStartTime] = useState<Date | null>(null);
+  const [chatMessage, setChatMessage] = useState('');
+  const [aiQuery, setAiQuery] = useState('');
+  const [doctorNote, setDoctorNote] = useState('');
+  const [activeTab, setActiveTab] = useState('chat');
+
+  const localVideoRef = useRef<HTMLDivElement>(null);
+  const remoteVideoRef = useRef<HTMLDivElement>(null);
+
+  // Fetch consultation details
+  const { data: consultation } = useQuery({
+    queryKey: ['/api/video-consultations', consultationId],
+    enabled: !!consultationId,
   });
 
-  // Refs for video elements
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-
-  // Get patient data
-  const { data: patient, isLoading: patientLoading } = useQuery({
-    queryKey: ['/api/patients', patientId],
-    enabled: !!patientId,
+  // Fetch consultation notes
+  const { data: notes = [] } = useQuery<ConsultationNote[]>({
+    queryKey: ['/api/video-consultations', consultationId, 'notes'],
+    enabled: !!consultationId,
   });
 
-  // Get patient medical history
-  const { data: medicalHistory = [] } = useQuery({
-    queryKey: ['/api/patients', patientId, 'medical-history'],
-    enabled: !!patientId,
+  // Generate Agora token
+  const { data: agoraConfig, isLoading: tokenLoading } = useQuery<{
+    token: string;
+    appId: string;
+    channelName: string;
+    uid: number;
+  }>({
+    queryKey: ['agora-token', consultationId],
+    enabled: !!consultationId,
   });
 
-  // Initialize video call
+  // Create consultation note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async (data: { type: string; content: string; metadata?: any }) => {
+      return apiRequest('/api/video-consultations/' + consultationId + '/notes', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId, 'notes'] });
+    },
+  });
+
+  // Start consultation mutation
+  const startConsultationMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('/api/video-consultations/' + consultationId + '/start', {
+        method: 'POST',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId] });
+    },
+  });
+
+  // End consultation mutation
+  const endConsultationMutation = useMutation({
+    mutationFn: async (data: { duration: number; meetingNotes: string }) => {
+      return apiRequest('/api/video-consultations/' + consultationId + '/end', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/video-consultations', consultationId] });
+      toast({
+        title: 'Consulta Finalizada',
+        description: 'Todas as notas e gravações foram salvas com sucesso.',
+      });
+      setLocation('/dashboard');
+    },
+  });
+
+  // Initialize Agora client
   useEffect(() => {
-    initializeVideoCall();
-    return () => {
-      // Cleanup
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
+    const agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+    setClient(agoraClient);
+
+    agoraClient.on('user-published', async (user, mediaType) => {
+      await agoraClient.subscribe(user, mediaType);
+      
+      if (mediaType === 'video') {
+        setRemoteUsers((prev) => {
+          const exists = prev.find((u) => u.uid === user.uid);
+          if (exists) return prev;
+          return [...prev, user];
+        });
       }
+
+      if (mediaType === 'audio') {
+        user.audioTrack?.play();
+      }
+    });
+
+    agoraClient.on('user-unpublished', (user) => {
+      setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+    });
+
+    return () => {
+      agoraClient.removeAllListeners();
+      leaveChannel();
     };
   }, []);
 
-  const initializeVideoCall = async () => {
+  // Join channel when token is available
+  useEffect(() => {
+    if (agoraConfig && client && !joined) {
+      joinChannel();
+    }
+  }, [agoraConfig, client, joined]);
+
+  // Play remote video
+  useEffect(() => {
+    if (remoteUsers.length > 0 && remoteVideoRef.current) {
+      const remoteUser = remoteUsers[0];
+      remoteUser.videoTrack?.play(remoteVideoRef.current);
+    }
+  }, [remoteUsers]);
+
+  const joinChannel = async () => {
+    if (!client || !agoraConfig || joined) return;
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
-      
+      await client.join(
+        agoraConfig.appId,
+        agoraConfig.channelName,
+        agoraConfig.token,
+        agoraConfig.uid
+      );
+
+      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      const videoTrack = await AgoraRTC.createCameraVideoTrack();
+
+      setLocalAudioTrack(audioTrack);
+      setLocalVideoTrack(videoTrack);
+
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+        videoTrack.play(localVideoRef.current);
       }
 
-      // TODO: Implement real WebRTC peer-to-peer connection
-      // This implementation only shows local video but doesn't establish
-      // a real connection with the remote patient. For production, this needs:
-      // 1. RTCPeerConnection setup
-      // 2. ICE candidate handling
-      // 3. SDP offer/answer exchange via WebSocket signaling
-      // 4. Connection to existing consultation rooms in server/routes.ts
+      await client.publish([audioTrack, videoTrack]);
+      setJoined(true);
 
-      // Initialize speech recognition for transcription
-      if ('webkitSpeechRecognition' in window) {
-        const recognition = new (window as any).webkitSpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'pt-BR';
-        
-        recognition.onresult = (event: any) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          setAudioTranscript(prev => prev + ' ' + transcript);
-        };
+      // Start consultation
+      startConsultationMutation.mutate();
 
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-        };
-
-        // Start transcription when recording starts
-        if (isRecording) {
-          recognition.start();
-        }
-      }
-      
-    } catch (error) {
       toast({
-        title: "Erro na Videochamada",
-        description: "Não foi possível acessar câmera/microfone. Verifique as permissões.",
-        variant: "destructive",
+        title: 'Conectado',
+        description: 'Você entrou na vídeo consulta com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error joining channel:', error);
+      toast({
+        title: 'Erro ao conectar',
+        description: 'Não foi possível entrar na vídeo consulta.',
+        variant: 'destructive',
       });
     }
   };
 
-  const toggleVideo = () => {
-    setIsVideoOn(!isVideoOn);
-    if (localVideoRef.current?.srcObject) {
-      const tracks = (localVideoRef.current.srcObject as MediaStream).getVideoTracks();
-      tracks.forEach(track => track.enabled = !isVideoOn);
+  const leaveChannel = async () => {
+    if (!client) return;
+
+    localAudioTrack?.close();
+    localVideoTrack?.close();
+    await client.leave();
+    setJoined(false);
+    setLocalAudioTrack(null);
+    setLocalVideoTrack(null);
+    setRemoteUsers([]);
+  };
+
+  const toggleVideo = async () => {
+    if (localVideoTrack) {
+      await localVideoTrack.setEnabled(!isVideoOn);
+      setIsVideoOn(!isVideoOn);
     }
   };
 
-  const toggleAudio = () => {
-    setIsAudioOn(!isAudioOn);
-    if (localVideoRef.current?.srcObject) {
-      const tracks = (localVideoRef.current.srcObject as MediaStream).getAudioTracks();
-      tracks.forEach(track => track.enabled = !isAudioOn);
+  const toggleAudio = async () => {
+    if (localAudioTrack) {
+      await localAudioTrack.setEnabled(!isAudioOn);
+      setIsAudioOn(!isAudioOn);
     }
   };
 
-  const toggleRecording = async () => {
+  const toggleRecording = () => {
     if (!isRecording) {
-      // Start recording
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const recorder = new MediaRecorder(stream);
-        
-        recorder.ondataavailable = (event) => {
-          // TODO: Send audio chunks to server for transcription
-          console.log('Audio chunk available:', event.data.size);
-        };
-        
-        recorder.onstop = () => {
-          console.log('Recording stopped');
-          stream.getTracks().forEach(track => track.stop());
-        };
-        
-        recorder.start(1000); // Capture 1-second chunks
-        mediaRecorderRef.current = recorder;
-        
-        // Start speech recognition
-        if ('webkitSpeechRecognition' in window) {
-          const recognition = new (window as any).webkitSpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = 'pt-BR';
-          
-          recognition.onresult = (event: any) => {
-            let transcript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              if (event.results[i].isFinal) {
-                transcript += event.results[i][0].transcript + ' ';
-              }
-            }
-            if (transcript) {
-              setAudioTranscript(prev => prev + transcript);
-            }
-          };
-          
-          recognition.start();
-        }
-        
-        setIsRecording(true);
-        toast({
-          title: "Gravação Iniciada",
-          description: "Áudio sendo transcrito automaticamente",
-        });
-      } catch (error) {
-        toast({
-          title: "Erro na Gravação",
-          description: "Não foi possível iniciar a gravação de áudio",
-          variant: "destructive",
-        });
-      }
+      setIsRecording(true);
+      setRecordingStartTime(new Date());
+      toast({
+        title: 'Gravação Iniciada',
+        description: 'A consulta está sendo gravada.',
+      });
     } else {
-      // Stop recording
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-      
       setIsRecording(false);
+      setRecordingStartTime(null);
       toast({
-        title: "Gravação Parada",
-        description: "Áudio não está mais sendo transcrito",
+        title: 'Gravação Pausada',
+        description: 'A gravação foi pausada.',
       });
     }
   };
 
-  const addNote = (type: ConsultationNote['type']) => {
-    if (!currentNote.trim()) return;
+  const sendChatMessage = () => {
+    if (!chatMessage.trim()) return;
+
+    createNoteMutation.mutate({
+      type: 'chat',
+      content: chatMessage,
+    });
+    setChatMessage('');
+  };
+
+  const sendAiQuery = async () => {
+    if (!aiQuery.trim()) return;
+
+    createNoteMutation.mutate({
+      type: 'ai_query',
+      content: aiQuery,
+    });
+
+    setAiQuery('');
     
-    const note: ConsultationNote = {
-      timestamp: new Date().toLocaleTimeString('pt-BR'),
-      note: currentNote,
-      type
-    };
+    toast({
+      title: 'Consulta IA Enviada',
+      description: 'A IA está processando sua solicitação.',
+    });
+  };
+
+  const saveDoctorNote = () => {
+    if (!doctorNote.trim()) return;
+
+    createNoteMutation.mutate({
+      type: 'doctor_note',
+      content: doctorNote,
+    });
+    setDoctorNote('');
     
-    setConsultationNotes(prev => [...prev, note]);
-    setCurrentNote("");
+    toast({
+      title: 'Anotação Salva',
+      description: 'Sua anotação foi salva com sucesso.',
+    });
   };
 
-  const generateAIAnalysis = async () => {
-    try {
-      const analysisData = {
-        transcript: audioTranscript,
-        notes: consultationNotes,
-        patientHistory: medicalHistory,
-        patientInfo: patient
-      };
+  const endCall = async () => {
+    const duration = (consultation as any)?.startedAt
+      ? Math.floor((Date.now() - new Date((consultation as any).startedAt).getTime()) / 1000)
+      : 0;
 
-      const response = await apiRequest('POST', '/api/ai/clinical-analysis', analysisData);
-      const analysis = await response.json();
-      
-      // Update SOAP notes with AI analysis
-      setSoapNotes({
-        subjective: analysis.subjective || "",
-        objective: analysis.objective || "",
-        assessment: analysis.assessment || "",
-        plan: analysis.plan || ""
-      });
+    const allNotes = notes
+      .filter((n) => n.type === 'doctor_note')
+      .map((n) => n.content)
+      .join('\n\n');
 
-      toast({
-        title: "Análise IA Concluída",
-        description: "Relatório clínico gerado com base na consulta",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro na Análise IA",
-        description: "Não foi possível gerar a análise automática",
-        variant: "destructive",
-      });
-    }
+    await leaveChannel();
+    endConsultationMutation.mutate({ duration, meetingNotes: allNotes });
   };
 
-  const endConsultation = async () => {
-    try {
-      // Save consultation data
-      const consultationData = {
-        patientId,
-        notes: consultationNotes,
-        audioTranscript,
-        soapNotes,
-        duration: Date.now(), // Calculate actual duration
-        timestamp: new Date().toISOString()
-      };
+  const chatNotes = notes.filter((n) => n.type === 'chat');
+  const aiNotes = notes.filter((n) => n.type === 'ai_query' || n.type === 'ai_response');
+  const doctorNotes = notes.filter((n) => n.type === 'doctor_note');
 
-      await apiRequest('POST', '/api/consultations', consultationData);
-      
-      toast({
-        title: "Consulta Finalizada",
-        description: "Dados salvos no prontuário do paciente",
-      });
-
-      // Redirect back to dashboard
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 2000);
-      
-    } catch (error) {
-      toast({
-        title: "Erro ao Finalizar",
-        description: "Não foi possível salvar os dados da consulta",
-        variant: "destructive",
-      });
-    }
-  };
-
-  if (patientLoading) {
+  if (tokenLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-screen bg-background">
+        <p className="text-lg text-muted-foreground">Carregando consulta...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" data-testid="video-consultation-page">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Teleconsulta</h1>
-          <p className="text-muted-foreground">
-            Paciente: {patient?.name} • Iniciada às {new Date().toLocaleTimeString('pt-BR')}
-          </p>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'container mx-auto p-4'} bg-black flex flex-col`} data-testid="video-consultation-page">
+      {/* Video Area - 70% minimum */}
+      <div className="flex-1 relative" style={{ minHeight: '70vh' }}>
+        {/* Remote Video (Doctor/Patient) */}
+        <div
+          ref={remoteVideoRef}
+          className="absolute inset-0 bg-gray-900"
+          data-testid="video-remote"
+        >
+          {remoteUsers.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center text-white">
+              <div className="text-center">
+                <Video className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">Aguardando participante...</p>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant={isRecording ? "destructive" : "secondary"}>
-            {isRecording ? "🔴 Gravando" : "⏹️ Parado"}
-          </Badge>
-          <Button 
-            variant="destructive"
-            onClick={endConsultation}
-            data-testid="button-end-consultation"
+
+        {/* Local Video (Picture-in-Picture) */}
+        <div className="absolute bottom-4 right-4 w-64 h-48 bg-gray-800 rounded-lg overflow-hidden border-2 border-white shadow-lg">
+          <div
+            ref={localVideoRef}
+            className="w-full h-full"
+            data-testid="video-local"
+          />
+          {!isVideoOn && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <VideoOff className="h-12 w-12 text-white opacity-50" />
+            </div>
+          )}
+        </div>
+
+        {/* Recording Indicator */}
+        {isRecording && (
+          <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full" data-testid="status-recording">
+            <CircleDot className="h-4 w-4 animate-pulse" />
+            <span className="font-semibold">Gravando</span>
+          </div>
+        )}
+
+        {/* Control Bar */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-3 bg-gray-900/90 px-6 py-3 rounded-full">
+          <Button
+            variant={isVideoOn ? 'default' : 'destructive'}
+            size="icon"
+            onClick={toggleVideo}
+            className="rounded-full"
+            data-testid="button-toggle-video"
           >
-            Finalizar Consulta
+            {isVideoOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+          </Button>
+
+          <Button
+            variant={isAudioOn ? 'default' : 'destructive'}
+            size="icon"
+            onClick={toggleAudio}
+            className="rounded-full"
+            data-testid="button-toggle-audio"
+          >
+            {isAudioOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+          </Button>
+
+          <Button
+            variant={isRecording ? 'destructive' : 'secondary'}
+            size="icon"
+            onClick={toggleRecording}
+            className="rounded-full"
+            data-testid="button-toggle-recording"
+          >
+            {isRecording ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="rounded-full"
+            data-testid="button-toggle-fullscreen"
+          >
+            {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+          </Button>
+
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={endCall}
+            className="rounded-full ml-2"
+            data-testid="button-end-call"
+          >
+            <PhoneOff className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Video Section */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Main Video Area */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Remote Patient Video */}
-                <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                  <video 
-                    ref={remoteVideoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                  />
-                  <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                    {patient?.name || 'Paciente'}
-                  </div>
-                </div>
+      {/* Side Panel - Chat, AI, Notes */}
+      <div className="w-full bg-background border-t" style={{ height: '30vh' }}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="chat" className="flex items-center gap-2" data-testid="tab-chat">
+              <MessageSquare className="h-4 w-4" />
+              Chat
+            </TabsTrigger>
+            <TabsTrigger value="ai" className="flex items-center gap-2" data-testid="tab-ai">
+              <Brain className="h-4 w-4" />
+              IA Diagnóstica
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="flex items-center gap-2" data-testid="tab-notes">
+              <FileText className="h-4 w-4" />
+              Anotações
+            </TabsTrigger>
+          </TabsList>
 
-                {/* Local Doctor Video */}
-                <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                  <video 
-                    ref={localVideoRef}
-                    className="w-full h-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
-                  <div className="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
-                    Você (Médico)
-                  </div>
-                </div>
-              </div>
-
-              {/* Video Controls */}
-              <div className="flex items-center justify-center space-x-4 mt-4">
-                <Button
-                  variant={isVideoOn ? "default" : "secondary"}
-                  size="sm"
-                  onClick={toggleVideo}
-                  data-testid="button-toggle-video"
-                >
-                  <i className={`fas ${isVideoOn ? 'fa-video' : 'fa-video-slash'} mr-2`}></i>
-                  {isVideoOn ? 'Desligar Câmera' : 'Ligar Câmera'}
-                </Button>
-                <Button
-                  variant={isAudioOn ? "default" : "secondary"}
-                  size="sm"
-                  onClick={toggleAudio}
-                  data-testid="button-toggle-audio"
-                >
-                  <i className={`fas ${isAudioOn ? 'fa-microphone' : 'fa-microphone-slash'} mr-2`}></i>
-                  {isAudioOn ? 'Mutar' : 'Desmutar'}
-                </Button>
-                <Button
-                  variant={isRecording ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={toggleRecording}
-                  data-testid="button-toggle-recording"
-                >
-                  <i className="fas fa-circle mr-2"></i>
-                  {isRecording ? 'Parar Gravação' : 'Iniciar Gravação'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Audio Transcript */}
-          {audioTranscript && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Transcrição da Conversa</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted p-4 rounded-lg max-h-32 overflow-y-auto">
-                  <p className="text-sm">{audioTranscript}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Medical Dashboard */}
-        <div className="space-y-4">
-          {/* Patient Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informações do Paciente</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Nome:</span>
-                <span className="text-sm font-medium">{patient?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Idade:</span>
-                <span className="text-sm font-medium">{patient?.age || 'N/A'} anos</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Telefone:</span>
-                <span className="text-sm font-medium">{patient?.phone || 'N/A'}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Medical Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Anotações da Consulta</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                placeholder="Digite suas observações..."
-                value={currentNote}
-                onChange={(e) => setCurrentNote(e.target.value)}
-                data-testid="textarea-consultation-notes"
-              />
-              
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" onClick={() => addNote('observation')} data-testid="button-add-observation">
-                  Observação
-                </Button>
-                <Button size="sm" onClick={() => addNote('prescription')} data-testid="button-add-prescription">
-                  Prescrição
-                </Button>
-                <Button size="sm" onClick={() => addNote('lab_request')} data-testid="button-add-lab">
-                  Exame
-                </Button>
-                <Button size="sm" onClick={() => addNote('soap')} data-testid="button-add-soap">
-                  SOAP
-                </Button>
-              </div>
-
-              {/* Notes List */}
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {consultationNotes.map((note, index) => (
-                  <div key={index} className="bg-muted p-2 rounded text-sm">
-                    <div className="flex items-center justify-between mb-1">
-                      <Badge variant="outline" className="text-xs">{note.type}</Badge>
-                      <span className="text-xs text-muted-foreground">{note.timestamp}</span>
-                    </div>
-                    <p>{note.note}</p>
-                  </div>
+          <TabsContent value="chat" className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="flex-1 p-4" data-testid="scroll-chat">
+              <div className="space-y-3">
+                {chatNotes.map((note) => (
+                  <Card key={note.id} className="p-3" data-testid={`message-chat-${note.id}`}>
+                    <p className="text-sm">{note.content}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(note.timestamp).toLocaleTimeString()}
+                    </p>
+                  </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-
-          {/* AI Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Análise IA</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                className="w-full mb-4" 
-                onClick={generateAIAnalysis}
-                data-testid="button-generate-ai-analysis"
-              >
-                <i className="fas fa-brain mr-2"></i>
-                Gerar Relatório IA
+            </ScrollArea>
+            <div className="p-4 border-t flex gap-2">
+              <Input
+                placeholder="Digite sua mensagem..."
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                data-testid="input-chat-message"
+              />
+              <Button onClick={sendChatMessage} size="icon" data-testid="button-send-chat">
+                <Send className="h-4 w-4" />
               </Button>
+            </div>
+          </TabsContent>
 
-              {/* SOAP Notes */}
-              <Tabs defaultValue="subjective" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="subjective" className="text-xs">S</TabsTrigger>
-                  <TabsTrigger value="objective" className="text-xs">O</TabsTrigger>
-                  <TabsTrigger value="assessment" className="text-xs">A</TabsTrigger>
-                  <TabsTrigger value="plan" className="text-xs">P</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="subjective">
-                  <Textarea
-                    placeholder="Subjetivo (sintomas relatados)"
-                    value={soapNotes.subjective}
-                    onChange={(e) => setSoapNotes(prev => ({...prev, subjective: e.target.value}))}
-                    className="min-h-20 text-sm"
-                  />
-                </TabsContent>
-                
-                <TabsContent value="objective">
-                  <Textarea
-                    placeholder="Objetivo (exame físico)"
-                    value={soapNotes.objective}
-                    onChange={(e) => setSoapNotes(prev => ({...prev, objective: e.target.value}))}
-                    className="min-h-20 text-sm"
-                  />
-                </TabsContent>
-                
-                <TabsContent value="assessment">
-                  <Textarea
-                    placeholder="Avaliação (diagnóstico)"
-                    value={soapNotes.assessment}
-                    onChange={(e) => setSoapNotes(prev => ({...prev, assessment: e.target.value}))}
-                    className="min-h-20 text-sm"
-                  />
-                </TabsContent>
-                
-                <TabsContent value="plan">
-                  <Textarea
-                    placeholder="Plano (tratamento)"
-                    value={soapNotes.plan}
-                    onChange={(e) => setSoapNotes(prev => ({...prev, plan: e.target.value}))}
-                    className="min-h-20 text-sm"
-                  />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="ai" className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="flex-1 p-4" data-testid="scroll-ai">
+              <div className="space-y-3">
+                {aiNotes.map((note) => (
+                  <Card
+                    key={note.id}
+                    className={`p-3 ${note.type === 'ai_query' ? 'bg-blue-50 dark:bg-blue-950' : 'bg-green-50 dark:bg-green-950'}`}
+                    data-testid={`message-ai-${note.id}`}
+                  >
+                    <p className="text-sm font-semibold">
+                      {note.type === 'ai_query' ? '🤔 Pergunta:' : '🤖 IA:'}
+                    </p>
+                    <p className="text-sm mt-1">{note.content}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(note.timestamp).toLocaleTimeString()}
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+            <div className="p-4 border-t flex gap-2">
+              <Textarea
+                placeholder="Faça uma pergunta para a IA diagnóstica..."
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                rows={2}
+                data-testid="input-ai-query"
+              />
+              <Button onClick={sendAiQuery} size="icon" data-testid="button-send-ai">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notes" className="flex-1 flex flex-col overflow-hidden">
+            <ScrollArea className="flex-1 p-4" data-testid="scroll-notes">
+              <div className="space-y-3">
+                {doctorNotes.map((note) => (
+                  <Card key={note.id} className="p-3" data-testid={`note-doctor-${note.id}`}>
+                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {new Date(note.timestamp).toLocaleTimeString()}
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+            <div className="p-4 border-t flex gap-2">
+              <Textarea
+                placeholder="Escreva suas anotações médicas..."
+                value={doctorNote}
+                onChange={(e) => setDoctorNote(e.target.value)}
+                rows={2}
+                data-testid="input-doctor-note"
+              />
+              <Button onClick={saveDoctorNote} size="icon" data-testid="button-save-note">
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

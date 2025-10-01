@@ -9,10 +9,11 @@ import { whisperService } from "./services/whisper";
 import { cryptoService } from "./services/crypto";
 import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { eq, desc, sql, and } from "drizzle-orm";
+import { generateAgoraToken, getAgoraAppId } from "./agora";
 
 // TMC Credit System Validation Schemas
 const tmcTransferSchema = z.object({
@@ -1859,6 +1860,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Get transcription status error:', error);
       res.status(500).json({ message: 'Failed to get transcription status' });
+    }
+  });
+
+  // Generate Agora token for video consultation
+  app.post('/api/video-consultations/agora-token', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { channelName, role } = req.body;
+
+      if (!channelName || !role) {
+        return res.status(400).json({ message: 'Channel name and role are required' });
+      }
+
+      // Use user ID as UID for Agora (convert to number using hash)
+      const uid = Math.abs(req.user.id.split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0));
+
+      const token = generateAgoraToken({
+        channelName,
+        uid,
+        role: role as 'publisher' | 'subscriber',
+        expirationTimeInSeconds: 3600 // 1 hour
+      });
+
+      res.json({
+        token,
+        appId: getAgoraAppId(),
+        channelName,
+        uid
+      });
+    } catch (error) {
+      console.error('Generate Agora token error:', error);
+      res.status(500).json({ message: 'Failed to generate token' });
+    }
+  });
+
+  // Get consultation notes
+  app.get('/api/video-consultations/:id/notes', async (req, res) => {
+    try {
+      const notes = await storage.getConsultationNotes(req.params.id);
+      res.json(notes);
+    } catch (error) {
+      console.error('Get consultation notes error:', error);
+      res.status(500).json({ message: 'Failed to get consultation notes' });
+    }
+  });
+
+  // Create consultation note (chat, AI query, doctor note)
+  app.post('/api/video-consultations/:id/notes', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { type, content, metadata } = req.body;
+      const validatedData = insertConsultationNoteSchema.parse({
+        consultationId: req.params.id,
+        userId: req.user.id,
+        type,
+        content,
+        metadata
+      });
+
+      const note = await storage.createConsultationNote(validatedData);
+      
+      // Broadcast note to participants
+      const consultation = await storage.getVideoConsultation(req.params.id);
+      if (consultation) {
+        broadcastToDoctor(consultation.doctorId, {
+          type: 'consultation_note_added',
+          data: note
+        });
+      }
+
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Create consultation note error:', error);
+      res.status(400).json({ message: 'Failed to create consultation note', error });
+    }
+  });
+
+  // Get consultation recordings
+  app.get('/api/video-consultations/:id/recordings', async (req, res) => {
+    try {
+      const recordings = await storage.getConsultationRecordings(req.params.id);
+      res.json(recordings);
+    } catch (error) {
+      console.error('Get consultation recordings error:', error);
+      res.status(500).json({ message: 'Failed to get consultation recordings' });
+    }
+  });
+
+  // Create consultation recording
+  app.post('/api/video-consultations/:id/recordings', async (req, res) => {
+    try {
+      const { segmentUrl, startTime, endTime, duration, segmentType, fileSize } = req.body;
+      const validatedData = insertConsultationRecordingSchema.parse({
+        consultationId: req.params.id,
+        segmentUrl,
+        startTime: new Date(startTime),
+        endTime: endTime ? new Date(endTime) : undefined,
+        duration,
+        segmentType,
+        fileSize
+      });
+
+      const recording = await storage.createConsultationRecording(validatedData);
+      res.status(201).json(recording);
+    } catch (error) {
+      console.error('Create consultation recording error:', error);
+      res.status(400).json({ message: 'Failed to create consultation recording', error });
     }
   });
 

@@ -3,6 +3,7 @@ import {
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
   tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences, patientNotes,
+  consultationNotes, consultationRecordings,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -12,7 +13,8 @@ import {
   type HospitalReferral, type InsertHospitalReferral, type CollaboratorIntegration, type InsertCollaboratorIntegration,
   type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig,
   type SystemSettings, type InsertSystemSettings, type ChatbotReference, type InsertChatbotReference,
-  type PatientNote, type InsertPatientNote
+  type PatientNote, type InsertPatientNote, type ConsultationNote, type InsertConsultationNote,
+  type ConsultationRecording, type InsertConsultationRecording
 } from "@shared/schema";
 
 // Import TMC types from schema
@@ -183,6 +185,12 @@ export interface IStorage {
   createPatientNote(note: InsertPatientNote): Promise<PatientNote>;
   updatePatientNote(id: string, note: Partial<InsertPatientNote>): Promise<PatientNote | undefined>;
   deletePatientNote(id: string): Promise<boolean>;
+
+  // Consultation Notes & Recordings
+  getConsultationNotes(consultationId: string): Promise<ConsultationNote[]>;
+  createConsultationNote(note: InsertConsultationNote): Promise<ConsultationNote>;
+  getConsultationRecordings(consultationId: string): Promise<ConsultationRecording[]>;
+  createConsultationRecording(recording: InsertConsultationRecording): Promise<ConsultationRecording>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1572,6 +1580,29 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(patientNotes)
       .where(eq(patientNotes.id, id));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Consultation Notes & Recordings Implementation
+  async getConsultationNotes(consultationId: string): Promise<ConsultationNote[]> {
+    return await db.select().from(consultationNotes)
+      .where(eq(consultationNotes.consultationId, consultationId))
+      .orderBy(consultationNotes.timestamp);
+  }
+
+  async createConsultationNote(insertNote: InsertConsultationNote): Promise<ConsultationNote> {
+    const [note] = await db.insert(consultationNotes).values(insertNote).returning();
+    return note;
+  }
+
+  async getConsultationRecordings(consultationId: string): Promise<ConsultationRecording[]> {
+    return await db.select().from(consultationRecordings)
+      .where(eq(consultationRecordings.consultationId, consultationId))
+      .orderBy(consultationRecordings.startTime);
+  }
+
+  async createConsultationRecording(insertRecording: InsertConsultationRecording): Promise<ConsultationRecording> {
+    const [recording] = await db.insert(consultationRecordings).values(insertRecording).returning();
+    return recording;
   }
 }
 
