@@ -1822,6 +1822,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Video consultation not found' });
       }
 
+      // Calculate and charge credits for consultation duration
+      if (duration && duration > 0 && consultation.patientId) {
+        try {
+          const config = await tmcCreditsService.getCreditConfig();
+          const durationMinutes = Math.ceil(duration / 60); // Convert seconds to minutes, round up
+          const totalCredits = durationMinutes * config.CREDIT_PER_MINUTE;
+          
+          // Get patient's user ID
+          const patient = await storage.getPatient(consultation.patientId);
+          
+          if (patient?.userId) {
+            const user = await db.select().from(users).where(eq(users.id, patient.userId)).limit(1);
+            
+            // Charge credits if user is not admin
+            if (user[0] && user[0].role !== 'admin') {
+              try {
+                // Debit from patient
+                await tmcCreditsService.debitCredits(
+                  patient.userId,
+                  totalCredits,
+                  'video_consultation',
+                  {
+                    functionUsed: 'video_consultation',
+                    consultationId: consultation.id,
+                    durationMinutes,
+                    durationSeconds: duration
+                  }
+                );
+                
+                // Apply commission to doctor
+                if (consultation.doctorId) {
+                  const commissionAmount = Math.floor((totalCredits * config.DOCTOR_COMMISSION_PERCENT) / 100);
+                  if (commissionAmount > 0) {
+                    await tmcCreditsService.creditUser(
+                      consultation.doctorId,
+                      commissionAmount,
+                      'consultation_commission',
+                      {
+                        functionUsed: 'video_consultation_commission',
+                        consultationId: consultation.id,
+                        originalAmount: totalCredits,
+                        commissionPercent: config.DOCTOR_COMMISSION_PERCENT
+                      }
+                    );
+                  }
+                }
+                
+                console.log(`✅ Charged ${totalCredits} credits for ${durationMinutes} minutes consultation`);
+              } catch (creditError: any) {
+                console.error('Credit charging error:', creditError);
+                // Don't fail the consultation end if credits fail
+                if (creditError.message === 'Insufficient credits') {
+                  console.warn('Patient has insufficient credits, consultation ended without charge');
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error processing consultation credits:', error);
+          // Don't fail consultation end if credit processing fails
+        }
+      }
+
       broadcastToDoctor(consultation.doctorId || actualDoctorId || DEFAULT_DOCTOR_ID, { type: 'consultation_ended', data: consultation });
       
       res.json(consultation);
@@ -1981,6 +2044,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const note = await storage.createConsultationNote(validatedData);
+      
+      // Charge credits for AI diagnostic queries
+      if (type === 'ai_query' && req.user.role !== 'admin') {
+        try {
+          const config = await tmcCreditsService.getCreditConfig();
+          const consultation = await storage.getVideoConsultation(req.params.id);
+          
+          if (consultation?.patientId) {
+            const patient = await storage.getPatient(consultation.patientId);
+            
+            if (patient?.userId) {
+              try {
+                await tmcCreditsService.debitCredits(
+                  patient.userId,
+                  config.CREDIT_PER_AI_RESPONSE,
+                  'ai_diagnostic_query',
+                  {
+                    functionUsed: 'ai_diagnostic',
+                    consultationId: consultation.id,
+                    noteId: note.id,
+                    query: content
+                  }
+                );
+                console.log(`✅ Charged ${config.CREDIT_PER_AI_RESPONSE} credits for AI diagnostic query`);
+              } catch (creditError: any) {
+                console.error('Credit charging error for AI query:', creditError);
+                // Don't fail the query if credits fail, but log it
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error processing AI query credits:', error);
+        }
+      }
       
       // Broadcast note to participants
       const consultation = await storage.getVideoConsultation(req.params.id);
