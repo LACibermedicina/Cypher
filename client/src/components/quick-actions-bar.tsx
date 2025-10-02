@@ -167,7 +167,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50" data-testid="quick-actions-bar">
-      <div className={`bg-card/80 dark:bg-card/70 backdrop-blur-lg border border-border/50 rounded-xl shadow-xl transition-all duration-300 ${
+      <div className={`transition-all duration-300 ${
         isExpanded ? 'p-3' : 'p-0'
       }`}>
         {/* Expand/Collapse Button */}
@@ -176,7 +176,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`h-10 w-10 rounded-xl hover:bg-primary/10 transition-all ${isExpanded ? 'mb-2' : ''}`}
+            className={`h-10 w-10 rounded-full hover:bg-primary/20 transition-all ${isExpanded ? 'mb-2' : ''}`}
             data-testid="button-toggle-quick-actions"
             title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
