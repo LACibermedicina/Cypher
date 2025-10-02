@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, X, Send, Brain, Calendar, Stethoscope, Minimize2, Maximize2 } from 'lucide-react';
 
 interface ChatMessage {
@@ -53,6 +54,7 @@ interface ChatbotResponse {
 export default function FloatingChatbot() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -80,24 +82,34 @@ export default function FloatingChatbot() {
   // Enhanced AI Chat mutation using unified chatbot endpoint
   const chatMutation = useMutation({
     mutationFn: async (message: string): Promise<ChatbotResponse> => {
-      // Use the unified chatbot endpoint that handles all roles
       try {
-        const response = await apiRequest('POST', '/api/chatbot/message', {
+        // Use different endpoints based on authentication status
+        const endpoint = user ? '/api/chatbot/message' : '/api/chatbot/visitor-message';
+        
+        const response = await apiRequest('POST', endpoint, {
           message
         }) as any;
         
-        return {
-          response: response.response || 'Como posso ajudá-lo hoje?',
-          isSchedulingRequest: response.type === 'appointment',
-          isClinicalQuestion: response.type === 'clinical',
-          suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
-          diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
-          interviewId: response.metadata?.interviewId,
-          interviewStage: response.metadata?.interviewStage,
-          urgencyLevel: response.metadata?.urgencyLevel,
-          isComplete: response.metadata?.isComplete,
-          urgentFlag: response.metadata?.urgentFlag
-        };
+        // For authenticated users, parse full metadata
+        if (user) {
+          return {
+            response: response.message?.content || response.response || 'Como posso ajudá-lo hoje?',
+            isSchedulingRequest: response.type === 'appointment',
+            isClinicalQuestion: response.type === 'clinical',
+            suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
+            diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
+            interviewId: response.metadata?.interviewId,
+            interviewStage: response.metadata?.interviewStage,
+            urgencyLevel: response.metadata?.urgencyLevel,
+            isComplete: response.metadata?.isComplete,
+            urgentFlag: response.metadata?.urgentFlag
+          };
+        } else {
+          // For visitors, simpler response structure (no advanced features)
+          return {
+            response: response.response || 'Como posso ajudá-lo hoje?',
+          };
+        }
       } catch (error) {
         console.error('❌ Chatbot error:', error);
         throw new Error('Erro ao processar mensagem');

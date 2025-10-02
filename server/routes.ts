@@ -9761,6 +9761,71 @@ IMPORTANTE:
     }
   });
 
+  // Public chatbot endpoint for visitors (no authentication required)
+  app.post('/api/chatbot/visitor-message', async (req: Request, res: Response) => {
+    try {
+      const { message } = req.body;
+
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: 'Message is required' });
+      }
+
+      // Visitor-specific system prompt (limited functionality, no diagnosis)
+      const systemPrompt = `Você é um assistente de saúde AI que ajuda visitantes com:
+- Informações gerais sobre serviços de telemedicina
+- Orientações sobre quando procurar atendimento médico
+- Explicações sobre exames e procedimentos comuns
+- Dicas de prevenção e autocuidado
+
+IMPORTANTE: 
+- Você NÃO faz diagnósticos
+- Sempre recomende consulta médica para avaliação adequada
+- Em casos de emergência, oriente a procurar atendimento imediato
+- Se houver referências médicas disponíveis (PDFs), baseie suas respostas nelas
+- Você está falando com um visitante não registrado, então não pode agendar consultas ou acessar prontuários`;
+
+      // Call Gemini API with context - using 'visitor' role to filter appropriate references
+      const aiResult = await geminiService.chatWithContext(
+        message,
+        systemPrompt,
+        [], // No conversation history for visitors (stateless)
+        'visitor' // Important: this filters PDF references to only those marked for visitors
+      );
+
+      // Update usage count for references (even for visitors, to track popular content)
+      if (aiResult.referencesUsed.length > 0) {
+        for (const refId of aiResult.referencesUsed) {
+          await db.update(chatbotReferences)
+            .set({
+              usageCount: sql`${chatbotReferences.usageCount} + 1`,
+              lastUsed: new Date(),
+            })
+            .where(eq(chatbotReferences.id, refId));
+        }
+      }
+
+      res.json({
+        response: aiResult.response,
+        referencesUsed: aiResult.referencesUsed,
+      });
+    } catch (error) {
+      console.error('Visitor chatbot error:', error);
+      
+      // Check if it's a Gemini API key error
+      if (error instanceof Error && error.message.includes('GEMINI_API_KEY')) {
+        return res.json({
+          response: 'Funcionalidade de IA temporariamente indisponível. Por favor, tente novamente mais tarde ou entre em contato com nossa equipe.',
+          referencesUsed: []
+        });
+      }
+      
+      res.status(500).json({ 
+        message: 'Failed to process visitor message',
+        response: 'Desculpe, houve um erro ao processar sua pergunta. Por favor, tente novamente.'
+      });
+    }
+  });
+
   return httpServer;
 }
 
