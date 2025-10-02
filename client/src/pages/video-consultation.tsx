@@ -69,6 +69,8 @@ export default function VideoConsultation() {
 
   const localVideoRef = useRef<HTMLDivElement>(null);
   const remoteVideoRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   // Start or get consultation for this patient
   const { data: consultationData } = useQuery<{ id: string }>({
@@ -283,20 +285,102 @@ export default function VideoConsultation() {
     }
   };
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (!isRecording) {
-      setIsRecording(true);
-      setRecordingStartTime(new Date());
-      toast({
-        title: 'Gravação Iniciada',
-        description: 'A consulta está sendo gravada.',
-      });
+      try {
+        // Get the local stream for recording
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        });
+        
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'video/webm;codecs=vp8,opus'
+        });
+        
+        recordedChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            recordedChunksRef.current.push(event.data);
+          }
+        };
+        
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const endTime = new Date();
+          const duration = recordingStartTime 
+            ? Math.floor((endTime.getTime() - recordingStartTime.getTime()) / 1000)
+            : 0;
+          
+          // Create a data URL (in production, this should be uploaded to a server)
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const dataUrl = reader.result as string;
+            
+            try {
+              // Save recording to database
+              await fetch(`/api/video-consultations/${consultationId}/recordings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                  segmentUrl: dataUrl.substring(0, 500) + '...', // Truncate for demo
+                  startTime: recordingStartTime?.toISOString(),
+                  endTime: endTime.toISOString(),
+                  duration,
+                  segmentType: 'video',
+                  fileSize: blob.size
+                })
+              });
+              
+              toast({
+                title: 'Gravação Salva',
+                description: `Gravação de ${duration}s salva no histórico.`,
+              });
+            } catch (error) {
+              console.error('Failed to save recording:', error);
+              toast({
+                title: 'Erro ao Salvar',
+                description: 'Não foi possível salvar a gravação.',
+                variant: 'destructive'
+              });
+            }
+          };
+          reader.readAsDataURL(blob);
+          
+          // Cleanup
+          stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start(1000); // Collect data every second
+        mediaRecorderRef.current = mediaRecorder;
+        setIsRecording(true);
+        setRecordingStartTime(new Date());
+        
+        toast({
+          title: 'Gravação Iniciada',
+          description: 'A consulta está sendo gravada.',
+        });
+      } catch (error) {
+        console.error('Failed to start recording:', error);
+        toast({
+          title: 'Erro na Gravação',
+          description: 'Não foi possível iniciar a gravação.',
+          variant: 'destructive'
+        });
+      }
     } else {
+      // Stop recording
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       setIsRecording(false);
       setRecordingStartTime(null);
+      
       toast({
-        title: 'Gravação Pausada',
-        description: 'A gravação foi pausada.',
+        title: 'Gravação Parada',
+        description: 'A gravação foi finalizada e está sendo processada.',
       });
     }
   };

@@ -21,28 +21,29 @@ The application uses PostgreSQL with Drizzle ORM and Neon serverless driver for 
 Security is implemented with user-based authentication and role-based access control (doctor, admin, patient), aiming for healthcare compliance. It includes FIPS 140-2 Level 3 compliance indicators, integrated digital certificate management for document signing, and PostgreSQL-based session management.
 
 ### Key Features
-- **AI Clinical Assistant**: OpenAI integration for diagnostic support.
+- **AI Clinical Assistant**: Gemini API integration (migrated from OpenAI) for diagnostic support, medication interaction analysis, and clinical Q&A.
 - **WhatsApp Integration**: Automated patient communication.
-- **Real-time Dashboard**: Live updates for various system metrics.
-- **Medical Records Management**: Comprehensive patient data and exam analysis.
+- **Real-time Dashboard**: Simplified dashboards showing only production-backed statistics via /api/dashboard/stats endpoint.
+- **Medical Records Management**: Strict role-based access control - patients denied access, doctors see only assigned patients, admins see all records.
 - **Appointment Scheduling**: AI-powered scheduling with different appointment types.
 - **Digital Document Signing**: FIPS-compliant workflow for medical documents.
 - **Patient Health Status**: Physician-determined health status after consultations.
 - **Patient Personal Agenda**: Private note-taking for patients.
 - **Enhanced Patient Dashboard**: Quick navigation to key functionalities.
 - **Prescription Management**: Role-based access for viewing, creating, and managing prescriptions.
-- **Video Consultation Feature**: Real-time video/audio using Agora.io with multi-tab panels for chat, AI diagnostics, and doctor notes, with data persistence.
+- **Video Consultation Feature**: Real-time video/audio using Agora.io with multi-tab panels for chat, AI diagnostics, and doctor notes. Fullscreen mode, consultation notes persistence, and recording infrastructure (requires Agora Cloud Recording for complete capture).
 - **Post-Consultation Rating System**: Patients can rate completed appointments with feedback, and doctors receive real-time updates and average rating statistics.
 - **Appointment Rescheduling System**: Allows doctors, admins, or patients to reschedule appointments with validation and real-time notifications.
 - **Profile Picture Upload System**: Secure profile picture management with server-side validation and storage.
 - **TMC Credits System**: Promotional credits for new users, automatic charging for video consultations and AI queries, doctor commissions, and PayPal integration for secure credit purchases.
-- **Enhanced Registration System**: Role-based registration (Patient, Doctor, Admin) with mandatory fields and transactional database writes.
+- **Enhanced Registration System**: Role-based registration (Patient, Doctor, Admin) with mandatory fields and transactional database writes. Registration links available on login page.
+- **AI Reference Management**: Admin-only PDF upload system for AI knowledge base with secure file validation and role-based access control.
 
 ## External Dependencies
 
 ### Third-party Services
 - **Neon Database**: Serverless PostgreSQL hosting.
-- **OpenAI API**: GPT-5 model for AI features.
+- **Google Gemini API**: Gemini 1.5 Flash model for AI features (WhatsApp triage, scheduling, diagnostics, clinical Q&A, exam analysis, drug interactions).
 - **WhatsApp Business API**: Meta's official integration for messaging.
 - **Agora.io**: Real-time video/audio communication SDK.
 - **PayPal**: Payment gateway for credit purchases.
