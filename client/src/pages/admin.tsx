@@ -398,6 +398,7 @@ export default function AdminPage() {
           <TabsTrigger value="monitoring" data-testid="tab-monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
           <TabsTrigger value="ai-references" data-testid="tab-ai-references">AI References</TabsTrigger>
+          <TabsTrigger value="layout-theme" data-testid="tab-layout-theme">Layout & Tema</TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
