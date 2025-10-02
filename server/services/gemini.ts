@@ -44,7 +44,7 @@ export interface SchedulingResponse {
 async function generateWithJSON(prompt: string): Promise<any> {
   const client = getGeminiClient();
   const model = client.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash-exp",
     generationConfig: {
       responseMimeType: "application/json"
     }
@@ -58,11 +58,13 @@ async function generateWithJSON(prompt: string): Promise<any> {
 async function generateText(prompt: string, systemInstruction?: string): Promise<string> {
   const client = getGeminiClient();
   const model = client.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
-    systemInstruction: systemInstruction
+    model: "gemini-2.0-flash-exp"
   });
   
-  const result = await model.generateContent(prompt);
+  // Include system instruction in the prompt if provided
+  const fullPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
+  
+  const result = await model.generateContent(fullPrompt);
   return result.response.text();
 }
 
@@ -411,12 +413,11 @@ Formato: texto corrido, máximo 300 palavras.
     try {
       const client = getGeminiClient();
       const model = client.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: systemContext
+        model: "gemini-2.0-flash-exp"
       });
 
       // Build conversation history for context
-      let fullPrompt = '';
+      let fullPrompt = systemContext + '\n\n';
       
       // Add last 5 messages for context (to keep token count reasonable)
       const recentHistory = conversationHistory.slice(-5);
