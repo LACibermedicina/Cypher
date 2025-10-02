@@ -243,7 +243,8 @@ export default function Header() {
                         <img 
                           src={telemedLogo} 
                           alt="Telemed Logo" 
-                          className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
+                          className="w-full h-full object-contain"
+                          style={{ filter: 'brightness(0) invert(1)' }}
                         />
                       </div>
                       {user && (
@@ -350,7 +351,8 @@ export default function Header() {
                 <img 
                   src={telemedLogo} 
                   alt="Telemed Logo" 
-                  className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
+                  className="w-full h-full object-contain"
+                  style={{ filter: 'brightness(0) invert(1)' }}
                 />
               </div>
             </Link>
@@ -489,7 +491,8 @@ export default function Header() {
                 <img 
                   src={userIcon} 
                   alt="User Icon" 
-                  className="w-5 h-5 dark:invert dark:brightness-0 dark:contrast-200"
+                  className="w-5 h-5"
+                  style={{ filter: 'brightness(0) invert(1)' }}
                 />
                 <i className="fas fa-sign-in-alt text-lg text-primary"></i>
               </Button>

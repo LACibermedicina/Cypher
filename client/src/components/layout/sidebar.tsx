@@ -82,7 +82,8 @@ function SidebarContent() {
           <img 
             src={telemedLogo} 
             alt="Telemed Logo" 
-            className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
+            className="w-full h-full object-contain"
+            style={{ filter: 'brightness(0) invert(1)' }}
           />
         </div>
         <div>
