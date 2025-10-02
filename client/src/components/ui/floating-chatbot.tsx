@@ -82,37 +82,32 @@ export default function FloatingChatbot() {
   // Enhanced AI Chat mutation using unified chatbot endpoint
   const chatMutation = useMutation({
     mutationFn: async (message: string): Promise<ChatbotResponse> => {
-      try {
-        // Use different endpoints based on authentication status
-        const endpoint = user ? '/api/chatbot/message' : '/api/chatbot/visitor-message';
-        
-        const response = await apiRequest('POST', endpoint, {
-          message
-        }) as any;
-        
-        // For authenticated users, parse full metadata
-        if (user) {
-          return {
-            response: response.message?.content || response.response || 'Como posso ajudá-lo hoje?',
-            isSchedulingRequest: response.type === 'appointment',
-            isClinicalQuestion: response.type === 'clinical',
-            suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
-            diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
-            interviewId: response.metadata?.interviewId,
-            interviewStage: response.metadata?.interviewStage,
-            urgencyLevel: response.metadata?.urgencyLevel,
-            isComplete: response.metadata?.isComplete,
-            urgentFlag: response.metadata?.urgentFlag
-          };
-        } else {
-          // For visitors, simpler response structure (no advanced features)
-          return {
-            response: response.response || 'Como posso ajudá-lo hoje?',
-          };
-        }
-      } catch (error) {
-        console.error('❌ Chatbot error:', error);
-        throw new Error('Erro ao processar mensagem');
+      // Use different endpoints based on authentication status
+      const endpoint = user ? '/api/chatbot/message' : '/api/chatbot/visitor-message';
+      
+      const response = await apiRequest('POST', endpoint, {
+        message
+      }) as any;
+      
+      // For authenticated users, parse full metadata
+      if (user) {
+        return {
+          response: response.message?.content || response.response || 'Como posso ajudá-lo hoje?',
+          isSchedulingRequest: response.type === 'appointment',
+          isClinicalQuestion: response.type === 'clinical',
+          suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
+          diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
+          interviewId: response.metadata?.interviewId,
+          interviewStage: response.metadata?.interviewStage,
+          urgencyLevel: response.metadata?.urgencyLevel,
+          isComplete: response.metadata?.isComplete,
+          urgentFlag: response.metadata?.urgentFlag
+        };
+      } else {
+        // For visitors, simpler response structure (no advanced features)
+        return {
+          response: response.response || 'Como posso ajudá-lo hoje?',
+        };
       }
     },
     onSuccess: (data) => {
