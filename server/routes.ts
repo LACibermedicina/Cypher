@@ -9059,7 +9059,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         priority: z.number().int().min(1).default(1),
         source: z.string().optional(),
         sourceType: z.enum(['text', 'pdf', 'url', 'internet']).default('text'),
-        fileUrl: z.string().url().optional(),
+        fileUrl: z.string().optional(), // Changed from z.string().url() to accept relative paths
         fileName: z.string().optional(),
         fileSize: z.number().int().optional(),
         pdfExtractedText: z.string().optional(),
@@ -9104,7 +9104,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         priority: z.number().int().min(1).optional(),
         source: z.string().optional(),
         sourceType: z.enum(['text', 'pdf', 'url', 'internet']).optional(),
-        fileUrl: z.string().url().optional(),
+        fileUrl: z.string().optional(), // Changed from z.string().url() to accept relative paths
         fileName: z.string().optional(),
         fileSize: z.number().int().optional(),
         pdfExtractedText: z.string().optional(),
