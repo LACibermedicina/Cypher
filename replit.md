@@ -61,6 +61,19 @@ Preferred communication style: Simple, everyday language.
   - Frontend preview before submission
   - Avatar URL saved to user's profilePicture field in database
 
+### Visitor Chatbot with PDF References
+- **Public Chatbot Endpoint**: New `/api/chatbot/visitor-message` endpoint allows unauthenticated visitors to use AI chatbot:
+  - No authentication required
+  - Uses `userRole='visitor'` to filter PDF references marked for public access
+  - Stateless (no conversation history persistence)
+  - Visitor-specific system prompt (no diagnosis, no scheduling capabilities)
+  - Automatic reference usage tracking
+- **Smart Endpoint Selection**: FloatingChatbot component detects authentication state:
+  - Authenticated users: uses `/api/chatbot/message` with full features (scheduling, diagnostics, conversation history)
+  - Visitors: uses `/api/chatbot/visitor-message` with limited, safe functionality
+- **Reference-Based Responses**: Visitors receive answers grounded in medical PDF references when references are marked with 'visitor' in allowedRoles array
+- **Security**: Visitors cannot access privileged features (appointment scheduling, medical records, patient diagnostics)
+
 ## System Architecture
 
 ### Frontend Architecture
