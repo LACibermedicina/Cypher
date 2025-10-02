@@ -127,15 +127,20 @@ function LoginFormSection({ defaultValues, onSubmit, isSubmitting, formRef }: {
 }
 
 // Subcomponent for register form with its own useForm hook
-function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIcon, formRef }: {
+function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIcon, formRef, avatarFile, setAvatarFile, avatarPreview, setAvatarPreview }: {
   defaultValues: RegisterForm;
   onSubmit: (data: RegisterForm) => void;
   isSubmitting: boolean;
   getRoleIcon: (role: string) => JSX.Element;
   formRef: React.MutableRefObject<{ getValues: () => RegisterForm } | null>;
+  avatarFile: File | null;
+  setAvatarFile: (file: File | null) => void;
+  avatarPreview: string | null;
+  setAvatarPreview: (url: string | null) => void;
 }) {
   const { t } = useTranslation();
   const registerSchema = createRegisterSchema(t);
+  const { toast } = useToast();
   
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -149,6 +154,27 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
   useEffect(() => {
     formRef.current = { getValues: form.getValues };
   }, [form.getValues, formRef]);
+
+  // Handle avatar file selection
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: "O avatar deve ter no máximo 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <Form {...form}>
@@ -291,6 +317,28 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
               </FormItem>
             )}
           />
+
+          {/* Avatar upload */}
+          <div className="space-y-2">
+            <FormLabel>Foto de Perfil (Opcional)</FormLabel>
+            <div className="flex items-center space-x-4">
+              {avatarPreview && (
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary">
+                  <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                data-testid="input-register-avatar"
+                className="mobile-input-enhanced"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Formatos aceitos: JPG, PNG, GIF, WEBP. Máximo 5MB.
+            </p>
+          </div>
           
           {/* Doctor-specific fields */}
           {selectedRole === "doctor" && (
@@ -454,6 +502,10 @@ export default function Login() {
   const { login, register: registerUser, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Avatar state
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -511,12 +563,38 @@ export default function Login() {
   const handleRegister = async (data: RegisterForm) => {
     setIsSubmitting(true);
     try {
-      const registerData = {
-        ...data,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
-      };
-      await registerUser(registerData);
+      // Create FormData to send file with other data
+      const formData = new FormData();
+      formData.append('username', data.username);
+      formData.append('password', data.password);
+      formData.append('role', data.role);
+      formData.append('name', data.name);
+      if (data.email) formData.append('email', data.email);
+      if (data.phone) formData.append('phone', data.phone);
+      if (data.medicalLicense) formData.append('medicalLicense', data.medicalLicense);
+      if (data.specialization) formData.append('specialization', data.specialization);
+      if (data.dateOfBirth) formData.append('dateOfBirth', data.dateOfBirth);
+      if (data.gender) formData.append('gender', data.gender);
+      if (data.bloodType) formData.append('bloodType', data.bloodType);
+      if (data.allergies) formData.append('allergies', data.allergies);
+      if (avatarFile) formData.append('avatar', avatarFile);
+
+      // Send FormData to server
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Registration failed');
+      }
+
+      const result = await response.json();
+      
+      // Log in with the new credentials
+      await login(data.username, data.password);
+      
       toast({
         title: t("auth.register_success"),
         description: t("auth.register_success_desc"),
@@ -612,6 +690,10 @@ export default function Login() {
                 isSubmitting={isSubmitting}
                 getRoleIcon={getRoleIcon}
                 formRef={registerFormRef}
+                avatarFile={avatarFile}
+                setAvatarFile={setAvatarFile}
+                avatarPreview={avatarPreview}
+                setAvatarPreview={setAvatarPreview}
               />
             </TabsContent>
           </Tabs>

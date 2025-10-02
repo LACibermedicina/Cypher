@@ -4548,9 +4548,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== AUTHENTICATION ENDPOINTS =====
 
   // User Registration
-  app.post('/api/auth/register', async (req, res) => {
+  app.post('/api/auth/register', upload.single('avatar'), async (req, res) => {
     try {
       const { username, password, role, name, email, phone, medicalLicense, specialization, dateOfBirth, gender, bloodType, allergies } = req.body;
+      const avatarFile = req.file;
       
       // Validate required fields
       if (!username || !password || !role || !name) {
@@ -4591,6 +4592,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password (in production, use bcrypt)
       const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
       
+      // Prepare profile picture URL if avatar was uploaded
+      const profilePictureUrl = avatarFile ? `/uploads/profiles/${avatarFile.filename}` : undefined;
+
       // Use transaction to create both user and patient record (if patient)
       const newUser = await db.transaction(async (tx) => {
         // Create user
@@ -4604,6 +4608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           medicalLicense: role === 'doctor' ? medicalLicense : undefined,
           specialization: role === 'doctor' ? specialization : undefined,
           digitalCertificate: role === 'doctor' ? `cert-${Date.now()}` : undefined,
+          profilePicture: profilePictureUrl,
         }).returning();
         
         // If patient, also create patient record
@@ -7592,6 +7597,63 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Layout setting delete error:', error);
       res.status(500).json({ message: 'Erro ao remover configuração' });
+    }
+  });
+
+  // ======================
+  // DATABASE CLEANUP API ROUTES
+  // ======================
+
+  // Clear all users and related data (admin only - FOR TESTING PURPOSES)
+  app.post('/api/admin/clear-database', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { confirmation } = req.body;
+      if (confirmation !== 'CLEAR_ALL_DATA') {
+        return res.status(400).json({ 
+          message: 'Confirmação inválida. Envie { "confirmation": "CLEAR_ALL_DATA" } para confirmar a operação.' 
+        });
+      }
+
+      // Delete all data in correct order (respecting foreign key constraints)
+      await db.delete(chatbotConversations);
+      await db.delete(whatsappMessages);
+      await db.delete(medicalRecords);
+      await db.delete(prescriptionItems);
+      await db.delete(prescriptions);
+      await db.delete(examResults);
+      await db.delete(appointments);
+      await db.delete(patients);
+      await db.delete(tmcTransactions);
+      
+      // Delete all users except the current admin
+      await db.delete(users).where(
+        and(
+          sql`${users.id} != ${user.id}`,
+          sql`${users.role} != 'admin'`
+        )
+      );
+
+      // Delete uploaded profile pictures
+      const uploadsDir = path.join(process.cwd(), 'client', 'public', 'uploads', 'profiles');
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir);
+        for (const file of files) {
+          fs.unlinkSync(path.join(uploadsDir, file));
+        }
+      }
+
+      res.json({ 
+        message: 'Todos os dados foram removidos com sucesso. O sistema está pronto para novos usuários de teste.',
+        note: 'Seu usuário administrador foi preservado.'
+      });
+    } catch (error) {
+      console.error('Database clear error:', error);
+      res.status(500).json({ message: 'Erro ao limpar banco de dados' });
     }
   });
 
