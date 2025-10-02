@@ -189,7 +189,8 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
         <div className={`transition-all duration-300 ${
           isExpanded ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 overflow-hidden'
         }`}>
-          <div className="grid grid-cols-2 gap-1.5 w-40">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 gap-1.5 w-40">
             {quickActions.map((action) => (
               <Tooltip key={action.id}>
                 <TooltipTrigger asChild>
@@ -227,12 +228,13 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
                 </TooltipContent>
               </Tooltip>
             ))}
-          </div>
+            </div>
 
-          {/* Quick help */}
-          <div className="mt-2 text-center">
-            <div className="text-[10px] text-muted-foreground">
-              Pressione <Badge variant="outline" className="text-[8px] px-1 py-0">⌘K</Badge> para mais
+            {/* Quick help */}
+            <div className="mt-2 text-center">
+              <div className="text-[10px] text-muted-foreground">
+                Pressione <Badge variant="outline" className="text-[8px] px-1 py-0">⌘K</Badge> para mais
+              </div>
             </div>
           </div>
         </div>
