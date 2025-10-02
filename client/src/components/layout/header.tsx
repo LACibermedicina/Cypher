@@ -207,6 +207,7 @@ export default function Header() {
     { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp", roles: ["admin", "doctor"] },
     { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical", roles: ["admin", "doctor", "patient"] },
     { path: "/prescriptions", label: "Prescrições", icon: "fas fa-prescription-bottle-alt", roles: ["admin", "doctor"] },
+    { path: "/assistant", label: "Assistente IA", icon: "fas fa-robot", roles: ["admin", "doctor", "patient"] },
     { path: "/analytics", label: "Analytics", icon: "fas fa-chart-bar", roles: ["admin"] },
     { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt", roles: ["admin"] },
   ];
