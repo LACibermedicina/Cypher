@@ -168,7 +168,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
   const quickActions = getQuickActions();
 
   return (
-    <div className="fixed bottom-6 right-[4.5rem] z-50" data-testid="quick-actions-bar">
+    <div className="fixed bottom-6 right-11 z-50" data-testid="quick-actions-bar">
       <div className={`transition-all duration-300 ${
         isExpanded ? 'p-3' : 'p-0'
       }`}>
