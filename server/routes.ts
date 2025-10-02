@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { openAIService } from "./services/openai";
+import { geminiService } from "./services/gemini";
 import { whatsAppService } from "./services/whatsapp";
 import { SchedulingService } from "./services/scheduling";
 import { whisperService } from "./services/whisper";
@@ -739,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Analyze message with AI
-        const analysis = await openAIService.analyzeWhatsappMessage(
+        const analysis = await geminiService.analyzeWhatsappMessage(
           message.text,
           patient.medicalHistory ? JSON.stringify(patient.medicalHistory) : undefined
         );
@@ -753,7 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const availableSlots = await schedulingService.getAvailableSlots(doctorId);
           const formattedSlots = availableSlots.map(slot => slot.formatted);
 
-          const schedulingResponse = await openAIService.processSchedulingRequest(
+          const schedulingResponse = await geminiService.processSchedulingRequest(
             message.text,
             formattedSlots
           );
@@ -815,7 +815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle clinical questions
         if (analysis.isClinicalQuestion) {
-          const clinicalResponse = await openAIService.answerClinicalQuestion(message.text);
+          const clinicalResponse = await geminiService.answerClinicalQuestion(message.text);
           await whatsAppService.sendClinicalResponse(message.from, message.text, clinicalResponse);
           
           // Store clinical question and AI response as medical record
@@ -1317,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Process consultation transcript with AI
-      const analysis = await openAIService.transcribeAndSummarizeConsultation(audioTranscript);
+      const analysis = await geminiService.transcribeAndSummarizeConsultation(audioTranscript);
       
       // Create medical record with AI analysis and transcript
       const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
@@ -1410,7 +1410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate AI diagnostic hypotheses
       let hypotheses;
       try {
-        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history || '');
+        hypotheses = await geminiService.generateDiagnosticHypotheses(symptoms, history || '');
       } catch (openaiError) {
         console.error('OpenAI service unavailable:', {
           status: openaiError instanceof Error ? openaiError.name : 'Unknown',
@@ -1497,7 +1497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/exam-results/analyze', async (req, res) => {
     try {
       const { rawData, examType, patientId } = req.body;
-      const analysis = await openAIService.extractExamResults(rawData, examType);
+      const analysis = await geminiService.extractExamResults(rawData, examType);
       
       const examResult = await storage.createExamResult({
         patientId,
@@ -4215,7 +4215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate AI diagnostic hypotheses
       let hypotheses;
       try {
-        hypotheses = await openAIService.generateDiagnosticHypotheses(symptoms, history || '');
+        hypotheses = await geminiService.generateDiagnosticHypotheses(symptoms, history || '');
       } catch (openaiError) {
         console.error('OpenAI service error:', openaiError);
         return res.status(502).json({ 
@@ -4657,7 +4657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { symptoms, patientHistory } = diagnosticSchema.parse(req.body);
 
       // Use existing OpenAI service for diagnostic analysis
-      const hypotheses = await openAIService.generateDiagnosticHypotheses(
+      const hypotheses = await geminiService.generateDiagnosticHypotheses(
         symptoms,
         patientHistory || ''
       );
@@ -4691,7 +4691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, availableSlots } = schedulingSchema.parse(req.body);
 
       // Use existing OpenAI service for scheduling
-      const analysis = await openAIService.processSchedulingRequest(
+      const analysis = await geminiService.processSchedulingRequest(
         message,
         availableSlots || ['09:00', '14:00', '16:00']
       );
@@ -5008,7 +5008,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { message, patientHistory } = chatSchema.parse(req.body);
 
       // Use existing OpenAI service for WhatsApp analysis
-      const analysis = await openAIService.analyzeWhatsappMessage(
+      const analysis = await geminiService.analyzeWhatsappMessage(
         message,
         patientHistory || ''
       );
@@ -5085,7 +5085,7 @@ Format your response as valid JSON with this structure:
 `;
 
       // Use existing OpenAI service for analysis
-      const analysis = await openAIService.generateClinicalAnalysis(prompt);
+      const analysis = await geminiService.generateClinicalAnalysis(prompt);
 
       // Try to parse the response as JSON, fallback to structured text
       let soapData;
@@ -5257,7 +5257,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       ];
 
       // Generate summary using AI
-      const summary = await openAIService.generatePatientSummary(
+      const summary = await geminiService.generatePatientSummary(
         includeHistory ? mockPatientHistory : [],
         includeConsultationNotes ? mockConsultationNotes : []
       );
@@ -5377,7 +5377,7 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       const { examResultId, examType, results, patientHistory } = req.body;
       
       // Generate AI analysis of exam results
-      const analysis = await openAIService.analyzeExamResults(
+      const analysis = await geminiService.analyzeExamResults(
         examType,
         results,
         patientHistory || "Histórico não informado"
