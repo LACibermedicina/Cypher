@@ -168,17 +168,16 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
   const quickActions = getQuickActions();
 
   return (
-    <div className="fixed bottom-6 right-20 z-50" data-testid="quick-actions-bar">
+    <div className="fixed bottom-6 right-[4.5rem] z-50" data-testid="quick-actions-bar">
       <div className={`transition-all duration-300 ${
         isExpanded ? 'p-3' : 'p-0'
       }`}>
         {/* Expand/Collapse Button */}
         <div className="flex justify-center">
           <Button
-            variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`h-10 w-10 rounded-full bg-gradient-to-br from-primary to-medical-primary hover:scale-105 transition-all border-2 border-gray-800 dark:border-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${isExpanded ? 'mb-2' : ''}`}
+            className={`h-10 w-10 p-0 rounded-full bg-gradient-to-br from-primary/90 to-medical-primary/90 hover:from-primary hover:to-medical-primary hover:scale-105 transition-all border-2 border-gray-800 dark:border-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${isExpanded ? 'mb-2' : ''}`}
             data-testid="button-toggle-quick-actions"
             title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
