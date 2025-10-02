@@ -9,7 +9,8 @@ import LanguageSelector from "@/components/ui/language-selector";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogOut, User, Settings } from "lucide-react";
+import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import NotificationCenter from "@/components/notifications/notification-center";
 import telemedLogo from "@/assets/logo-fundo.png";
 import userIcon from "@/assets/user-icon.png";
@@ -201,16 +202,16 @@ export default function Header() {
   };
 
   const allNavItems = [
-    { path: "/dashboard", label: t("navigation.dashboard"), icon: "fas fa-chart-line", roles: ["admin", "doctor", "patient"] },
-    { path: "/patients", label: t("navigation.patients"), icon: "fas fa-users", roles: ["admin", "doctor"] },
-    { path: "/schedule", label: t("navigation.schedule"), icon: "fas fa-calendar-alt", roles: ["admin", "doctor"] },
-    { path: "/whatsapp", label: t("navigation.whatsapp"), icon: "fab fa-whatsapp", roles: ["admin", "doctor"] },
-    { path: "/records", label: t("navigation.records"), icon: "fas fa-file-medical", roles: ["admin", "doctor", "patient"] },
-    { path: "/prescriptions", label: "Prescrições", icon: "fas fa-prescription-bottle-alt", roles: ["admin", "doctor"] },
-    { path: "/assistant", label: "Assistente IA", icon: "fas fa-robot", roles: ["admin", "doctor", "patient"] },
-    { path: "/medical-references", label: "Referências Médicas", icon: "fas fa-file-pdf", roles: ["admin", "doctor"] },
-    { path: "/analytics", label: "Analytics", icon: "fas fa-chart-bar", roles: ["admin"] },
-    { path: "/admin", label: t("navigation.admin"), icon: "fas fa-shield-alt", roles: ["admin"] },
+    { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard, faIcon: "fas fa-chart-line", roles: ["admin", "doctor", "patient"] },
+    { path: "/patients", label: "Pacientes", icon: Users, faIcon: "fas fa-users", roles: ["admin", "doctor"] },
+    { path: "/schedule", label: "Agenda", icon: CalendarClock, faIcon: "fas fa-calendar-alt", roles: ["admin", "doctor"] },
+    { path: "/whatsapp", label: "WhatsApp IA", icon: MessageCircle, faIcon: "fab fa-whatsapp", roles: ["admin", "doctor"] },
+    { path: "/records", label: "Prontuários", icon: FileText, faIcon: "fas fa-file-medical", roles: ["admin", "doctor", "patient"] },
+    { path: "/prescriptions", label: "Prescrições", icon: ClipboardList, faIcon: "fas fa-prescription-bottle-alt", roles: ["admin", "doctor"] },
+    { path: "/assistant", label: "Assistente IA", icon: BrainCircuit, faIcon: "fas fa-robot", roles: ["admin", "doctor", "patient"] },
+    { path: "/medical-references", label: "Referências Médicas", icon: BookOpenCheck, faIcon: "fas fa-file-pdf", roles: ["admin", "doctor"] },
+    { path: "/analytics", label: "Analytics", icon: BarChart3, faIcon: "fas fa-chart-bar", roles: ["admin"] },
+    { path: "/admin", label: t("navigation.admin"), icon: Shield, faIcon: "fas fa-shield-alt", roles: ["admin"] },
   ];
 
   // Filter navigation items based on user role
@@ -289,7 +290,7 @@ export default function Header() {
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             isActive ? "bg-white/20" : "bg-muted"
                           }`}>
-                            <i className={`${item.icon} ${isActive ? "text-white" : "text-muted-foreground"}`}></i>
+                            <i className={`${item.faIcon} ${isActive ? "text-white" : "text-muted-foreground"}`}></i>
                           </div>
                           <span className="font-medium">{item.label}</span>
                         </div>
@@ -381,36 +382,45 @@ export default function Header() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6" data-testid="nav-main">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                href={item.path}
-                data-testid={`link-nav-${item.path.slice(1) || 'dashboard'}`}
-              >
-                {(() => {
-                  const isActive = location === item.path || (location === "/" && item.path === "/dashboard");
-                  return (
-                    <span
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? "text-white shadow-md"
-                          : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                      }`}
-                      style={{
-                        background: isActive
-                          ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
-                          : "transparent"
-                      }}
-                    >
-                      <i className={`${item.icon} mr-2`}></i>
-                      {item.label}
-                    </span>
-                  );
-                })()}
-              </Link>
-            ))}
-          </nav>
+          <TooltipProvider>
+            <nav className="hidden md:flex items-center space-x-2" data-testid="nav-main">
+              {navItems.map((item) => {
+                const isActive = location === item.path || (location === "/" && item.path === "/dashboard");
+                const IconComponent = item.icon;
+                
+                return (
+                  <Tooltip key={item.path}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={item.path}
+                        data-testid={`link-nav-${item.path.slice(1) || 'dashboard'}`}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`w-10 h-10 rounded-lg transition-all duration-200 ${
+                            isActive
+                              ? "text-white shadow-md"
+                              : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          }`}
+                          style={{
+                            background: isActive
+                              ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
+                              : "transparent"
+                          }}
+                        >
+                          <IconComponent className="h-5 w-5" />
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{item.label}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </nav>
+          </TooltipProvider>
 
           <div className="flex items-center space-x-4">
             <LanguageSelector />
