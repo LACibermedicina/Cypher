@@ -1242,10 +1242,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Medical Records API
+  // Medical Records API with role-based access control
   app.get('/api/medical-records/:patientId', async (req, res) => {
     try {
-      const records = await storage.getMedicalRecordsByPatient(req.params.patientId);
+      const patientId = req.params.patientId;
+      
+      // Manual authentication check (requireAuth not available yet in file order)
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const user = req.user;
+
+      // Only admins and doctors have access to medical records
+      if (user.role !== 'admin' && user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+      }
+
+      // Doctors can only access records of their patients
+      if (user.role === 'doctor') {
+        const patient = await storage.getPatient(patientId);
+        if (!patient) {
+          return res.status(404).json({ message: 'Patient not found' });
+        }
+
+        // Check if doctor is the primary doctor for this patient
+        const isPrimaryDoctor = patient.primaryDoctorId === user.id;
+        
+        // Check if doctor has any appointments with this patient
+        const doctorAppointments = await storage.getAppointments();
+        const hasAppointment = doctorAppointments.some(
+          apt => apt.doctorId === user.id && apt.patientId === patientId
+        );
+
+        if (!isPrimaryDoctor && !hasAppointment) {
+          return res.status(403).json({ 
+            message: 'Access denied: You can only view records of your assigned patients' 
+          });
+        }
+      }
+
+      // Admins have full access - no additional checks needed
+
+      const records = await storage.getMedicalRecordsByPatient(patientId);
       res.json(records);
     } catch (error) {
       res.status(500).json({ message: 'Failed to get medical records' });
@@ -1319,8 +1358,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Validate patient ID format
       const patientId = req.params.patientId;
+
       if (!z.string().uuid().safeParse(patientId).success) {
         return res.status(400).json({ message: 'Invalid patient ID format' });
+      }
+      
+      // Manual authentication check
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const user = req.user;
+      
+      // Only admins and doctors can create medical records
+      if (user.role !== 'admin' && user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
       }
       
       // Validate input
@@ -1338,6 +1390,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const patient = await storage.getPatient(patientId);
       if (!patient) {
         return res.status(404).json({ message: 'Patient not found' });
+      }
+
+      // Doctors can only create records for their patients
+      if (user.role === 'doctor') {
+        const isPrimaryDoctor = patient.primaryDoctorId === user.id;
+        const doctorAppointments = await storage.getAppointments();
+        const hasAppointment = doctorAppointments.some(
+          apt => apt.doctorId === user.id && apt.patientId === patientId
+        );
+
+        if (!isPrimaryDoctor && !hasAppointment) {
+          return res.status(403).json({ 
+            message: 'Access denied: You can only create records for your assigned patients' 
+          });
+        }
       }
       
       // Generate AI diagnostic hypotheses
@@ -1382,10 +1449,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Exam Results API
+  // Exam Results API with role-based access control
   app.get('/api/exam-results/:patientId', async (req, res) => {
     try {
-      const results = await storage.getExamResultsByPatient(req.params.patientId);
+      const patientId = req.params.patientId;
+      
+      // Manual authentication check
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const user = req.user;
+
+      // Only admins and doctors have access to exam results
+      if (user.role !== 'admin' && user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+      }
+
+      // Doctors can only access exam results of their patients
+      if (user.role === 'doctor') {
+        const patient = await storage.getPatient(patientId);
+        if (!patient) {
+          return res.status(404).json({ message: 'Patient not found' });
+        }
+
+        const isPrimaryDoctor = patient.primaryDoctorId === user.id;
+        const doctorAppointments = await storage.getAppointments();
+        const hasAppointment = doctorAppointments.some(
+          apt => apt.doctorId === user.id && apt.patientId === patientId
+        );
+
+        if (!isPrimaryDoctor && !hasAppointment) {
+          return res.status(403).json({ 
+            message: 'Access denied: You can only view exam results of your assigned patients' 
+          });
+        }
+      }
+
+      // Admins have full access
+      const results = await storage.getExamResultsByPatient(patientId);
       res.json(results);
     } catch (error) {
       res.status(500).json({ message: 'Failed to get exam results' });
