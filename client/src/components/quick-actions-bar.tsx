@@ -13,7 +13,8 @@ import {
   CreditCard,
   Search,
   Zap,
-  Sparkles
+  Sparkles,
+  Grid3x3
 } from "lucide-react";
 
 interface QuickActionsBarProps {
@@ -180,7 +181,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             data-testid="button-toggle-quick-actions"
             title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
-            <Sparkles className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+            <Grid3x3 className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
           </Button>
         </div>
 
