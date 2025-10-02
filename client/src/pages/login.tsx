@@ -558,7 +558,7 @@ export default function Login() {
               <img 
                 src={telemedLogo} 
                 alt="Telemed Logo" 
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
               />
             </div>
           </div>

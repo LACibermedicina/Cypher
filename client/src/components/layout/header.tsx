@@ -243,7 +243,7 @@ export default function Header() {
                         <img 
                           src={telemedLogo} 
                           alt="Telemed Logo" 
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
                         />
                       </div>
                       {user && (
@@ -350,7 +350,7 @@ export default function Header() {
                 <img 
                   src={telemedLogo} 
                   alt="Telemed Logo" 
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain dark:invert dark:brightness-0 dark:contrast-200"
                 />
               </div>
             </Link>
