@@ -236,23 +236,21 @@ export default function FloatingChatbot() {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-28 z-50">
-        <div className="bg-white/10 dark:bg-black/10 rounded-lg shadow-lg border border-white/20 dark:border-black/20 p-2">
-          <Button
-            onClick={() => setIsOpen(true)}
-            size="lg"
-            className="rounded-full w-10 h-10 hover:scale-105 transition-transform bg-gradient-to-br from-primary to-medical-primary border-0 shadow-none"
-            data-testid="button-open-chatbot"
-          >
-            <MessageCircle className="w-5 h-5" />
-          </Button>
-        </div>
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          onClick={() => setIsOpen(true)}
+          size="lg"
+          className="rounded-full w-10 h-10 hover:scale-105 transition-transform bg-gradient-to-br from-primary to-medical-primary border-2 border-gray-800 dark:border-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+          data-testid="button-open-chatbot"
+        >
+          <MessageCircle className="w-5 h-5" />
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="fixed bottom-6 right-28 z-50">
+    <div className="fixed bottom-6 right-6 z-50">
       <Card className={`w-96 shadow-xl border-2 border-white/20 dark:border-black/20 backdrop-blur-sm ${isMinimized ? 'h-16' : 'h-[500px]'} transition-all duration-300`}>
         <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary to-medical-primary text-white rounded-t-lg">
           <div className="flex items-center justify-between">
