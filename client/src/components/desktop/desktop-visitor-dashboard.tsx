@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { AIAssistant } from "@/components/chatbot/AIAssistant"
+import medicalBg1 from "@assets/stock_images/medical_healthcare_i_8a0d1041.jpg"
+import medicalBg2 from "@assets/stock_images/medical_healthcare_i_f67f4d1c.jpg"
+import medicalBg3 from "@assets/stock_images/medical_healthcare_i_92189345.jpg"
 
 interface Service {
   id: string;
@@ -150,27 +153,39 @@ export function DesktopVisitorDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <div className="min-h-screen relative p-8">
+      {/* Background Image with Blur Overlay */}
+      <div 
+        className="fixed inset-0 z-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${medicalBg1})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-indigo-800/85 to-purple-900/90 backdrop-blur-sm"></div>
+      </div>
+
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         
         {/* Hero Section */}
-        <Card className="border-0 shadow-xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-          <CardContent className="p-12">
+        <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl text-white overflow-hidden">
+          <div 
+            className="absolute inset-0 opacity-20 bg-cover bg-center"
+            style={{ backgroundImage: `url(${medicalBg2})` }}
+          ></div>
+          <CardContent className="p-12 relative z-10">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               <div>
                 <div className="flex items-center space-x-3 mb-4">
-                  <Globe className="w-12 h-12" />
-                  <Badge className="bg-white/20 text-white text-lg px-4 py-2">Visitante</Badge>
+                  <Globe className="w-12 h-12 drop-shadow-lg" />
+                  <Badge className="bg-white/30 backdrop-blur-md text-white text-lg px-4 py-2 border border-white/20">Visitante</Badge>
                 </div>
-                <h1 className="text-4xl font-bold mb-4">Bem-vindo ao Telemed</h1>
-                <p className="text-xl text-blue-100 mb-6">
+                <h1 className="text-4xl font-bold mb-4 drop-shadow-lg">Bem-vindo ao Telemed</h1>
+                <p className="text-xl text-blue-100 mb-6 drop-shadow-md">
                   Plataforma de telemedicina com tecnologia avançada para cuidar da sua saúde
                 </p>
                 <div className="flex space-x-4">
                   <Link href="/register">
                     <Button 
                       size="lg" 
-                      className="bg-white text-blue-600 hover:bg-blue-50"
+                      className="bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm"
                       data-testid="button-register-now"
                     >
                       Registrar Agora
@@ -179,8 +194,7 @@ export function DesktopVisitorDashboard() {
                   <Link href="/features">
                     <Button 
                       size="lg" 
-                      variant="outline" 
-                      className="border-white text-white hover:bg-white/10"
+                      className="bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl backdrop-blur-sm"
                       data-testid="button-learn-more"
                     >
                       Saiba Mais
@@ -217,7 +231,7 @@ export function DesktopVisitorDashboard() {
 
         {/* Registration Options */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="shadow-lg border-medical-primary/20 hover:shadow-xl transition-shadow">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md hover:shadow-3xl hover:scale-[1.02] transition-all duration-300">
             <CardHeader className="pb-4">
               <h2 className="text-xl font-semibold flex items-center text-medical-primary">
                 <Users className="w-6 h-6 mr-2" />
@@ -243,14 +257,14 @@ export function DesktopVisitorDashboard() {
                 </li>
               </ul>
               <Link href="/register/patient">
-                <Button className="w-full bg-medical-primary hover:bg-medical-primary/90" data-testid="button-register-patient">
+                <Button className="w-full bg-medical-primary hover:bg-medical-primary/90 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl" data-testid="button-register-patient">
                   Registrar como Paciente
                 </Button>
               </Link>
             </CardContent>
           </Card>
           
-          <Card className="shadow-lg border-medical-secondary/20 hover:shadow-xl transition-shadow">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md hover:shadow-3xl hover:scale-[1.02] transition-all duration-300">
             <CardHeader className="pb-4">
               <h2 className="text-xl font-semibold flex items-center text-medical-secondary">
                 <FileText className="w-6 h-6 mr-2" />
@@ -276,7 +290,7 @@ export function DesktopVisitorDashboard() {
                 </li>
               </ul>
               <Link href="/register/doctor">
-                <Button variant="outline" className="w-full border-medical-secondary text-medical-secondary hover:bg-medical-secondary/10" data-testid="button-register-doctor">
+                <Button className="w-full bg-medical-secondary text-white hover:bg-medical-secondary/90 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl" data-testid="button-register-doctor">
                   Registrar como Médico
                 </Button>
               </Link>
@@ -285,14 +299,14 @@ export function DesktopVisitorDashboard() {
         </div>
 
         {/* Available Services */}
-        <Card className="shadow-lg">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold flex items-center">
                 <Calendar className="w-6 h-6 mr-2 text-blue-600" />
                 Serviços Disponíveis
               </h2>
-              <Badge variant="secondary" className="text-base px-4 py-2">
+              <Badge variant="secondary" className="text-base px-4 py-2 backdrop-blur-sm">
                 {publicServices.filter(s => s.available).length} serviços ativos
               </Badge>
             </div>
@@ -300,16 +314,16 @@ export function DesktopVisitorDashboard() {
           <CardContent>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {publicServices.map((service) => (
-                <Card key={service.id} className={`border transition-all hover:shadow-md ${
-                  service.available ? 'border-blue-200' : 'border-gray-200 opacity-60'
-                }`}>
+                <Card key={service.id} className={`border-0 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.02] ${
+                  service.available ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/80' : 'bg-gray-50/50 opacity-60'
+                } backdrop-blur-sm`}>
                   <CardContent className="p-6">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="font-semibold text-lg" data-testid={`text-service-name-${service.id}`}>
                           {service.name}
                         </h3>
-                        <Badge variant="outline" className="mt-1">{service.specialty}</Badge>
+                        <Badge variant="outline" className="mt-1 backdrop-blur-sm">{service.specialty}</Badge>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
@@ -327,13 +341,13 @@ export function DesktopVisitorDashboard() {
                       </div>
                       <Badge 
                         variant={service.available ? "default" : "secondary"}
-                        className="text-sm"
+                        className="text-sm backdrop-blur-sm"
                       >
                         {service.available ? "Disponível" : "Indisponível"}
                       </Badge>
                     </div>
                     <Button 
-                      className="w-full" 
+                      className="w-full hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg" 
                       disabled={!service.available}
                       onClick={() => handleServiceBooking(service.id)}
                       data-testid={`button-book-${service.id}`}
@@ -348,7 +362,7 @@ export function DesktopVisitorDashboard() {
         </Card>
 
         {/* Platform Features */}
-        <Card className="shadow-lg">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md">
           <CardHeader className="pb-4">
             <h2 className="text-2xl font-semibold flex items-center">
               <Shield className="w-6 h-6 mr-2 text-blue-600" />
@@ -358,8 +372,8 @@ export function DesktopVisitorDashboard() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {platformFeatures.map((feature, index) => (
-                <div key={index} className="text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div key={index} className="text-center group">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-all duration-300 shadow-lg group-hover:shadow-xl backdrop-blur-sm">
                     <feature.icon className="w-8 h-8 text-blue-600" />
                   </div>
                   <h3 className="font-semibold mb-2">{feature.title}</h3>
@@ -372,14 +386,18 @@ export function DesktopVisitorDashboard() {
 
         {/* Contact and Support */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="shadow-lg bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-            <CardHeader className="pb-4">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md hover:scale-[1.02] transition-all duration-300">
+            <div 
+              className="absolute inset-0 opacity-10 bg-cover bg-center rounded-lg"
+              style={{ backgroundImage: `url(${medicalBg3})` }}
+            ></div>
+            <CardHeader className="pb-4 relative z-10">
               <h2 className="text-xl font-semibold flex items-center text-green-800">
                 <Phone className="w-6 h-6 mr-2" />
                 Contato & Suporte
               </h2>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 relative z-10">
               <div className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <MessageCircle className="w-8 h-8 text-green-600" />
@@ -400,15 +418,14 @@ export function DesktopVisitorDashboard() {
               </div>
               <div className="space-y-2">
                 <Button 
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
                   onClick={handleSupportContact}
                   data-testid="button-contact-support"
                 >
                   Falar com Suporte
                 </Button>
                 <Button 
-                  variant="outline"
-                  className="w-full border-green-600 text-green-600 hover:bg-green-50"
+                  className="w-full bg-white text-green-600 hover:bg-green-50 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg border border-green-200"
                   onClick={handleWhatsAppContact}
                   data-testid="button-whatsapp-contact"
                 >
@@ -419,16 +436,17 @@ export function DesktopVisitorDashboard() {
             </CardContent>
           </Card>
           
-          <Card className="shadow-lg bg-gradient-to-r from-red-50 to-pink-50 border-red-200">
-            <CardHeader className="pb-4">
+          <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md hover:scale-[1.02] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-50 to-pink-50"></div>
+            <CardHeader className="pb-4 relative z-10">
               <h2 className="text-xl font-semibold flex items-center text-red-800">
                 <Shield className="w-6 h-6 mr-2" />
                 Emergência Médica
               </h2>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 relative z-10">
               <div className="text-center mb-4">
-                <div className="text-4xl font-bold text-red-600 mb-2">192</div>
+                <div className="text-4xl font-bold text-red-600 mb-2 drop-shadow-md">192</div>
                 <div className="text-red-700 font-semibold">SAMU - Serviço de Atendimento Móvel de Urgência</div>
               </div>
               <p className="text-red-600 text-center">
@@ -442,21 +460,21 @@ export function DesktopVisitorDashboard() {
         </div>
 
         {/* AI Chatbot Section */}
-        <Card className="shadow-lg bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
-          <CardHeader className="pb-4">
+        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-md hover:scale-[1.01] transition-all duration-300 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-50/50 to-indigo-50/50"></div>
+          <CardHeader className="pb-4 relative z-10">
             <h2 className="text-xl font-semibold flex items-center text-purple-800">
               <Bot className="w-6 h-6 mr-2" />
               Assistente Virtual IA
             </h2>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 relative z-10">
             <p className="text-purple-600">
               Nosso assistente virtual pode ajudar com agendamento de consultas, análise de sintomas e orientações médicas iniciais.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Button 
-                variant="outline" 
-                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                className="bg-purple-600 text-white hover:bg-purple-700 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
                 onClick={handleChatBot}
                 data-testid="button-ai-symptom-analysis"
               >
@@ -464,8 +482,7 @@ export function DesktopVisitorDashboard() {
                 Análise de Sintomas
               </Button>
               <Button 
-                variant="outline" 
-                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                className="bg-purple-600 text-white hover:bg-purple-700 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
                 onClick={handleChatBot}
                 data-testid="button-ai-appointment"
               >
@@ -473,8 +490,7 @@ export function DesktopVisitorDashboard() {
                 Agendar Consulta
               </Button>
               <Button 
-                variant="outline" 
-                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                className="bg-purple-600 text-white hover:bg-purple-700 hover:scale-105 transition-all duration-300 shadow-md hover:shadow-lg"
                 onClick={handleChatBot}
                 data-testid="button-ai-questions"
               >
