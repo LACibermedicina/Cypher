@@ -4845,6 +4845,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public Statistics API - No authentication required
+  app.get('/api/stats/public', async (req, res) => {
+    try {
+      // Get real statistics from database
+      const [completedAppointments] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(appointments)
+        .where(eq(appointments.status, 'completed'));
+      
+      const [activeDoctors] = await db
+        .select({ count: sql<number>`count(distinct ${users.id})::int` })
+        .from(users)
+        .where(eq(users.role, 'doctor'));
+      
+      // Calculate average rating from completed appointments with ratings
+      const [avgRating] = await db
+        .select({ avg: sql<number>`COALESCE(AVG(${appointments.rating}), 0)` })
+        .from(appointments)
+        .where(and(
+          eq(appointments.status, 'completed'),
+          isNotNull(appointments.rating)
+        ));
+      
+      res.json({
+        completedAppointments: completedAppointments?.count || 0,
+        activeDoctors: activeDoctors?.count || 0,
+        averageRating: avgRating?.avg ? Number(avgRating.avg.toFixed(1)) : 0,
+        support24_7: true, // Platform offers 24/7 support
+      });
+    } catch (error) {
+      console.error('Public stats error:', error);
+      res.status(500).json({ message: 'Failed to get public statistics' });
+    }
+  });
+
   // Reschedule appointment
   app.post('/api/appointments/:id/reschedule', requireAuth, async (req: any, res) => {
     try {

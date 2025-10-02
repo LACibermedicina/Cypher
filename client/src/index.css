@@ -4,39 +4,39 @@
 @tailwind utilities;
 
 :root {
-  /* Youthful Modern Healthcare Color Palette */
-  --background: hsl(0, 0%, 100%);
-  --foreground: hsl(223, 84%, 10%);
+  /* Autumn Pastel Healthcare Color Palette */
+  --background: hsl(45, 30%, 98%);
+  --foreground: hsl(30, 20%, 20%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(223, 84%, 10%);
+  --card-foreground: hsl(30, 20%, 20%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(223, 84%, 10%);
+  --popover-foreground: hsl(30, 20%, 20%);
   
-  /* Vibrant primary - Modern electric blue */
-  --primary: hsl(217, 91%, 59%);
+  /* Warm primary - Soft autumn orange */
+  --primary: hsl(30, 65%, 65%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --primary-gradient: linear-gradient(135deg, hsl(217, 91%, 59%) 0%, hsl(244, 81%, 69%) 100%);
+  --primary-gradient: linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(15, 60%, 70%) 100%);
   
-  /* Fresh secondary - Modern mint green */
-  --secondary: hsl(142, 76%, 36%);
+  /* Earthy secondary - Soft autumn green */
+  --secondary: hsl(90, 40%, 60%);
   --secondary-foreground: hsl(0, 0%, 100%);
   
-  /* Clean neutrals */
-  --muted: hsl(210, 40%, 98%);
-  --muted-foreground: hsl(215, 16%, 47%);
+  /* Clean neutrals with warm tones */
+  --muted: hsl(40, 20%, 96%);
+  --muted-foreground: hsl(35, 15%, 45%);
   
-  /* Energetic accent - Modern orange */
-  --accent: hsl(25, 95%, 53%);
+  /* Warm accent - Terracotta pastel */
+  --accent: hsl(20, 50%, 68%);
   --accent-foreground: hsl(0, 0%, 100%);
   
   /* Clear warning */
-  --destructive: hsl(0, 84%, 60%);
+  --destructive: hsl(0, 70%, 65%);
   --destructive-foreground: hsl(0, 0%, 100%);
   
-  /* Minimal borders */
-  --border: hsl(214, 32%, 91%);
-  --input: hsl(214, 32%, 91%);
-  --ring: hsl(217, 91%, 59%);
+  /* Soft borders with warm tint */
+  --border: hsl(40, 20%, 88%);
+  --input: hsl(40, 20%, 88%);
+  --ring: hsl(30, 65%, 65%);
   
   /* Canvas-Inspired Design System */
   --radius: 0.5rem;
@@ -53,17 +53,17 @@
   --font-serif: ui-serif, Georgia, Cambria, serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', monospace;
   
-  /* Youthful Healthcare-Specific Colors */
-  --medical-primary: hsl(217, 91%, 59%);
-  --medical-secondary: hsl(142, 76%, 36%);
-  --medical-accent: hsl(25, 95%, 53%);
-  --medical-success: hsl(142, 76%, 36%);
-  --medical-warning: hsl(43, 96%, 56%);
-  --medical-emergency: hsl(0, 84%, 60%);
+  /* Autumn Healthcare-Specific Colors */
+  --medical-primary: hsl(30, 65%, 65%);
+  --medical-secondary: hsl(90, 40%, 60%);
+  --medical-accent: hsl(20, 50%, 68%);
+  --medical-success: hsl(100, 45%, 60%);
+  --medical-warning: hsl(40, 75%, 65%);
+  --medical-emergency: hsl(0, 70%, 65%);
   --whatsapp-green: hsl(142, 70%, 49%);
-  --ai-gradient: linear-gradient(135deg, hsl(217, 91%, 59%) 0%, hsl(244, 81%, 69%) 100%);
-  --security-gradient: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(165, 82%, 51%) 100%);
-  --success-gradient: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(158, 64%, 52%) 100%);
+  --ai-gradient: linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 60%, 70%) 100%);
+  --security-gradient: linear-gradient(135deg, hsl(90, 40%, 60%) 0%, hsl(100, 45%, 60%) 100%);
+  --success-gradient: linear-gradient(135deg, hsl(100, 45%, 60%) 0%, hsl(90, 50%, 65%) 100%);
 }
 
 .dark {

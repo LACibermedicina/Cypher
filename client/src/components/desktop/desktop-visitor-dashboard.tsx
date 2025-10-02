@@ -11,9 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { AIAssistant } from "@/components/chatbot/AIAssistant"
-import medicalBg1 from "@assets/stock_images/medical_healthcare_i_8a0d1041.jpg"
-import medicalBg2 from "@assets/stock_images/medical_healthcare_i_f67f4d1c.jpg"
-import medicalBg3 from "@assets/stock_images/medical_healthcare_i_92189345.jpg"
+import { useQuery } from "@tanstack/react-query"
+import medicalBg1 from "@assets/stock_images/abstract_autumn_heal_864db12d.jpg"
+import medicalBg2 from "@assets/stock_images/abstract_autumn_heal_33901da9.jpg"
+import medicalBg3 from "@assets/stock_images/abstract_autumn_heal_b72e41eb.jpg"
 
 interface Service {
   id: string;
@@ -42,6 +43,12 @@ export function DesktopVisitorDashboard() {
     email: '',
     phone: '',
     message: ''
+  });
+
+  // Fetch real statistics from API
+  const { data: stats } = useQuery({
+    queryKey: ['/api/stats/public'],
+    refetchInterval: 60000, // Refetch every minute
   });
 
   // Support phone number - will be configurable in admin later
@@ -159,7 +166,7 @@ export function DesktopVisitorDashboard() {
         className="fixed inset-0 z-0 bg-cover bg-center"
         style={{ backgroundImage: `url(${medicalBg1})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-indigo-800/85 to-purple-900/90 backdrop-blur-sm"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-900/85 via-amber-800/80 to-yellow-900/85 backdrop-blur-sm"></div>
       </div>
 
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
@@ -207,20 +214,20 @@ export function DesktopVisitorDashboard() {
                   <h3 className="text-2xl font-bold mb-4">Estatísticas da Plataforma</h3>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <div className="text-3xl font-bold">1,245+</div>
-                      <div className="text-blue-200">Consultas Realizadas</div>
+                      <div className="text-3xl font-bold">{stats?.completedAppointments || 0}+</div>
+                      <div className="text-amber-200">Consultas Realizadas</div>
                     </div>
                     <div>
-                      <div className="text-3xl font-bold">150+</div>
-                      <div className="text-blue-200">Médicos Ativos</div>
+                      <div className="text-3xl font-bold">{stats?.activeDoctors || 0}</div>
+                      <div className="text-amber-200">Médicos Ativos</div>
                     </div>
                     <div>
-                      <div className="text-3xl font-bold">4.9⭐</div>
-                      <div className="text-blue-200">Avaliação Média</div>
+                      <div className="text-3xl font-bold">{stats?.averageRating > 0 ? `${stats.averageRating}⭐` : 'N/A'}</div>
+                      <div className="text-amber-200">Avaliação Média</div>
                     </div>
                     <div>
                       <div className="text-3xl font-bold">24/7</div>
-                      <div className="text-blue-200">Suporte Ativo</div>
+                      <div className="text-amber-200">Suporte Ativo</div>
                     </div>
                   </div>
                 </div>
