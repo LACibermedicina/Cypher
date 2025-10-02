@@ -1304,10 +1304,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if doctor is the primary doctor for this patient
         const isPrimaryDoctor = patient.primaryDoctorId === user.id;
         
-        // Check if doctor has any appointments with this patient
-        const doctorAppointments = await storage.getAppointments();
+        // Check if doctor has any appointments with this patient (efficient query)
+        const doctorAppointments = await storage.getAppointmentsByDoctor(user.id);
         const hasAppointment = doctorAppointments.some(
-          apt => apt.doctorId === user.id && apt.patientId === patientId
+          apt => apt.patientId === patientId
         );
 
         if (!isPrimaryDoctor && !hasAppointment) {
@@ -1430,9 +1430,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Doctors can only create records for their patients
       if (user.role === 'doctor') {
         const isPrimaryDoctor = patient.primaryDoctorId === user.id;
-        const doctorAppointments = await storage.getAppointments();
+        const doctorAppointments = await storage.getAppointmentsByDoctor(user.id);
         const hasAppointment = doctorAppointments.some(
-          apt => apt.doctorId === user.id && apt.patientId === patientId
+          apt => apt.patientId === patientId
         );
 
         if (!isPrimaryDoctor && !hasAppointment) {
@@ -1509,9 +1509,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const isPrimaryDoctor = patient.primaryDoctorId === user.id;
-        const doctorAppointments = await storage.getAppointments();
+        const doctorAppointments = await storage.getAppointmentsByDoctor(user.id);
         const hasAppointment = doctorAppointments.some(
-          apt => apt.doctorId === user.id && apt.patientId === patientId
+          apt => apt.patientId === patientId
         );
 
         if (!isPrimaryDoctor && !hasAppointment) {
@@ -1531,7 +1531,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/exam-results/analyze', async (req, res) => {
     try {
+      // Authentication check
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const user = req.user;
+      
+      // Only admins and doctors can create exam results
+      if (user.role !== 'admin' && user.role !== 'doctor') {
+        return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+      }
+
       const { rawData, examType, patientId } = req.body;
+      
+      if (!patientId) {
+        return res.status(400).json({ message: 'Patient ID is required' });
+      }
+
+      // Doctors can only create exam results for their patients
+      if (user.role === 'doctor') {
+        const patient = await storage.getPatient(patientId);
+        if (!patient) {
+          return res.status(404).json({ message: 'Patient not found' });
+        }
+
+        const isPrimaryDoctor = patient.primaryDoctorId === user.id;
+        const doctorAppointments = await storage.getAppointmentsByDoctor(user.id);
+        const hasAppointment = doctorAppointments.some(
+          apt => apt.patientId === patientId
+        );
+
+        if (!isPrimaryDoctor && !hasAppointment) {
+          return res.status(403).json({ 
+            message: 'Access denied: You can only create exam results for your assigned patients' 
+          });
+        }
+      }
+      
       const analysis = await geminiService.extractExamResults(rawData, examType);
       
       const examResult = await storage.createExamResult({
