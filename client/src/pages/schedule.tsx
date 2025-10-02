@@ -14,6 +14,7 @@ import { Clock, Calendar as CalendarIcon, Users, AlertCircle, Bell, CheckCircle2
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import VideoConsultation from "@/components/video-consultation/VideoConsultation";
+import { formatErrorForToast } from "@/lib/error-handler";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -101,9 +102,10 @@ export default function Schedule() {
       queryClient.invalidateQueries({ queryKey: ['/api/appointments/doctor'] });
     },
     onError: (error: any) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro ao agendar",
-        description: error.message || "Não foi possível agendar a consulta.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },
@@ -121,10 +123,11 @@ export default function Schedule() {
       setIsVideoConsultationOpen(true);
       queryClient.invalidateQueries({ queryKey: ['/api/video-consultations'] });
     },
-    onError: () => {
+    onError: (error) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro",
-        description: "Não foi possível iniciar a videochamada.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },
@@ -144,9 +147,10 @@ export default function Schedule() {
       setEditingAppointment(null);
     },
     onError: (error: any) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro ao atualizar",
-        description: error.message || "Não foi possível atualizar a consulta.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },

@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Shield, Users, Key, Activity, AlertTriangle, Plus, Eye, EyeOff, Copy, Trash2, UserCheck, UserX, Edit3, Clock, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { useWebSocket } from '@/hooks/use-websocket';
+import { formatErrorForToast } from '@/lib/error-handler';
 
 interface Collaborator {
   id: string;
@@ -143,7 +144,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'Collaborator created successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -155,7 +157,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'API key created successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -167,7 +170,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'API key updated successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -179,7 +183,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'User blocked successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -191,7 +196,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'User unblocked successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -203,7 +209,8 @@ export default function AdminPage() {
       toast({ title: 'Success', description: 'User updated successfully' });
     },
     onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
     }
   });
 
@@ -1143,10 +1150,11 @@ function AIReferencesTable() {
       });
       queryClient.invalidateQueries({ queryKey: ['/api/chatbot-references'] });
     },
-    onError: () => {
+    onError: (error) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Delete Failed",
-        description: "Failed to delete AI reference",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive"
       });
     }

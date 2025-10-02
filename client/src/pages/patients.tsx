@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { z } from "zod";
+import { formatErrorForToast } from "@/lib/error-handler";
 
 const patientFormSchema = insertPatientSchema.extend({
   name: z.string().min(1, "Nome é obrigatório"),
@@ -56,10 +57,11 @@ export default function Patients() {
       setIsDialogOpen(false);
       form.reset();
     },
-    onError: () => {
+    onError: (error) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro",
-        description: "Erro ao cadastrar paciente. Tente novamente.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },
@@ -77,10 +79,11 @@ export default function Patients() {
       setEditingPatient(null);
       editForm.reset();
     },
-    onError: () => {
+    onError: (error) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro",
-        description: "Erro ao atualizar paciente. Tente novamente.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },
@@ -95,10 +98,11 @@ export default function Patients() {
         description: "Paciente removido com sucesso!",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro",
-        description: "Erro ao remover paciente. Tente novamente.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     },

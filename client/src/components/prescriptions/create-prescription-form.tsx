@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Plus, Trash2, AlertTriangle } from 'lucide-react';
+import { formatErrorForToast } from '@/lib/error-handler';
 
 // Form validation schema
 const prescriptionFormSchema = z.object({
@@ -160,9 +161,10 @@ export default function CreatePrescriptionForm({ onSuccess }: CreatePrescription
       
       onSuccess();
     } catch (error: any) {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: 'Erro ao criar prescrição',
-        description: error.message || 'Ocorreu um erro inesperado.',
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: 'destructive',
       });
     } finally {

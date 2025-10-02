@@ -38,6 +38,24 @@ Security is implemented with user-based authentication and role-based access con
 - **TMC Credits System**: Promotional credits for new users, automatic charging for video consultations and AI queries, doctor commissions, and PayPal integration for secure credit purchases.
 - **Enhanced Registration System**: Role-based registration (Patient, Doctor, Admin) with mandatory fields and transactional database writes. Registration links available on login page.
 - **AI Reference Management**: Admin-only PDF upload system for AI knowledge base with secure file validation and role-based access control.
+- **Friendly Error Handling System**: User-friendly error messages with practical suggestions for common HTTP errors (400, 401, 403, 404, 409, 422, 429, 500+), implemented across all forms using formatErrorForToast helper.
+
+## Error Handling
+
+### User-Friendly Error Messages
+The platform implements a comprehensive error handling system that provides clear, actionable feedback to users:
+- **Helper Location**: `client/src/lib/error-handler.ts`
+- **Coverage**: All forms including registration, login, patient management, appointments, prescriptions, and admin functions
+- **Error Types Handled**:
+  - 409 Conflict: Specific suggestions for duplicate username, email, phone, or CRM
+  - 400 Bad Request: Validation error details with formatting guidance
+  - 401 Unauthorized: Credential verification suggestions
+  - 403 Forbidden: Permission requirement explanations
+  - 404 Not Found: Resource location guidance
+  - 422 Unprocessable: Data completeness suggestions
+  - 429 Too Many Requests: Rate limit advice
+  - 500+ Server Errors: Server issue acknowledgment with retry suggestions
+- **Implementation Pattern**: All form error handlers use `formatErrorForToast(error)` to parse HTTP errors and return structured, user-friendly messages with practical suggestions
 
 ## External Dependencies
 

@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { User, UserCheck, Stethoscope } from "lucide-react";
 import telemedLogo from "@/assets/logo-icon.jpg";
+import { formatErrorForToast } from "@/lib/error-handler";
 
 // Create schemas using translation function
 const createLoginSchema = (t: any) => z.object({
@@ -496,9 +497,10 @@ export default function Login() {
         description: t("auth.login_success_desc"),
       });
     } catch (error: any) {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: t("auth.login_error"),
-        description: error.message || t("auth.login_error_desc"),
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     } finally {
@@ -520,9 +522,10 @@ export default function Login() {
         description: t("auth.register_success_desc"),
       });
     } catch (error: any) {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: t("auth.register_error"),
-        description: error.message || t("auth.register_error_desc"),
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     } finally {
