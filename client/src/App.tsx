@@ -221,6 +221,9 @@ function Router() {
       
       {/* Floating AI Chatbot - Available on all pages */}
       <FloatingChatbot />
+      
+      {/* Quick Actions Bar - Available for authenticated users */}
+      {user && <QuickActionsBar userRole={user.role} />}
     </div>
   );
 }
