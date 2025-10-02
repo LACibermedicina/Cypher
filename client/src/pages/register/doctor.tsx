@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Calendar, Users, Stethoscope, Shield, CheckCircle, Clock, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatErrorForToast } from "@/lib/error-handler";
 
 const registerSchema = z.object({
   username: z.string().min(3, "Nome de usuário deve ter pelo menos 3 caracteres"),
@@ -62,9 +63,10 @@ export default function DoctorRegister() {
         description: t("register.doctor.success_description"),
       });
     } catch (error) {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: t("register.doctor.error_title"),
-        description: t("register.doctor.error_description"),
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     } finally {

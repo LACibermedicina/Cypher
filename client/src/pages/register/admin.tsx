@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Settings, Users, FileText, TrendingUp, CheckCircle, Lock } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatErrorForToast } from "@/lib/error-handler";
 
 const registerSchema = z.object({
   username: z.string().min(3, "Nome de usuário deve ter pelo menos 3 caracteres"),
@@ -56,9 +57,10 @@ export default function AdminRegister() {
         description: "Bem-vindo à plataforma Telemed. Você já pode fazer login.",
       });
     } catch (error) {
+      const errorInfo = formatErrorForToast(error);
       toast({
-        title: "Erro ao criar conta",
-        description: "Ocorreu um erro ao criar sua conta. Tente novamente.",
+        title: errorInfo.title,
+        description: errorInfo.description,
         variant: "destructive",
       });
     } finally {
