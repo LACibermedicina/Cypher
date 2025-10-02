@@ -17,7 +17,9 @@ const registerSchema = z.object({
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
   name: z.string().min(1, "Nome completo é obrigatório"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
-  phone: z.string().optional(),
+  phone: z.string().min(1, "Telefone é obrigatório"),
+  dateOfBirth: z.string().min(1, "Data de nascimento é obrigatória"),
+  gender: z.string().min(1, "Gênero é obrigatório"),
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -36,6 +38,8 @@ export default function PatientRegister() {
       name: "",
       email: "",
       phone: "",
+      dateOfBirth: "",
+      gender: "",
     },
   });
 
@@ -43,7 +47,13 @@ export default function PatientRegister() {
     setIsSubmitting(true);
     try {
       await register({
-        ...data,
+        username: data.username,
+        password: data.password,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender,
         role: "patient" as const,
       });
       
@@ -194,7 +204,7 @@ export default function PatientRegister() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Telefone (Opcional)</FormLabel>
+                        <FormLabel>Telefone</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -206,6 +216,50 @@ export default function PatientRegister() {
                       </FormItem>
                     )}
                   />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="dateOfBirth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data de Nascimento</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="date"
+                              data-testid="input-patient-dob"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Gênero</FormLabel>
+                          <FormControl>
+                            <select 
+                              {...field}
+                              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-medical-primary focus:border-transparent"
+                              data-testid="select-patient-gender"
+                            >
+                              <option value="">Selecione o gênero</option>
+                              <option value="masculino">Masculino</option>
+                              <option value="feminino">Feminino</option>
+                              <option value="outro">Outro</option>
+                              <option value="prefiro_nao_informar">Prefiro não informar</option>
+                            </select>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   
                   <Button 
                     type="submit" 

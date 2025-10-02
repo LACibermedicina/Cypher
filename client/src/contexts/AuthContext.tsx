@@ -36,6 +36,8 @@ interface RegisterData {
   phone?: string;
   medicalLicense?: string; // CRM for doctors
   specialization?: string; // Specialty for doctors
+  dateOfBirth?: string; // Date of birth for patients
+  gender?: string; // Gender for patients
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

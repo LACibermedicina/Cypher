@@ -4266,7 +4266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Registration
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, password, role, name, email, phone, medicalLicense, specialization } = req.body;
+      const { username, password, role, name, email, phone, medicalLicense, specialization, dateOfBirth, gender } = req.body;
       
       // Validate required fields
       if (!username || !password || !role || !name) {
@@ -4277,6 +4277,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (role === 'doctor') {
         if (!medicalLicense || !specialization) {
           return res.status(400).json({ message: 'CRM and specialization are required for doctors' });
+        }
+      }
+      
+      // Validate patient-specific fields
+      if (role === 'patient') {
+        if (!phone) {
+          return res.status(400).json({ message: 'Phone is required for patients' });
+        }
+        if (!dateOfBirth) {
+          return res.status(400).json({ message: 'Date of birth is required for patients' });
+        }
+        if (!gender) {
+          return res.status(400).json({ message: 'Gender is required for patients' });
         }
       }
       
@@ -4294,17 +4307,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Hash password (in production, use bcrypt)
       const hashedPassword = crypto.createHash('sha256').update(password).digest('hex');
       
-      // Create user
-      const newUser = await storage.createUser({
-        username,
-        password: hashedPassword,
-        role,
-        name,
-        email,
-        phone,
-        medicalLicense: role === 'doctor' ? medicalLicense : undefined,
-        specialization: role === 'doctor' ? specialization : undefined,
-        digitalCertificate: role === 'doctor' ? `cert-${Date.now()}` : undefined,
+      // Use transaction to create both user and patient record (if patient)
+      const newUser = await db.transaction(async (tx) => {
+        // Create user
+        const [user] = await tx.insert(users).values({
+          username,
+          password: hashedPassword,
+          role,
+          name,
+          email,
+          phone,
+          medicalLicense: role === 'doctor' ? medicalLicense : undefined,
+          specialization: role === 'doctor' ? specialization : undefined,
+          digitalCertificate: role === 'doctor' ? `cert-${Date.now()}` : undefined,
+        }).returning();
+        
+        // If patient, also create patient record
+        if (role === 'patient') {
+          await tx.insert(patients).values({
+            userId: user.id,
+            name,
+            email,
+            phone: phone!,
+            dateOfBirth: new Date(dateOfBirth),
+            gender,
+            healthStatus: 'a_determinar',
+          });
+        }
+        
+        return user;
       });
       
       // Add promotional credits for new user (except admin)
