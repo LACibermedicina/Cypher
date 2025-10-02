@@ -30,7 +30,7 @@ interface AuthContextType {
 interface RegisterData {
   username: string;
   password: string;
-  role: 'doctor' | 'admin' | 'patient';
+  role: 'doctor' | 'admin' | 'patient' | 'researcher';
   name: string;
   email?: string;
   phone?: string;
@@ -38,6 +38,8 @@ interface RegisterData {
   specialization?: string; // Specialty for doctors
   dateOfBirth?: string; // Date of birth for patients
   gender?: string; // Gender for patients
+  bloodType?: string; // Blood type for patients
+  allergies?: string; // Allergies for patients
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

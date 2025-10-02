@@ -25,9 +25,17 @@ const createRegisterSchema = (t: any) => z.object({
   username: z.string().min(3, t("forms.validation.username_min_length")),
   password: z.string().min(6, t("forms.validation.password_min_length")),
   name: z.string().min(1, t("forms.validation.name_required")),
-  role: z.enum(["doctor", "patient", "admin"] as const),
+  role: z.enum(["doctor", "patient", "admin", "researcher"] as const),
   email: z.string().email(t("forms.validation.email_invalid")).optional().or(z.literal("")),
   phone: z.string().optional(),
+  // Doctor fields
+  medicalLicense: z.string().optional(),
+  specialization: z.string().optional(),
+  // Patient fields
+  dateOfBirth: z.string().optional(),
+  gender: z.string().optional(),
+  bloodType: z.string().optional(),
+  allergies: z.string().optional(),
 });
 
 type LoginForm = z.infer<ReturnType<typeof createLoginSchema>>;
@@ -133,6 +141,9 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
     defaultValues,
   });
   
+  // Watch for role changes to show/hide conditional fields
+  const selectedRole = form.watch("role");
+  
   // Expose getValues to parent via ref
   useEffect(() => {
     formRef.current = { getValues: form.getValues };
@@ -142,6 +153,50 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("ui.user_type")}</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger data-testid="select-register-role" className="mobile-input-enhanced">
+                      <SelectValue placeholder={t("ui.user_type_placeholder")} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="patient" data-testid="option-role-patient">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("patient")}
+                        {t("roles.patient")}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="doctor" data-testid="option-role-doctor">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("doctor")}
+                        {t("roles.doctor")}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin" data-testid="option-role-admin">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("admin")}
+                        {t("roles.admin")}
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="researcher" data-testid="option-role-researcher">
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon("researcher")}
+                        {t("roles.researcher")}
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
           <FormField
             control={form.control}
             name="name"
@@ -197,43 +252,7 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="role"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>{t("ui.user_type")}</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger data-testid="select-register-role" className="mobile-input-enhanced">
-                      <SelectValue placeholder={t("ui.user_type_placeholder")} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="patient" data-testid="option-role-patient">
-                      <div className="flex items-center gap-2">
-                        {getRoleIcon("patient")}
-                        {t("roles.patient")}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="doctor" data-testid="option-role-doctor">
-                      <div className="flex items-center gap-2">
-                        {getRoleIcon("doctor")}
-                        {t("roles.doctor")}
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="admin" data-testid="option-role-admin">
-                      <div className="flex items-center gap-2">
-                        {getRoleIcon("admin")}
-                        {t("roles.admin")}
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          
           <FormField
             control={form.control}
             name="email"
@@ -271,6 +290,140 @@ function RegisterFormSection({ defaultValues, onSubmit, isSubmitting, getRoleIco
               </FormItem>
             )}
           />
+          
+          {/* Doctor-specific fields */}
+          {selectedRole === "doctor" && (
+            <>
+              <FormField
+                control={form.control}
+                name="medicalLicense"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CRM (Registro Médico) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Ex: CRM-SP 123456"
+                        data-testid="input-register-medical-license"
+                        className="mobile-input-enhanced"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="specialization"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Especialização *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Ex: Cardiologia, Pediatria"
+                        data-testid="input-register-specialization"
+                        className="mobile-input-enhanced"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
+          
+          {/* Patient-specific fields */}
+          {selectedRole === "patient" && (
+            <>
+              <FormField
+                control={form.control}
+                name="dateOfBirth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Nascimento</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="date"
+                        data-testid="input-register-dob"
+                        className="mobile-input-enhanced"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gênero</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-register-gender" className="mobile-input-enhanced">
+                          <SelectValue placeholder="Selecione o gênero" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="feminino">Feminino</SelectItem>
+                        <SelectItem value="outro">Outro</SelectItem>
+                        <SelectItem value="prefiro_nao_informar">Prefiro não informar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bloodType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo Sanguíneo</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-register-blood-type" className="mobile-input-enhanced">
+                          <SelectValue placeholder="Selecione o tipo sanguíneo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="A+">A+</SelectItem>
+                        <SelectItem value="A-">A-</SelectItem>
+                        <SelectItem value="B+">B+</SelectItem>
+                        <SelectItem value="B-">B-</SelectItem>
+                        <SelectItem value="AB+">AB+</SelectItem>
+                        <SelectItem value="AB-">AB-</SelectItem>
+                        <SelectItem value="O+">O+</SelectItem>
+                        <SelectItem value="O-">O-</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="allergies"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alergias</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Ex: Penicilina, Dipirona"
+                        data-testid="input-register-allergies"
+                        className="mobile-input-enhanced"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
         </CardContent>
         <CardFooter>
           <Button

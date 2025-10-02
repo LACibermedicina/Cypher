@@ -4403,7 +4403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Registration
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { username, password, role, name, email, phone, medicalLicense, specialization, dateOfBirth, gender } = req.body;
+      const { username, password, role, name, email, phone, medicalLicense, specialization, dateOfBirth, gender, bloodType, allergies } = req.body;
       
       // Validate required fields
       if (!username || !password || !role || !name) {
@@ -4431,7 +4431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Validate role
-      if (!['doctor', 'admin', 'patient'].includes(role)) {
+      if (!['doctor', 'admin', 'patient', 'researcher'].includes(role)) {
         return res.status(400).json({ message: 'Invalid role' });
       }
       
@@ -4468,6 +4468,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             phone: phone!,
             dateOfBirth: new Date(dateOfBirth),
             gender,
+            bloodType: bloodType || null,
+            allergies: allergies || null,
             healthStatus: 'a_determinar',
           });
         }
