@@ -40,6 +40,15 @@ export default function MedicalAssistant() {
   // Get or create active conversation
   const { data: conversation, isLoading } = useQuery<Conversation>({
     queryKey: ['/api/chatbot/conversation', user?.id],
+    queryFn: async () => {
+      const response = await fetch('/api/chatbot/conversation', {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to load conversation');
+      }
+      return response.json();
+    },
     enabled: !!user,
   });
 
