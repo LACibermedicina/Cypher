@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Users, Key, Activity, AlertTriangle, Plus, Eye, EyeOff, Copy, Trash2, UserCheck, UserX, Edit3, Clock, Zap } from 'lucide-react';
+import { Shield, Users, Key, Activity, AlertTriangle, Plus, Eye, EyeOff, Copy, Trash2, UserCheck, UserX, Edit3, Clock, Zap, Database } from 'lucide-react';
 import { format } from 'date-fns';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { formatErrorForToast } from '@/lib/error-handler';
@@ -399,6 +399,12 @@ export default function AdminPage() {
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
           <TabsTrigger value="ai-references" data-testid="tab-ai-references">AI References</TabsTrigger>
           <TabsTrigger value="layout-theme" data-testid="tab-layout-theme">Layout & Tema</TabsTrigger>
+          <TabsTrigger value="database-cleanup" data-testid="tab-database-cleanup">
+            <div className="flex items-center space-x-2">
+              <Database className="h-4 w-4" />
+              <span>Limpeza de Dados</span>
+            </div>
+          </TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -1475,6 +1481,9 @@ export default function AdminPage() {
             </DialogContent>
           </Dialog>
         </TabsContent>
+
+        {/* Database Cleanup Tab */}
+        <DatabaseCleanupTab />
       </Tabs>
     </div>
   );
@@ -1778,5 +1787,157 @@ function CreateApiKeyForm({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+// Database Cleanup Tab Content Component
+function DatabaseCleanupTab() {
+  const { toast } = useToast();
+  const [confirmationText, setConfirmationText] = useState('');
+  const [isClearing, setIsClearing] = useState(false);
+
+  const clearDatabaseMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/admin/clear-database', {
+        confirmation: 'CLEAR_ALL_DATA'
+      });
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Banco de dados limpo com sucesso!",
+        description: data.message,
+      });
+      setConfirmationText('');
+      // Invalidate all queries to refresh data
+      queryClient.invalidateQueries();
+    },
+    onError: (error: any) => {
+      const errorInfo = formatErrorForToast(error);
+      toast({
+        title: errorInfo.title,
+        description: errorInfo.description,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleClearDatabase = () => {
+    if (confirmationText !== 'LIMPAR TUDO') {
+      toast({
+        title: "Confirmação inválida",
+        description: "Digite exatamente 'LIMPAR TUDO' para confirmar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!confirm('⚠️ ATENÇÃO: Esta ação é irreversível e irá remover TODOS os dados de usuários, pacientes, médicos e agendamentos. Apenas seu usuário administrador será preservado. Tem certeza?')) {
+      return;
+    }
+
+    setIsClearing(true);
+    clearDatabaseMutation.mutate();
+    setTimeout(() => setIsClearing(false), 3000);
+  };
+
+  return (
+    <TabsContent value="database-cleanup" className="space-y-4">
+      <Card className="border-destructive">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-destructive">
+            <Database className="h-6 w-6" />
+            <span>Limpeza Completa do Banco de Dados</span>
+          </CardTitle>
+          <CardDescription>
+            Remove todos os dados de teste para preparar o sistema para usuários reais. 
+            <strong className="text-destructive"> Esta ação é irreversível!</strong>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Warning Section */}
+          <div className="bg-destructive/10 border-2 border-destructive rounded-lg p-4 space-y-3">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0 mt-1" />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">⚠️ Atenção: Operação Destrutiva</h3>
+                <p className="text-sm text-muted-foreground">
+                  Esta operação irá <strong>remover permanentemente</strong> os seguintes dados:
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-4">
+                  <li>Todos os usuários (exceto administradores)</li>
+                  <li>Todos os pacientes cadastrados</li>
+                  <li>Todos os agendamentos</li>
+                  <li>Todos os prontuários médicos</li>
+                  <li>Todas as prescrições</li>
+                  <li>Todos os resultados de exames</li>
+                  <li>Todas as mensagens do WhatsApp</li>
+                  <li>Todas as transações TMC</li>
+                  <li>Todas as fotos de perfil</li>
+                </ul>
+                <p className="text-sm font-semibold text-destructive mt-2">
+                  ✅ Seu usuário administrador será preservado.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Confirmation Section */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="confirmation">
+                Para confirmar, digite <strong className="text-destructive">LIMPAR TUDO</strong> abaixo:
+              </Label>
+              <Input
+                id="confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                placeholder="Digite: LIMPAR TUDO"
+                className="font-mono"
+                data-testid="input-clear-database-confirmation"
+              />
+            </div>
+
+            <Button
+              onClick={handleClearDatabase}
+              disabled={confirmationText !== 'LIMPAR TUDO' || isClearing || clearDatabaseMutation.isPending}
+              variant="destructive"
+              className="w-full"
+              size="lg"
+              data-testid="button-clear-database"
+            >
+              {(isClearing || clearDatabaseMutation.isPending) ? (
+                <>
+                  <div className="animate-spin mr-2 h-5 w-5 border-2 border-white/30 border-t-white rounded-full" />
+                  Limpando banco de dados...
+                </>
+              ) : (
+                <>
+                  <Database className="mr-2 h-5 w-5" />
+                  Limpar Banco de Dados
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Success Message */}
+          {clearDatabaseMutation.isSuccess && (
+            <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-500 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <Shield className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-green-700 dark:text-green-400">
+                    ✅ Banco de dados limpo com sucesso!
+                  </h3>
+                  <p className="text-sm text-green-600 dark:text-green-300">
+                    O sistema está pronto para receber novos usuários de teste. 
+                    Novos usuários podem se registrar com fotos de perfil personalizadas.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
   );
 }
