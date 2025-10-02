@@ -489,7 +489,7 @@ export default function Header() {
                 <img 
                   src={userIcon} 
                   alt="User Icon" 
-                  className="w-5 h-5"
+                  className="w-5 h-5 dark:invert dark:brightness-0 dark:contrast-200"
                 />
                 <i className="fas fa-sign-in-alt text-lg text-primary"></i>
               </Button>
