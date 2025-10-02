@@ -168,7 +168,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
   const quickActions = getQuickActions();
 
   return (
-    <div className="fixed bottom-[19px] right-[66px] z-50 w-10" data-testid="quick-actions-bar">
+    <div className="fixed bottom-[16px] right-[66px] z-50 w-10" data-testid="quick-actions-bar">
       <div className="flex flex-col-reverse items-center w-10">
         {/* Quick Actions - aparece acima do botão */}
         <div className={`transition-all duration-300 mb-2 ${
