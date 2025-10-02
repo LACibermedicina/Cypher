@@ -13,20 +13,28 @@ import {
   CreditCard,
   Search,
   Zap,
-  ChevronUp,
-  ChevronDown
+  Sparkles
 } from "lucide-react";
 
 interface QuickActionsBarProps {
   userRole: string;
 }
 
+interface QuickAction {
+  id: string;
+  title: string;
+  icon: JSX.Element;
+  action: () => void;
+  shortcut?: string;
+  isEmergency?: boolean;
+}
+
 export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Quick actions based on user role
-  const getQuickActions = () => {
-    const commonActions = [
+  const getQuickActions = (): QuickAction[] => {
+    const commonActions: QuickAction[] = [
       {
         id: 'command-palette',
         title: 'Comandos',
@@ -53,7 +61,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
       }
     ];
 
-    const doctorActions = [
+    const doctorActions: QuickAction[] = [
       {
         id: 'ai-analysis',
         title: 'Análise IA',
@@ -104,7 +112,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
       }
     ];
 
-    const adminActions = [
+    const adminActions: QuickAction[] = [
       {
         id: 'users',
         title: 'Usuários',
@@ -125,7 +133,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
       }
     ];
 
-    const emergencyAction = {
+    const emergencyAction: QuickAction = {
       id: 'emergency',
       title: 'Emergência',
       icon: <Zap className="w-4 h-4" />,
@@ -159,19 +167,20 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50" data-testid="quick-actions-bar">
-      <div className={`bg-card border border-border rounded-2xl shadow-2xl transition-all duration-300 ${
-        isExpanded ? 'p-4' : 'p-2'
+      <div className={`bg-card/80 dark:bg-card/70 backdrop-blur-lg border border-border/50 rounded-xl shadow-xl transition-all duration-300 ${
+        isExpanded ? 'p-3' : 'p-0'
       }`}>
         {/* Expand/Collapse Button */}
-        <div className="flex justify-center mb-2">
+        <div className="flex justify-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-6 px-2"
+            className={`h-10 w-10 rounded-xl hover:bg-primary/10 transition-all ${isExpanded ? 'mb-2' : ''}`}
             data-testid="button-toggle-quick-actions"
+            title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
-            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+            <Sparkles className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </Button>
         </div>
 
@@ -179,30 +188,25 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
         <div className={`transition-all duration-300 ${
           isExpanded ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 overflow-hidden'
         }`}>
-          <div className="grid grid-cols-2 gap-2 w-48">
-            {quickActions.map((action, index) => (
+          <div className="grid grid-cols-2 gap-1.5 w-40">
+            {quickActions.map((action) => (
               <Tooltip key={action.id}>
                 <TooltipTrigger asChild>
                   <Button
-                    variant={action.isEmergency ? "destructive" : "outline"}
+                    variant={action.isEmergency ? "destructive" : "ghost"}
                     size="sm"
                     onClick={action.action}
-                    className={`flex flex-col items-center justify-center h-16 text-xs gap-1 ${
-                      action.isEmergency ? 'border-red-500 bg-red-50 hover:bg-red-100 text-red-700' : ''
+                    className={`flex flex-col items-center justify-center h-12 text-[10px] gap-0.5 ${
+                      action.isEmergency ? 'border-red-500 bg-red-50/80 hover:bg-red-100 text-red-700' : 'hover:bg-primary/10'
                     }`}
                     data-testid={`quick-action-${action.id}`}
                   >
                     <div className="flex-shrink-0">
                       {action.icon}
                     </div>
-                    <div className="truncate w-full text-center">
+                    <div className="truncate w-full text-center leading-tight">
                       {action.title}
                     </div>
-                    {action.shortcut && (
-                      <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3">
-                        {action.shortcut.replace('Ctrl+', '⌘')}
-                      </Badge>
-                    )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="max-w-xs">
@@ -224,35 +228,13 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             ))}
           </div>
 
-          {/* Role indicator */}
-          <div className="mt-3 pt-2 border-t border-border">
-            <div className="flex items-center justify-center">
-              <Badge 
-                variant={userRole === 'admin' ? 'default' : userRole === 'doctor' ? 'secondary' : 'outline'}
-                className="text-xs"
-              >
-                {userRole === 'admin' ? 'Administrador' : 
-                 userRole === 'doctor' ? 'Médico' : 
-                 userRole === 'patient' ? 'Paciente' :
-                 userRole === 'researcher' ? 'Pesquisador' : 'Visitante'}
-              </Badge>
-            </div>
-          </div>
-
           {/* Quick help */}
           <div className="mt-2 text-center">
-            <div className="text-xs text-muted-foreground">
-              Pressione <Badge variant="outline" className="text-[8px] px-1 py-0">⌘K</Badge> para mais comandos
+            <div className="text-[10px] text-muted-foreground">
+              Pressione <Badge variant="outline" className="text-[8px] px-1 py-0">⌘K</Badge> para mais
             </div>
           </div>
         </div>
-
-        {/* Collapsed state indicator */}
-        {!isExpanded && (
-          <div className="flex justify-center">
-            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-          </div>
-        )}
       </div>
     </div>
   );
