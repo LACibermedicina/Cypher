@@ -747,6 +747,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WEBHOOK ENDPOINTS
   // ============================================================================
 
+  // Helper function to get available time slots for a doctor on a given date
+  async function getAvailableSlots(doctorId: string, date: Date): Promise<string[]> {
+    const dayStart = new Date(date);
+    dayStart.setHours(8, 0, 0, 0); // Start at 8 AM
+    
+    const dayEnd = new Date(date);
+    dayEnd.setHours(18, 0, 0, 0); // End at 6 PM
+
+    // Get all appointments for the doctor on this date
+    const doctorAppointments = await db.select()
+      .from(appointments)
+      .where(and(
+        eq(appointments.doctorId, doctorId),
+        sql`DATE(${appointments.scheduledAt}) = DATE(${date.toISOString()})`
+      ));
+
+    // Generate all possible 30-minute slots
+    const allSlots: Date[] = [];
+    const currentSlot = new Date(dayStart);
+    while (currentSlot < dayEnd) {
+      allSlots.push(new Date(currentSlot));
+      currentSlot.setMinutes(currentSlot.getMinutes() + 30);
+    }
+
+    // Filter out occupied slots
+    const availableSlots = allSlots.filter(slot => {
+      const slotTime = slot.getTime();
+      const slotDuration = 30 * 60 * 1000;
+      
+      return !doctorAppointments.some(apt => {
+        const aptTime = new Date(apt.scheduledAt).getTime();
+        const aptDuration = (apt.duration || 30) * 60 * 1000;
+        
+        // Check if times overlap
+        return (slotTime < aptTime + aptDuration) && (slotTime + slotDuration > aptTime);
+      });
+    });
+
+    // Format slots as strings
+    return availableSlots.map(slot => 
+      slot.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    );
+  }
+
   // WhatsApp webhook handler
   app.post('/api/whatsapp/webhook', async (req, res) => {
     try {
@@ -783,68 +827,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle scheduling requests
         if (analysis.isSchedulingRequest) {
-          // Get real available slots from doctor schedule
-          const doctorId = actualDoctorId || DEFAULT_DOCTOR_ID;
-          const availableSlots = await schedulingService.getAvailableSlots(doctorId);
-          const formattedSlots = availableSlots.map(slot => slot.formatted);
+          // Get all doctors with availability for today and tomorrow
+          const today = new Date();
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+
+          // Get all doctors
+          const doctors = await db.select()
+            .from(users)
+            .where(eq(users.role, 'doctor'));
+
+          // Get availability for each doctor for the next 2 days
+          const availableDoctors = [];
+          for (const doctor of doctors) {
+            const todayDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+            const tomorrowDate = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+            
+            const todaySlots = await getAvailableSlots(doctor.id, today);
+            const tomorrowSlots = await getAvailableSlots(doctor.id, tomorrow);
+            
+            // Build structured slots with ISO dates and labels
+            const allSlots = [
+              ...todaySlots.map(timeStr => ({
+                dateIso: todayDate,
+                time: timeStr,
+                label: `Hoje ${timeStr}`
+              })),
+              ...tomorrowSlots.map(timeStr => ({
+                dateIso: tomorrowDate,
+                time: timeStr,
+                label: `Amanhã ${timeStr}`
+              }))
+            ];
+
+            if (allSlots.length > 0) {
+              availableDoctors.push({
+                doctorId: doctor.id,
+                doctorName: doctor.name,
+                availableSlots: allSlots // Send structured objects with ISO dates
+              });
+            }
+          }
 
           const schedulingResponse = await geminiService.processSchedulingRequest(
             message.text,
-            formattedSlots
+            availableDoctors
           );
 
           if (schedulingResponse.suggestedAppointment && !schedulingResponse.requiresHumanIntervention) {
-            // Find the exact slot that was suggested to get proper date/time
-            const selectedSlot = availableSlots.find(slot => 
-              slot.formatted === schedulingResponse.suggestedAppointment?.date + ' às ' + schedulingResponse.suggestedAppointment?.time
-            );
-
+            const { dateIso, time, doctorId, doctorName } = schedulingResponse.suggestedAppointment as any;
+            
+            // Parse the date from Gemini response (should be ISO format)
             let scheduledAt: Date;
-            if (selectedSlot) {
-              // Use the properly formatted date and time from the slot
-              scheduledAt = new Date(`${selectedSlot.date} ${selectedSlot.time}`);
-            } else {
-              // Fallback to parsing the response (less reliable)
-              scheduledAt = new Date(`${schedulingResponse.suggestedAppointment.date} ${schedulingResponse.suggestedAppointment.time}`);
+            try {
+              if (!dateIso || !time) {
+                throw new Error('Missing dateIso or time from Gemini response');
+              }
+              scheduledAt = new Date(`${dateIso}T${time}`);
+              if (isNaN(scheduledAt.getTime())) {
+                throw new Error('Invalid date/time');
+              }
+            } catch (e) {
+              console.error('Error parsing date/time from Gemini:', e, { dateIso, time });
+              aiResponse = 'Desculpe, houve um erro ao processar a data e hora. Por favor, tente novamente.';
+              return;
             }
 
-            // Verify the slot is still available before creating
-            const isAvailable = await schedulingService.isSpecificSlotAvailable(
-              doctorId,
-              scheduledAt.toISOString().split('T')[0],
-              scheduledAt.toTimeString().slice(0, 5)
-            );
+            // Validate that the suggested slot was actually available
+            const availableSlotsForDoctor = await getAvailableSlots(doctorId, scheduledAt);
+            const suggestedTimeStr = scheduledAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            
+            if (!availableSlotsForDoctor.includes(suggestedTimeStr)) {
+              console.warn('Gemini suggested unavailable slot:', { doctorId, dateIso, time, available: availableSlotsForDoctor });
+              aiResponse = `Desculpe, o horário sugerido (${suggestedTimeStr}) não está mais disponível. Horários disponíveis: ${availableSlotsForDoctor.join(', ')}`;
+              return;
+            }
 
-            if (!isAvailable) {
+            // Double-check availability before creating appointment (redundant but safe)
+            const doctorAppointments = await db.select()
+              .from(appointments)
+              .where(and(
+                eq(appointments.doctorId, doctorId),
+                sql`DATE(${appointments.scheduledAt}) = DATE(${scheduledAt.toISOString()})`
+              ));
+
+            const requestedTime = scheduledAt.getTime();
+            const duration = 30 * 60 * 1000;
+            
+            const hasConflict = doctorAppointments.some(apt => {
+              const aptTime = new Date(apt.scheduledAt).getTime();
+              const aptDuration = (apt.duration || 30) * 60 * 1000;
+              return (requestedTime < aptTime + aptDuration) && (requestedTime + duration > aptTime);
+            });
+
+            if (hasConflict) {
               aiResponse = 'Desculpe, esse horário não está mais disponível. Por favor, escolha outro horário.';
             } else {
               // Create appointment automatically
               const appointment = await storage.createAppointment({
                 patientId: patient.id,
-                doctorId: doctorId,
-                scheduledAt,
-                type: schedulingResponse.suggestedAppointment.type || 'consulta',
+                doctorId,
+                scheduledAt: scheduledAt.toISOString(),
+                type: schedulingResponse.suggestedAppointment.type || 'Consulta Geral',
                 status: 'scheduled',
-                aiScheduled: true,
+                roomId: `room_${Date.now()}`,
+                duration: 30
               });
 
-            // Update WhatsApp message with appointment reference
-            await storage.updateWhatsappMessage(whatsappMessage.id, {
-              appointmentScheduled: true,
-              appointmentId: appointment.id,
-              processed: true,
-            });
+              // Update WhatsApp message with appointment reference
+              await storage.updateWhatsappMessage(whatsappMessage.id, {
+                appointmentScheduled: true,
+                appointmentId: appointment.id,
+                processed: true,
+              });
 
-            aiResponse = schedulingResponse.response;
+              aiResponse = schedulingResponse.response;
 
-            // Send confirmation
-            await whatsAppService.sendAppointmentConfirmation(
-              message.from,
-              patient.name,
-              schedulingResponse.suggestedAppointment.date,
-              schedulingResponse.suggestedAppointment.time
-            );
+              // Send confirmation
+              const formattedDate = scheduledAt.toLocaleDateString('pt-BR');
+              const formattedTime = scheduledAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+              await whatsAppService.sendAppointmentConfirmation(
+                message.from,
+                patient.name,
+                formattedDate,
+                formattedTime
+              );
             }
+          } else {
+            aiResponse = schedulingResponse.response;
           }
         }
 
@@ -9162,6 +9272,50 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
+  // Get available appointment slots for doctors
+  app.get('/api/doctors/available-slots', async (req: Request, res: Response) => {
+    try {
+      const { doctorId, date } = req.query;
+
+      if (!date) {
+        return res.status(400).json({ message: 'Data é obrigatória' });
+      }
+
+      const targetDate = new Date(date as string);
+
+      if (doctorId) {
+        // Get slots for specific doctor
+        const slots = await getAvailableSlots(doctorId as string, targetDate);
+        res.json({ doctorId, date, availableSlots: slots });
+      } else {
+        // Get all doctors and their available slots
+        const doctors = await db.select()
+          .from(users)
+          .where(eq(users.role, 'doctor'));
+
+        const doctorSlots = await Promise.all(
+          doctors.map(async (doctor) => {
+            const slots = await getAvailableSlots(doctor.id, targetDate);
+            return {
+              doctorId: doctor.id,
+              doctorName: doctor.name,
+              availableSlots: slots,
+              hasAvailability: slots.length > 0
+            };
+          })
+        );
+
+        res.json({
+          date,
+          doctors: doctorSlots.filter(d => d.hasAvailability)
+        });
+      }
+    } catch (error) {
+      console.error('Get available slots error:', error);
+      res.status(500).json({ message: 'Erro ao consultar horários disponíveis' });
+    }
+  });
+
   // Schedule appointment via chatbot
   app.post('/api/chatbot/schedule', async (req: Request, res: Response) => {
     try {
@@ -9196,11 +9350,38 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         });
       }
 
+      // Check doctor availability - get all appointments for the doctor on the requested date
+      const doctorAppointments = await db.select()
+        .from(appointments)
+        .where(and(
+          eq(appointments.doctorId, doctorId),
+          sql`DATE(${appointments.scheduledAt}) = DATE(${scheduledDate.toISOString()})`
+        ));
+
+      // Check for time conflicts (appointments within 30 minutes of requested time)
+      const requestedTime = scheduledDate.getTime();
+      const duration = 30 * 60 * 1000; // 30 minutes in milliseconds
+      
+      const hasConflict = doctorAppointments.some(apt => {
+        const aptTime = new Date(apt.scheduledAt).getTime();
+        const aptDuration = (apt.duration || 30) * 60 * 1000;
+        
+        // Check if times overlap
+        return (requestedTime < aptTime + aptDuration) && (requestedTime + duration > aptTime);
+      });
+
+      if (hasConflict) {
+        return res.status(409).json({
+          message: 'Este horário não está disponível. Por favor, escolha outro horário.',
+          availableSlots: await getAvailableSlots(doctorId, scheduledDate)
+        });
+      }
+
       // Create appointment (use authenticated user ID)
       const appointment = await storage.createAppointment({
         patientId: req.user.id,
         doctorId,
-        scheduledFor: scheduledDate.toISOString(),
+        scheduledAt: scheduledDate.toISOString(),
         type: type || 'Consulta Geral',
         status: 'scheduled',
         roomId: `room_${Date.now()}`,
@@ -9208,13 +9389,13 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       });
 
       res.json({
-        message: 'Appointment scheduled successfully',
+        message: 'Consulta agendada com sucesso',
         appointment
       });
 
     } catch (error) {
       console.error('Chatbot scheduling error:', error);
-      res.status(500).json({ message: 'Error scheduling appointment via chatbot' });
+      res.status(500).json({ message: 'Erro ao agendar consulta via chatbot' });
     }
   });
 

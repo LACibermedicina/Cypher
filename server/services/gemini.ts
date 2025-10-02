@@ -108,30 +108,68 @@ export class GeminiService {
     }
   }
 
-  async processSchedulingRequest(message: string, availableSlots: string[]): Promise<SchedulingResponse> {
+  async processSchedulingRequest(
+    message: string, 
+    availableDoctors?: Array<{ 
+      doctorId: string; 
+      doctorName: string; 
+      availableSlots: Array<{ dateIso: string; time: string; label: string }> 
+    }>
+  ): Promise<SchedulingResponse> {
     try {
+      let availabilityInfo = '';
+      let slotsMetadata: Record<string, { dateIso: string; time: string }> = {};
+      
+      if (availableDoctors && availableDoctors.length > 0) {
+        availabilityInfo = 'Médicos disponíveis com horários estruturados:\n';
+        availableDoctors.forEach(doctor => {
+          availabilityInfo += `\n- Dr(a). ${doctor.doctorName} (ID: ${doctor.doctorId})\n`;
+          availabilityInfo += '  Horários disponíveis:\n';
+          doctor.availableSlots.forEach(slot => {
+            const slotKey = `${doctor.doctorId}_${slot.dateIso}_${slot.time}`;
+            slotsMetadata[slotKey] = { dateIso: slot.dateIso, time: slot.time };
+            availabilityInfo += `    - ${slot.label} [dateIso: ${slot.dateIso}, time: ${slot.time}]\n`;
+          });
+        });
+      } else {
+        availabilityInfo = 'Nenhum médico disponível no momento. Solicite que o paciente escolha outra data.';
+      }
+
       const prompt = `
-        Você é um assistente de agendamento médico. Analise a solicitação de agendamento do paciente e sugira o melhor horário disponível.
+        Você é um assistente de agendamento médico inteligente. Analise a solicitação de agendamento do paciente e sugira o melhor médico e horário disponível baseado na DISPONIBILIDADE REAL dos médicos.
         
         Mensagem do paciente: "${message}"
-        Horários disponíveis: ${availableSlots.join(', ')}
+        
+        ${availabilityInfo}
+        
+        IMPORTANTE: 
+        - Você DEVE sugerir apenas horários que estão REALMENTE disponíveis na lista acima
+        - Se não houver horários disponíveis, informe o paciente e peça para escolher outra data
+        - Sempre inclua o ID do médico na resposta
+        - COPIE EXATAMENTE o dateIso e time do horário escolhido - não invente valores
+        - O campo dateIso já está no formato YYYY-MM-DD correto
+        - O campo time já está no formato HH:MM correto
         
         Forneça uma resposta em JSON com:
-        - isSchedulingRequest: boolean
-        - suggestedAppointment: { date, time, type }
-        - response: string (resposta para o paciente)
-        - requiresHumanIntervention: boolean
+        - isSchedulingRequest: boolean (sempre true se for uma solicitação de agendamento)
+        - suggestedAppointment: { dateIso: string (copie o valor exato do horário escolhido), time: string (copie o valor exato do horário escolhido), doctorId: string, doctorName: string, type: string }
+        - response: string (resposta amigável para o paciente explicando a sugestão, use o label do horário para melhor comunicação)
+        - requiresHumanIntervention: boolean (true se não houver disponibilidade)
       `;
 
-      return await generateWithJSON(prompt);
+      const result = await generateWithJSON(prompt);
+      return {
+        ...result,
+        isSchedulingRequest: true
+      };
     } catch (error) {
       console.error('Gemini scheduling error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         message: error instanceof Error ? error.message : 'Failed to process scheduling request'
       });
       return {
-        isSchedulingRequest: false,
-        response: 'Desculpe, não foi possível processar sua solicitação de agendamento no momento.',
+        isSchedulingRequest: true,
+        response: 'Desculpe, não foi possível processar sua solicitação de agendamento no momento. Por favor, tente novamente ou entre em contato com nossa equipe.',
         requiresHumanIntervention: true,
       };
     }
