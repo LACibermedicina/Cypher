@@ -167,8 +167,8 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50" data-testid="quick-actions-bar">
-      <div className={`transition-all duration-300 ${
-        isExpanded ? 'p-3' : 'p-0'
+      <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-sm rounded-lg shadow-lg border border-white/20 dark:border-black/20 transition-all duration-300 ${
+        isExpanded ? 'p-3' : 'p-2'
       }`}>
         {/* Expand/Collapse Button */}
         <div className="flex justify-center">
