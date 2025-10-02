@@ -2,7 +2,17 @@
   "app": {
     "name": "Telemed",
     "subtitle": "远程医疗系统",
-    "description": "集成人工智能的远程医疗系统"
+    "description": "集成人工智能的远程医疗系统",
+    "logo_alt": "Telemed 徽标"
+  },
+  "user": {
+    "guest": "访客",
+    "crm": "执照",
+    "role_doctor": "医生",
+    "role_patient": "患者",
+    "role_admin": "管理员",
+    "role_researcher": "研究员",
+    "role_visitor": "访客"
   },
   "navigation": {
     "dashboard": "仪表板",
@@ -10,6 +20,9 @@
     "schedule": "日程",
     "whatsapp": "WhatsApp 智能",
     "records": "病历",
+    "prescriptions": "处方",
+    "ai_assistant": "人工智能助手",
+    "medical_references": "医学参考",
     "admin": "管理",
     "logout": "登出"
   },
@@ -38,6 +51,9 @@
     "doctor": "医生",
     "appointment": "预约",
     "prescription": "处方",
+    "prescriptions": "医疗处方",
+    "ai_assistant_desc": "临床人工智能助手",
+    "knowledge_base": "知识库",
     "diagnosis": "诊断",
     "symptoms": "症状",
     "treatment": "治疗",
@@ -56,6 +72,7 @@
     "today_appointments": "今日预约",
     "recent_messages": "最新消息",
     "system_status": "系统状态",
+    "support_system": "支持系统",
     "quick_actions": "快速操作",
     "new_appointment": "新预约",
     "emergency": "急诊",

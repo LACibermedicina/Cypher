@@ -2,7 +2,17 @@
   "app": {
     "name": "Telemed",
     "subtitle": "Système de Télémédecine",
-    "description": "Système de télémédecine avec IA intégrée"
+    "description": "Système de télémédecine avec IA intégrée",
+    "logo_alt": "Logo Telemed"
+  },
+  "user": {
+    "guest": "Invité",
+    "crm": "Licence",
+    "role_doctor": "Médecin",
+    "role_patient": "Patient",
+    "role_admin": "Administrateur",
+    "role_researcher": "Chercheur",
+    "role_visitor": "Visiteur"
   },
   "navigation": {
     "dashboard": "Tableau de Bord",
@@ -10,6 +20,9 @@
     "schedule": "Planning",
     "whatsapp": "WhatsApp IA",
     "records": "Dossiers",
+    "prescriptions": "Ordonnances",
+    "ai_assistant": "Assistant IA",
+    "medical_references": "Références Médicales",
     "admin": "Admin",
     "logout": "Déconnexion"
   },
@@ -38,6 +51,9 @@
     "doctor": "Médecin",
     "appointment": "Rendez-vous",
     "prescription": "Prescription",
+    "prescriptions": "Prescriptions Médicales",
+    "ai_assistant_desc": "Assistant Clinique IA",
+    "knowledge_base": "Base de Connaissances",
     "diagnosis": "Diagnostic",
     "symptoms": "Symptômes",
     "treatment": "Traitement",
@@ -56,6 +72,7 @@
     "today_appointments": "Rendez-vous d'Aujourd'hui",
     "recent_messages": "Messages Récents",
     "system_status": "État du Système",
+    "support_system": "Système de Support",
     "quick_actions": "Actions Rapides",
     "new_appointment": "Nouveau Rendez-vous",
     "emergency": "Urgence",

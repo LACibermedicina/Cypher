@@ -2,7 +2,17 @@
   "app": {
     "name": "Telemed",
     "subtitle": "Pohã Ñana Sistema",
-    "description": "Pohã ñana sistema inteligencia artificial reheve"
+    "description": "Pohã ñana sistema inteligencia artificial reheve",
+    "logo_alt": "Telemed Ta'ãnga"
+  },
+  "user": {
+    "guest": "Oúva",
+    "crm": "Licencia",
+    "role_doctor": "Pohãra",
+    "role_patient": "Hasýva",
+    "role_admin": "Ñangarekoha",
+    "role_researcher": "Ñeka'áva",
+    "role_visitor": "Oúva"
   },
   "navigation": {
     "dashboard": "Ñepyrũ",
@@ -10,6 +20,9 @@
     "schedule": "Tembiaporã",
     "whatsapp": "WhatsApp Akãnguera",
     "records": "Kuatiahai",
+    "prescriptions": "Pohã Jeporai",
+    "ai_assistant": "Pytyvõhára Akãnguera",
+    "medical_references": "Pohã Kuaapy",
     "admin": "Ñangarekoha",
     "logout": "Ñesẽ"
   },
@@ -38,6 +51,9 @@
     "doctor": "Pohãra",
     "appointment": "Jehu",
     "prescription": "Pohã jeporai",
+    "prescriptions": "Pohã Jeporai Kuéra",
+    "ai_assistant_desc": "Pytyvõhára Pohãrã Akãnguera",
+    "knowledge_base": "Kuaapy Rapykuere",
     "diagnosis": "Mba'asy jeikuaa",
     "symptoms": "Ta'ãnga",
     "treatment": "Ñaña",
@@ -56,6 +72,7 @@
     "today_appointments": "Ko Árape Jehu",
     "recent_messages": "Ñe'ẽmondo Pyahu",
     "system_status": "Sistema Teko",
+    "support_system": "Pytyvõ Sistema",
     "quick_actions": "Ñemba'apo Pya'e",
     "new_appointment": "Jehu Pyahu",
     "emergency": "Pya'e jeipota",

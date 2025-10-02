@@ -2,7 +2,17 @@
   "app": {
     "name": "Telemed",
     "subtitle": "Telemedizin System",
-    "description": "Telemedizin-System mit integrierter KI"
+    "description": "Telemedizin-System mit integrierter KI",
+    "logo_alt": "Telemed Logo"
+  },
+  "user": {
+    "guest": "Gast",
+    "crm": "Lizenz",
+    "role_doctor": "Arzt",
+    "role_patient": "Patient",
+    "role_admin": "Administrator",
+    "role_researcher": "Forscher",
+    "role_visitor": "Besucher"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -10,6 +20,9 @@
     "schedule": "Terminplan",
     "whatsapp": "WhatsApp KI",
     "records": "Akten",
+    "prescriptions": "Rezepte",
+    "ai_assistant": "KI-Assistent",
+    "medical_references": "Medizinische Referenzen",
     "admin": "Admin",
     "logout": "Abmelden"
   },
@@ -38,6 +51,9 @@
     "doctor": "Arzt",
     "appointment": "Termin",
     "prescription": "Rezept",
+    "prescriptions": "Medizinische Rezepte",
+    "ai_assistant_desc": "Klinischer KI-Assistent",
+    "knowledge_base": "Wissensdatenbank",
     "diagnosis": "Diagnose",
     "symptoms": "Symptome",
     "treatment": "Behandlung",
@@ -56,6 +72,7 @@
     "today_appointments": "Heutige Termine",
     "recent_messages": "Aktuelle Nachrichten",
     "system_status": "Systemstatus",
+    "support_system": "Supportsystem",
     "quick_actions": "Schnellaktionen",
     "new_appointment": "Neuer Termin",
     "emergency": "Notfall",

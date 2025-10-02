@@ -2,7 +2,17 @@
   "app": {
     "name": "Telemed",
     "subtitle": "Sistema de Telemedicina",
-    "description": "Sistema de telemedicina con IA integrada"
+    "description": "Sistema de telemedicina con IA integrada",
+    "logo_alt": "Logo Telemed"
+  },
+  "user": {
+    "guest": "Visitante",
+    "crm": "Matrícula",
+    "role_doctor": "Médico",
+    "role_patient": "Paciente",
+    "role_admin": "Administrador",
+    "role_researcher": "Investigador",
+    "role_visitor": "Visitante"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -10,6 +20,9 @@
     "schedule": "Agenda",
     "whatsapp": "WhatsApp IA",
     "records": "Historiales",
+    "prescriptions": "Prescripciones",
+    "ai_assistant": "Asistente IA",
+    "medical_references": "Referencias Médicas",
     "admin": "Admin",
     "logout": "Salir"
   },
@@ -44,6 +57,9 @@
     "doctor": "Doctor",
     "appointment": "Cita",
     "prescription": "Receta",
+    "prescriptions": "Recetas Médicas",
+    "ai_assistant_desc": "Asistente Clínico IA",
+    "knowledge_base": "Base de Conocimiento",
     "diagnosis": "Diagnóstico",
     "symptoms": "Síntomas",
     "treatment": "Tratamiento",
@@ -62,6 +78,7 @@
     "today_appointments": "Citas de Hoy",
     "recent_messages": "Mensajes Recientes",
     "system_status": "Estado del Sistema",
+    "support_system": "Sistema de Soporte",
     "quick_actions": "Acciones Rápidas",
     "new_appointment": "Nueva Cita",
     "emergency": "Emergencia",

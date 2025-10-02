@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
+import { LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, Menu, Settings, User, Lock, Shield, Headphones, Ambulance, Plus, AlertTriangle, Pill } from "lucide-react";
 import telemedLogo from "@/assets/logo-fundo.png";
 
 interface SidebarProps {
@@ -19,56 +21,75 @@ interface SidebarProps {
 function SidebarContent() {
   const [location] = useLocation();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const navItems = [
     {
       path: "/dashboard",
       label: t("navigation.dashboard"),
-      icon: "fas fa-chart-line",
+      icon: LayoutDashboard,
       description: t("dashboard.title")
     },
     {
       path: "/patients",
       label: t("navigation.patients"),
-      icon: "fas fa-users",
+      icon: Users,
       description: t("patients.title")
     },
     {
       path: "/schedule",
       label: t("navigation.schedule"),
-      icon: "fas fa-calendar-alt",
+      icon: CalendarClock,
       description: t("appointments.title")
     },
     {
       path: "/whatsapp",
       label: t("navigation.whatsapp"),
-      icon: "fab fa-whatsapp",
+      icon: MessageCircle,
       description: t("telemedicine.secure_messaging")
     },
     {
       path: "/records",
       label: t("navigation.records"),
-      icon: "fas fa-file-medical",
+      icon: FileText,
       description: t("medical.medical_record")
+    },
+    {
+      path: "/prescriptions",
+      label: t("navigation.prescriptions"),
+      icon: ClipboardList,
+      description: t("medical.prescriptions")
+    },
+    {
+      path: "/ai-assistant",
+      label: t("navigation.ai_assistant"),
+      icon: BrainCircuit,
+      description: t("medical.ai_assistant_desc")
+    },
+    {
+      path: "/medical-references",
+      label: t("navigation.medical_references"),
+      icon: BookOpenCheck,
+      description: t("medical.knowledge_base")
     },
   ];
 
   const quickActions = [
     {
       label: t("dashboard.new_appointment"),
-      icon: "fas fa-plus",
+      icon: Plus,
       action: "new-appointment",
       color: "bg-primary text-primary-foreground"
     },
     {
       label: t("medical.emergency"),
-      icon: "fas fa-exclamation-triangle",
+      icon: AlertTriangle,
       action: "emergency",
       color: "bg-destructive text-destructive-foreground"
     },
     {
       label: t("medical.prescription_digital"),
-      icon: "fas fa-prescription-bottle",
+      icon: Pill,
       action: "prescription",
       color: "bg-secondary text-secondary-foreground"
     },
@@ -81,7 +102,7 @@ function SidebarContent() {
         <div className="w-12 h-12 flex items-center justify-center">
           <img 
             src={telemedLogo} 
-            alt="Telemed Logo" 
+            alt={t("app.logo_alt")} 
             className="w-full h-full object-contain"
             style={{ filter: 'brightness(0) invert(1)' }}
           />
@@ -102,8 +123,8 @@ function SidebarContent() {
           className="w-full text-xs font-semibold hover:bg-accent/10 transition-colors"
           data-testid="sidebar-support"
         >
-          <i className="fas fa-headset mr-2 text-accent"></i>
-          Falar com Suporte
+          <Headphones className="mr-2 h-4 w-4 text-accent" />
+          {t("support.contact")}
         </Button>
         <Button 
           variant="destructive" 
@@ -111,8 +132,8 @@ function SidebarContent() {
           className="w-full text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
           data-testid="sidebar-emergency"
         >
-          <i className="fas fa-ambulance mr-2"></i>
-          Emergência Médica
+          <Ambulance className="mr-2 h-4 w-4" />
+          {t("medical.emergency")}
         </Button>
       </div>
 
@@ -122,24 +143,27 @@ function SidebarContent() {
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {t("navigation.dashboard")}
           </h3>
-          {navItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <div
-                className={`nav-item flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                  location === item.path || (location === "/" && item.path === "/dashboard")
-                    ? "active bg-gradient-to-r from-primary to-medical-primary text-white shadow-md"
-                    : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                }`}
-                data-testid={`sidebar-nav-${item.path.slice(1) || 'dashboard'}`}
-              >
-                <i className={`${item.icon} w-5 text-center`}></i>
-                <div className="flex-1">
-                  <div>{item.label}</div>
-                  <div className="text-xs opacity-80">{item.description}</div>
+          {navItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <Link key={item.path} href={item.path}>
+                <div
+                  className={`nav-item flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                    location === item.path || (location === "/" && item.path === "/dashboard")
+                      ? "active bg-gradient-to-r from-primary to-medical-primary text-white shadow-md"
+                      : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                  }`}
+                  data-testid={`sidebar-nav-${item.path.slice(1) || 'dashboard'}`}
+                >
+                  <IconComponent className="w-5 h-5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div>{item.label}</div>
+                    <div className="text-xs opacity-80">{item.description}</div>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Quick Actions */}
@@ -147,18 +171,21 @@ function SidebarContent() {
           <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             {t("dashboard.quick_actions")}
           </h3>
-          {quickActions.map((action) => (
-            <Button
-              key={action.action}
-              variant="outline"
-              size="sm"
-              className="w-full justify-start h-12 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200"
-              data-testid={`sidebar-action-${action.action}`}
-            >
-              <i className={`${action.icon} mr-3 text-primary`}></i>
-              <span className="text-left font-medium">{action.label}</span>
-            </Button>
-          ))}
+          {quickActions.map((action) => {
+            const ActionIcon = action.icon;
+            return (
+              <Button
+                key={action.action}
+                variant="outline"
+                size="sm"
+                className="w-full justify-start h-12 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200"
+                data-testid={`sidebar-action-${action.action}`}
+              >
+                <ActionIcon className="mr-3 h-4 w-4 text-primary" />
+                <span className="text-left font-medium">{action.label}</span>
+              </Button>
+            );
+          })}
         </div>
 
         {/* AI Status */}
@@ -170,7 +197,7 @@ function SidebarContent() {
             <div className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200">
               <div className="flex items-center space-x-3">
                 <div className="w-4 h-4 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-sm"></div>
-                <span className="text-sm font-medium">Sistema de Suporte</span>
+                <span className="text-sm font-medium">{t("dashboard.support_system")}</span>
               </div>
               <Badge className="success-badge text-xs px-3 py-1">{t("dashboard.status_active")}</Badge>
             </div>
@@ -198,14 +225,19 @@ function SidebarContent() {
       <div className="border-t border-border p-6">
         <div className="flex items-center space-x-4">
           <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-md">
-            <i className="fas fa-user text-white text-lg"></i>
+            <User className="text-white h-5 w-5" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold" data-testid="sidebar-user-name">Dr. Carlos Silva</p>
-            <p className="text-xs text-muted-foreground font-medium">CRM: 123456-SP</p>
+            <p className="text-sm font-semibold" data-testid="sidebar-user-name">{user?.name || t("user.guest")}</p>
+            {user?.medicalLicense && (
+              <p className="text-xs text-muted-foreground font-medium">{t("user.crm")}: {user.medicalLicense}</p>
+            )}
+            {!user?.medicalLicense && user?.role && (
+              <p className="text-xs text-muted-foreground font-medium">{t(`user.role_${user.role}`)}</p>
+            )}
           </div>
           <Button variant="ghost" size="sm" className="rounded-xl hover:bg-primary/10" data-testid="sidebar-user-menu">
-            <i className="fas fa-cog text-primary"></i>
+            <Settings className="text-primary h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -214,11 +246,11 @@ function SidebarContent() {
       <div className="border-t border-border p-4">
         <div className="space-y-3 text-xs">
           <div className="flex items-center space-x-3 p-2 rounded-lg bg-security-gradient/10 border border-accent/20">
-            <i className="fas fa-lock text-accent text-sm"></i>
+            <Lock className="text-accent h-4 w-4" />
             <span className="font-medium text-muted-foreground">{t("security.encryption")}</span>
           </div>
           <div className="flex items-center space-x-3 p-2 rounded-lg bg-security-gradient/10 border border-accent/20">
-            <i className="fas fa-certificate text-accent text-sm"></i>
+            <Shield className="text-accent h-4 w-4" />
             <span className="font-medium text-muted-foreground">{t("security.iso_cert")}</span>
           </div>
         </div>
@@ -241,7 +273,7 @@ export default function Sidebar({ className }: SidebarProps) {
             className="fixed top-4 left-4 z-50 md:hidden"
             data-testid="sidebar-trigger-mobile"
           >
-            <i className="fas fa-bars"></i>
+            <Menu className="h-5 w-5" />
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-80 p-0">
