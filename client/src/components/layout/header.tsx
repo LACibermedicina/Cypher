@@ -9,7 +9,7 @@ import LanguageSelector from "@/components/ui/language-selector";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield, Ambulance } from "lucide-react";
+import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield, Ambulance, Menu } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import NotificationCenter from "@/components/notifications/notification-center";
 import telemedLogo from "@/assets/logo-fundo.png";
@@ -225,16 +225,23 @@ export default function Header() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-4">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden w-10 h-10 hover:bg-primary/10"
-                  data-testid="button-hamburger"
-                >
-                  <i className="fas fa-bars text-lg text-foreground"></i>
-                </Button>
-              </SheetTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="md:hidden w-10 h-10 hover:bg-primary/10"
+                      data-testid="button-hamburger"
+                    >
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Menu</p>
+                </TooltipContent>
+              </Tooltip>
               
               <SheetContent side="right" className="w-80 px-0">
                 <SheetHeader className="px-6 pb-6 border-b">
