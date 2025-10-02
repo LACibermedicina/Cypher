@@ -43,6 +43,24 @@ Preferred communication style: Simple, everyday language.
   - Resolution workflow with admin notes for tracking fixes
   - Date formatting in Portuguese with `date-fns` integration
 
+### Database Cleanup and Avatar Upload System
+- **Database Cleanup Endpoint**: Admin-only endpoint `/api/admin/clear-database` for removing test data:
+  - Requires admin authentication and explicit confirmation (`{ "confirmation": "CLEAR_ALL_DATA" }`)
+  - Deletes all data in FK-safe order: conversations, messages, records, prescriptions, exams, appointments, patients, transactions, non-admin users
+  - Removes all profile pictures from uploads directory
+  - Preserves admin users to maintain system access
+- **Admin Cleanup Interface**: New "Limpeza de Dados" tab in admin panel:
+  - Visual warnings about destructive operation
+  - Double confirmation: typed text ("LIMPAR TUDO") + browser alert
+  - Clear listing of all data types that will be removed
+  - Success feedback confirming system is ready for real users
+- **Avatar Upload in Registration**: Profile picture upload integrated into registration flow:
+  - `/api/auth/register` endpoint accepts multipart form data with avatar file
+  - Server-side validation: 5MB max size, image formats only (JPG, PNG, GIF, WEBP)
+  - Unique filename generation and storage in `/uploads/profiles/`
+  - Frontend preview before submission
+  - Avatar URL saved to user's profilePicture field in database
+
 ## System Architecture
 
 ### Frontend Architecture
