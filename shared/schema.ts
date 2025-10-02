@@ -571,6 +571,27 @@ export const drugInteractions = pgTable("drug_interactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Error logging for admin monitoring
+export const errorLogs = pgTable("error_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  errorCode: text("error_code").notNull().unique(), // ERR-YYYYMMDD-XXXX format
+  userId: uuid("user_id").references(() => users.id), // Optional user who triggered the error
+  errorType: text("error_type").notNull(), // authentication, validation, database, external_api, internal, etc.
+  endpoint: text("endpoint"), // Which API endpoint
+  method: text("method"), // GET, POST, etc.
+  technicalMessage: text("technical_message").notNull(), // Full technical error message
+  userMessage: text("user_message").notNull(), // Friendly message shown to user
+  stackTrace: text("stack_trace"), // Full stack trace
+  context: jsonb("context"), // Additional context data
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  resolved: boolean("resolved").default(false),
+  resolvedBy: uuid("resolved_by").references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Patient personal agenda and notes
 export const patientNotes = pgTable("patient_notes", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1063,6 +1084,11 @@ export const insertPatientNoteSchema = createInsertSchema(patientNotes).omit({
   updatedAt: true,
 });
 
+export const insertErrorLogSchema = createInsertSchema(errorLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1160,6 +1186,9 @@ export type InsertDrugInteraction = z.infer<typeof insertDrugInteractionSchema>;
 
 export type PatientNote = typeof patientNotes.$inferSelect;
 export type InsertPatientNote = z.infer<typeof insertPatientNoteSchema>;
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type InsertErrorLog = z.infer<typeof insertErrorLogSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {

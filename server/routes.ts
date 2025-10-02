@@ -4444,38 +4444,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Validate required fields
       if (!username || !password || !role || !name) {
-        return res.status(400).json({ message: 'Missing required fields' });
+        return res.status(400).json({ message: 'Preencha todos os campos obrigatórios: nome de usuário, senha, perfil e nome completo.' });
       }
       
       // Validate doctor-specific fields
       if (role === 'doctor') {
         if (!medicalLicense || !specialization) {
-          return res.status(400).json({ message: 'CRM and specialization are required for doctors' });
+          return res.status(400).json({ message: 'Para médicos, o CRM e a especialização são obrigatórios.' });
         }
       }
       
       // Validate patient-specific fields
       if (role === 'patient') {
         if (!phone) {
-          return res.status(400).json({ message: 'Phone is required for patients' });
+          return res.status(400).json({ message: 'Para pacientes, o telefone é obrigatório.' });
         }
         if (!dateOfBirth) {
-          return res.status(400).json({ message: 'Date of birth is required for patients' });
+          return res.status(400).json({ message: 'Para pacientes, a data de nascimento é obrigatória.' });
         }
         if (!gender) {
-          return res.status(400).json({ message: 'Gender is required for patients' });
+          return res.status(400).json({ message: 'Para pacientes, o gênero é obrigatório.' });
         }
       }
       
       // Validate role
       if (!['doctor', 'admin', 'patient', 'researcher'].includes(role)) {
-        return res.status(400).json({ message: 'Invalid role' });
+        return res.status(400).json({ message: 'Perfil de usuário inválido. Escolha entre: médico, administrador, paciente ou pesquisador.' });
       }
       
       // Check if username already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
-        return res.status(409).json({ message: 'Username already exists' });
+        return res.status(409).json({ message: 'Este nome de usuário já está em uso. Por favor, escolha outro.' });
       }
       
       // Hash password (in production, use bcrypt)
@@ -4558,14 +4558,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Return user data (without password)
       const { password: _, ...userWithoutPassword } = newUser;
+      
+      // Success message based on role
+      const roleNames = {
+        doctor: 'Médico',
+        patient: 'Paciente',
+        admin: 'Administrador',
+        researcher: 'Pesquisador'
+      };
+      const roleName = roleNames[role as keyof typeof roleNames] || 'Usuário';
+      
       res.status(201).json({ 
         user: userWithoutPassword, 
         token,
-        message: 'Registration successful' 
+        message: `Cadastro realizado com sucesso! Bem-vindo(a) ao Telemed, ${userWithoutPassword.name}. Seu perfil de ${roleName} foi criado e você já pode acessar todas as funcionalidades da plataforma.` 
       });
     } catch (error) {
-      console.error('Registration error:', error);
-      res.status(500).json({ message: 'Registration failed' });
+      const { errorLoggerService } = await import('./services/error-logger');
+      const friendlyError = await errorLoggerService.logError(
+        error as Error,
+        {
+          endpoint: '/api/auth/register',
+          method: 'POST',
+          additionalData: {
+            username: req.body?.username,
+            role: req.body?.role
+          }
+        },
+        req
+      );
+      
+      res.status(500).json({ 
+        message: friendlyError.userMessage,
+        errorCode: friendlyError.errorCode
+      });
     }
   });
 
@@ -4575,13 +4601,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { username, password } = req.body;
       
       if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password required' });
+        return res.status(400).json({ message: 'Por favor, preencha seu nome de usuário e senha.' });
       }
       
       // Get user by username
       const user = await storage.getUserByUsername(username);
       if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Usuário ou senha incorretos. Verifique suas credenciais e tente novamente.' });
       }
       
       // Verify password (in production, use bcrypt.compare)
@@ -4589,7 +4615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle both hashed and plain text passwords for development migration
       const isValidPassword = user.password === hashedPassword || user.password === password;
       if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ message: 'Usuário ou senha incorretos. Verifique suas credenciais e tente novamente.' });
       }
       
       // Generate JWT token
@@ -4624,15 +4650,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Return user data (without password)
-      const { password: _, ...userWithoutPassword } = user;
+      const { password: _, ...userWithoutPassword} = user;
       res.json({ 
         user: userWithoutPassword, 
         token,
-        message: 'Login successful' 
+        message: `Bem-vindo(a) de volta, ${user.name}! Login realizado com sucesso.` 
       });
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Login failed' });
+      const { errorLoggerService } = await import('./services/error-logger');
+      const friendlyError = await errorLoggerService.logError(
+        error as Error,
+        {
+          endpoint: '/api/auth/login',
+          method: 'POST',
+          additionalData: {
+            username: req.body?.username
+          }
+        },
+        req
+      );
+      
+      res.status(500).json({ 
+        message: friendlyError.userMessage,
+        errorCode: friendlyError.errorCode
+      });
     }
   });
 
