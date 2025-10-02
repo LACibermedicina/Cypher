@@ -390,6 +390,20 @@ export const chatbotReferences = pgTable("chatbot_references", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Chatbot Conversations - Store chat history
+export const chatbotConversations = pgTable("chatbot_conversations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  userRole: text("user_role").notNull(), // patient, doctor, admin
+  messages: jsonb("messages").notNull().default(sql`'[]'::jsonb`), // Array of {role: 'user'|'assistant', content: string, timestamp: string}
+  context: text("context"), // patient_health_query, doctor_diagnostics, medical_guidelines
+  referencesUsed: text("references_used").array(), // IDs of chatbotReferences used
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Laboratory Templates for PDF Processing
 // Support System Configuration
 export const supportConfig = pgTable("support_config", {

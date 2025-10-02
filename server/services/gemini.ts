@@ -402,6 +402,50 @@ Formato: texto corrido, máximo 300 palavras.
       };
     }
   }
+
+  async chatWithContext(
+    userMessage: string,
+    systemContext: string,
+    conversationHistory: Array<{ role: string; content: string }>
+  ): Promise<string> {
+    try {
+      const client = getGeminiClient();
+      const model = client.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: systemContext
+      });
+
+      // Build conversation history for context
+      let fullPrompt = '';
+      
+      // Add last 5 messages for context (to keep token count reasonable)
+      const recentHistory = conversationHistory.slice(-5);
+      if (recentHistory.length > 0) {
+        fullPrompt += 'Histórico recente da conversa:\n\n';
+        recentHistory.forEach((msg) => {
+          const role = msg.role === 'user' ? 'Usuário' : 'Assistente';
+          fullPrompt += `${role}: ${msg.content}\n\n`;
+        });
+        fullPrompt += '---\n\n';
+      }
+      
+      fullPrompt += `Nova pergunta do usuário:\n${userMessage}\n\nResposta:`;
+
+      const result = await model.generateContent(fullPrompt);
+      return result.response.text();
+    } catch (error) {
+      console.error('Gemini chat error:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Failed to generate chat response'
+      });
+      
+      if (error instanceof Error && error.message.includes('GEMINI_API_KEY')) {
+        return 'Funcionalidade de IA temporariamente indisponível. Configure a GEMINI_API_KEY para usar este assistente.';
+      }
+      
+      return 'Desculpe, houve um erro ao processar sua pergunta. Por favor, tente novamente.';
+    }
+  }
 }
 
 export const geminiService = new GeminiService();

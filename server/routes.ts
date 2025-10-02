@@ -11,7 +11,7 @@ import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
 import * as tmcCreditsService from "./services/tmc-credits";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
-import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences } from "@shared/schema";
+import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences, chatbotConversations } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { eq, desc, sql, and, or, isNotNull } from "drizzle-orm";
@@ -9150,6 +9150,186 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     } catch (error) {
       console.error('Get credit balance error:', error);
       res.status(500).json({ message: 'Failed to get credit balance' });
+    }
+  });
+
+  // ===== MEDICAL ASSISTANT CHATBOT ENDPOINTS =====
+  
+  // Get or create active conversation
+  app.get('/api/chatbot/conversation', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      // Find active conversation for user
+      const [existing] = await db.select()
+        .from(chatbotConversations)
+        .where(and(
+          eq(chatbotConversations.userId, req.user.id),
+          eq(chatbotConversations.isActive, true)
+        ))
+        .orderBy(desc(chatbotConversations.lastMessageAt))
+        .limit(1);
+
+      if (existing) {
+        return res.json(existing);
+      }
+
+      // Create new conversation
+      const [newConversation] = await db.insert(chatbotConversations).values({
+        userId: req.user.id,
+        userRole: req.user.role,
+        messages: [],
+        context: req.user.role === 'doctor' ? 'doctor_diagnostics' : 'patient_health_query',
+        referencesUsed: [],
+      }).returning();
+
+      res.json(newConversation);
+    } catch (error) {
+      console.error('Get conversation error:', error);
+      res.status(500).json({ message: 'Failed to get conversation' });
+    }
+  });
+
+  // Send message to chatbot
+  app.post('/api/chatbot/message', async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const { message, conversationId, context } = req.body;
+
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: 'Message is required' });
+      }
+
+      // Get or create conversation
+      let conversation;
+      if (conversationId) {
+        [conversation] = await db.select()
+          .from(chatbotConversations)
+          .where(eq(chatbotConversations.id, conversationId))
+          .limit(1);
+      }
+
+      if (!conversation) {
+        [conversation] = await db.insert(chatbotConversations).values({
+          userId: req.user.id,
+          userRole: req.user.role,
+          messages: [],
+          context: context || (req.user.role === 'doctor' ? 'doctor_diagnostics' : 'patient_health_query'),
+          referencesUsed: [],
+        }).returning();
+      }
+
+      // Get relevant references from database
+      const references = await db.select()
+        .from(chatbotReferences)
+        .where(and(
+          eq(chatbotReferences.isActive, true),
+          sql`${chatbotReferences.allowedRoles} @> ARRAY[${req.user.role}]::text[]`
+        ))
+        .orderBy(desc(chatbotReferences.priority))
+        .limit(5);
+
+      // Build context from references
+      let contextText = '';
+      const referencesIds: string[] = [];
+      
+      if (references.length > 0) {
+        contextText = '\n\nReferências médicas disponíveis:\n';
+        references.forEach((ref) => {
+          referencesIds.push(ref.id);
+          contextText += `\n## ${ref.title}\n`;
+          if (ref.pdfExtractedText) {
+            // Use first 1000 chars of extracted PDF text
+            contextText += ref.pdfExtractedText.substring(0, 1000) + '...\n';
+          } else {
+            contextText += ref.content.substring(0, 500) + '...\n';
+          }
+        });
+      }
+
+      // Build system prompt based on user role
+      let systemPrompt = '';
+      if (req.user.role === 'doctor') {
+        systemPrompt = `Você é um assistente médico AI especializado em ajudar médicos com:
+- Verificação de hipóteses diagnósticas
+- Consulta a guidelines e protocolos médicos atualizados
+- Análise de casos clínicos
+- Sugestões de exames complementares
+- Informações sobre tratamentos e medicações
+
+Baseie suas respostas nas referências médicas fornecidas. Seja preciso, técnico e sempre cite as fontes quando disponíveis.`;
+      } else {
+        systemPrompt = `Você é um assistente de saúde AI que ajuda pacientes com:
+- Orientações gerais sobre sintomas e condições de saúde
+- Informações sobre quando procurar atendimento médico
+- Explicações sobre exames e procedimentos
+- Dicas de prevenção e autocuidado
+
+IMPORTANTE: 
+- Você NÃO faz diagnósticos
+- Sempre recomende consulta médica para avaliação adequada
+- Em casos de emergência, oriente a procurar atendimento imediato
+- Baseie suas respostas nas referências médicas fornecidas`;
+      }
+
+      // Add user message to conversation
+      const userMessage = {
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Call Gemini API with context
+      const aiResponse = await geminiService.chatWithContext(
+        message,
+        systemPrompt + contextText,
+        conversation.messages as Message[]
+      );
+
+      // Add assistant response
+      const assistantMessage = {
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+        referencesUsed: referencesIds,
+      };
+
+      // Update conversation
+      const updatedMessages = [...(conversation.messages as Message[]), userMessage, assistantMessage];
+      
+      await db.update(chatbotConversations)
+        .set({
+          messages: updatedMessages,
+          referencesUsed: Array.from(new Set([...(conversation.referencesUsed || []), ...referencesIds])),
+          lastMessageAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(chatbotConversations.id, conversation.id));
+
+      // Update usage count for references
+      if (referencesIds.length > 0) {
+        for (const refId of referencesIds) {
+          await db.update(chatbotReferences)
+            .set({
+              usageCount: sql`${chatbotReferences.usageCount} + 1`,
+              lastUsed: new Date(),
+            })
+            .where(eq(chatbotReferences.id, refId));
+        }
+      }
+
+      res.json({
+        conversationId: conversation.id,
+        message: assistantMessage,
+      });
+    } catch (error) {
+      console.error('Send message error:', error);
+      res.status(500).json({ message: 'Failed to send message' });
     }
   });
 
