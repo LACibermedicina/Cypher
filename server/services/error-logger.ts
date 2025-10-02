@@ -170,6 +170,7 @@ export class ErrorLoggerService {
   
   /**
    * Get all error logs with optional filters
+   * This is a pass-through to the storage layer
    */
   async getErrorLogs(filters?: {
     errorType?: string;
@@ -179,8 +180,9 @@ export class ErrorLoggerService {
     endDate?: Date;
     limit?: number;
   }) {
-    // This will be implemented in storage layer
-    return [];
+    // Import dynamically to avoid circular dependency
+    const { storage } = await import('../storage');
+    return await storage.getErrorLogs(filters);
   }
 }
 

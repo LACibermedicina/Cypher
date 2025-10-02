@@ -75,6 +75,26 @@ interface AdminUser {
   createdAt: string;
 }
 
+interface ErrorLog {
+  id: string;
+  errorCode: string;
+  userId?: string;
+  errorType: string;
+  endpoint?: string;
+  method?: string;
+  technicalMessage: string;
+  userMessage: string;
+  stackTrace?: string;
+  context?: any;
+  ipAddress?: string;
+  userAgent?: string;
+  resolved: boolean;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  adminNotes?: string;
+  createdAt: string;
+}
+
 export default function AdminPage() {
   const { toast } = useToast();
   const [showCreateCollaborator, setShowCreateCollaborator] = useState(false);
@@ -88,6 +108,13 @@ export default function AdminPage() {
   const [refTitle, setRefTitle] = useState('');
   const [refContent, setRefContent] = useState('');
   const [refCategory, setRefCategory] = useState('');
+  
+  // Error Logs filters
+  const [errorTypeFilter, setErrorTypeFilter] = useState<string>('all');
+  const [resolvedFilter, setResolvedFilter] = useState<string>('all');
+  const [selectedErrorLog, setSelectedErrorLog] = useState<ErrorLog | null>(null);
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
+  const [resolveNotes, setResolveNotes] = useState('');
 
   // WebSocket for real-time activity monitoring
   const { isConnected, messages } = useWebSocket();
@@ -139,6 +166,20 @@ export default function AdminPage() {
 
   const { data: recentActivity = [], isLoading: loadingActivity } = useQuery({
     queryKey: ['/api/admin/users/activity/recent'],
+  });
+
+  // Error Logs query with filters
+  const errorLogsQueryKey = [
+    '/api/admin/error-logs',
+    { 
+      errorType: errorTypeFilter !== 'all' ? errorTypeFilter : undefined,
+      resolved: resolvedFilter !== 'all' ? resolvedFilter : undefined,
+      limit: 100
+    }
+  ];
+  
+  const { data: errorLogs = [], isLoading: loadingErrorLogs } = useQuery({
+    queryKey: errorLogsQueryKey,
   });
 
   // Mutations
@@ -213,6 +254,22 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       toast({ title: 'Success', description: 'User updated successfully' });
+    },
+    onError: (error: any) => {
+      const errorInfo = formatErrorForToast(error);
+      toast({ title: errorInfo.title, description: errorInfo.description, variant: 'destructive' });
+    }
+  });
+
+  const resolveErrorMutation = useMutation({
+    mutationFn: ({ errorId, adminNotes }: { errorId: string; adminNotes?: string }) =>
+      apiRequest('PATCH', `/api/admin/error-logs/${errorId}/resolve`, { adminNotes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: errorLogsQueryKey });
+      setShowErrorDetails(false);
+      setSelectedErrorLog(null);
+      setResolveNotes('');
+      toast({ title: 'Sucesso', description: 'Erro marcado como resolvido com sucesso' });
     },
     onError: (error: any) => {
       const errorInfo = formatErrorForToast(error);
@@ -328,6 +385,12 @@ export default function AdminPage() {
               <Zap className="h-4 w-4" />
               <span>Live Activity</span>
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="error-logs" data-testid="tab-error-logs">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Error Logs</span>
             </div>
           </TabsTrigger>
           <TabsTrigger value="collaborators" data-testid="tab-collaborators">Collaborators</TabsTrigger>
@@ -1139,6 +1202,277 @@ export default function AdminPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Error Logs Tab */}
+        <TabsContent value="error-logs" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Logs de Erro do Sistema</CardTitle>
+              <CardDescription>Visualize e gerencie logs de erro da plataforma</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Tipo de Erro</Label>
+                  <Select value={errorTypeFilter} onValueChange={setErrorTypeFilter}>
+                    <SelectTrigger data-testid="select-error-type-filter">
+                      <SelectValue placeholder="Filtrar por tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="authentication">Autenticação</SelectItem>
+                      <SelectItem value="validation">Validação</SelectItem>
+                      <SelectItem value="database">Banco de Dados</SelectItem>
+                      <SelectItem value="external_api">API Externa</SelectItem>
+                      <SelectItem value="permission">Permissão</SelectItem>
+                      <SelectItem value="not_found">Não Encontrado</SelectItem>
+                      <SelectItem value="internal">Interno</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={resolvedFilter} onValueChange={setResolvedFilter}>
+                    <SelectTrigger data-testid="select-resolved-filter">
+                      <SelectValue placeholder="Filtrar por status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="false">Não Resolvidos</SelectItem>
+                      <SelectItem value="true">Resolvidos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Estatísticas</Label>
+                  <div className="p-2 border rounded-md">
+                    <div className="text-sm">
+                      <span className="font-medium">Total: </span>
+                      {(errorLogs as ErrorLog[]).length}
+                    </div>
+                    <div className="text-sm text-red-600">
+                      <span className="font-medium">Não Resolvidos: </span>
+                      {(errorLogs as ErrorLog[]).filter((log: ErrorLog) => !log.resolved).length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error Logs Table */}
+              {loadingErrorLogs ? (
+                <div className="text-center py-8">Carregando logs de erro...</div>
+              ) : (errorLogs as ErrorLog[]).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum log de erro encontrado
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Código</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Mensagem</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(errorLogs as ErrorLog[]).map((log: ErrorLog) => (
+                        <TableRow key={log.id} data-testid={`error-log-${log.id}`}>
+                          <TableCell className="font-mono text-xs">{log.errorCode}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {log.errorType.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs max-w-[200px] truncate">
+                            {log.endpoint || 'N/A'}
+                          </TableCell>
+                          <TableCell className="max-w-[300px] truncate">
+                            {log.userMessage}
+                          </TableCell>
+                          <TableCell>
+                            {log.resolved ? (
+                              <Badge variant="default">Resolvido</Badge>
+                            ) : (
+                              <Badge variant="destructive">Pendente</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {format(new Date(log.createdAt), 'dd/MM/yyyy HH:mm')}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedErrorLog(log);
+                                setShowErrorDetails(true);
+                              }}
+                              data-testid={`button-view-error-${log.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Error Details Dialog */}
+          <Dialog open={showErrorDetails} onOpenChange={setShowErrorDetails}>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Detalhes do Erro</DialogTitle>
+                <DialogDescription>
+                  Código: {selectedErrorLog?.errorCode}
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedErrorLog && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold">Tipo de Erro</Label>
+                      <p className="text-sm capitalize">{selectedErrorLog.errorType.replace('_', ' ')}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold">Status</Label>
+                      <p className="text-sm">
+                        {selectedErrorLog.resolved ? (
+                          <Badge variant="default">Resolvido</Badge>
+                        ) : (
+                          <Badge variant="destructive">Pendente</Badge>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold">Endpoint</Label>
+                    <p className="text-sm font-mono bg-muted p-2 rounded">
+                      {selectedErrorLog.method} {selectedErrorLog.endpoint || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold">Mensagem para Usuário</Label>
+                    <p className="text-sm bg-blue-50 dark:bg-blue-950 p-3 rounded">
+                      {selectedErrorLog.userMessage}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold">Mensagem Técnica</Label>
+                    <p className="text-sm font-mono bg-red-50 dark:bg-red-950 p-3 rounded text-red-900 dark:text-red-100">
+                      {selectedErrorLog.technicalMessage}
+                    </p>
+                  </div>
+
+                  {selectedErrorLog.stackTrace && (
+                    <div>
+                      <Label className="text-sm font-semibold">Stack Trace</Label>
+                      <pre className="text-xs font-mono bg-muted p-3 rounded overflow-x-auto max-h-[200px]">
+                        {selectedErrorLog.stackTrace}
+                      </pre>
+                    </div>
+                  )}
+
+                  {selectedErrorLog.context && (
+                    <div>
+                      <Label className="text-sm font-semibold">Contexto</Label>
+                      <pre className="text-xs font-mono bg-muted p-3 rounded overflow-x-auto">
+                        {JSON.stringify(selectedErrorLog.context, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold">IP Address</Label>
+                      <p className="text-sm font-mono">{selectedErrorLog.ipAddress || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-semibold">User Agent</Label>
+                      <p className="text-xs truncate">{selectedErrorLog.userAgent || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold">Data</Label>
+                    <p className="text-sm">
+                      {format(new Date(selectedErrorLog.createdAt), "dd 'de' MMMM 'de' yyyy 'às' HH:mm:ss")}
+                    </p>
+                  </div>
+
+                  {selectedErrorLog.resolved && (
+                    <div className="bg-green-50 dark:bg-green-950 p-4 rounded">
+                      <Label className="text-sm font-semibold">Resolução</Label>
+                      <p className="text-sm mt-2">
+                        Resolvido em: {selectedErrorLog.resolvedAt ? format(new Date(selectedErrorLog.resolvedAt), "dd/MM/yyyy 'às' HH:mm") : 'N/A'}
+                      </p>
+                      {selectedErrorLog.adminNotes && (
+                        <div className="mt-2">
+                          <Label className="text-xs font-semibold">Observações do Admin</Label>
+                          <p className="text-sm mt-1">{selectedErrorLog.adminNotes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!selectedErrorLog.resolved && (
+                    <div className="space-y-2">
+                      <Label htmlFor="resolve-notes">Observações da Resolução (opcional)</Label>
+                      <Input
+                        id="resolve-notes"
+                        value={resolveNotes}
+                        onChange={(e) => setResolveNotes(e.target.value)}
+                        placeholder="Adicione observações sobre como o erro foi resolvido"
+                        data-testid="input-resolve-notes"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <DialogFooter>
+                {selectedErrorLog && !selectedErrorLog.resolved && (
+                  <Button
+                    onClick={() => {
+                      if (selectedErrorLog) {
+                        resolveErrorMutation.mutate({
+                          errorId: selectedErrorLog.id,
+                          adminNotes: resolveNotes || undefined
+                        });
+                      }
+                    }}
+                    disabled={resolveErrorMutation.isPending}
+                    data-testid="button-resolve-error"
+                  >
+                    {resolveErrorMutation.isPending ? 'Resolvendo...' : 'Marcar como Resolvido'}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowErrorDetails(false)}
+                  data-testid="button-close-error-details"
+                >
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>
