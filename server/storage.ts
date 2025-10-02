@@ -3,7 +3,7 @@ import {
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
   tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences, patientNotes,
-  consultationNotes, consultationRecordings, errorLogs,
+  consultationNotes, consultationRecordings, errorLogs, layoutSettings,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -14,7 +14,8 @@ import {
   type CollaboratorApiKey, type InsertCollaboratorApiKey, type SupportConfig, type InsertSupportConfig,
   type SystemSettings, type InsertSystemSettings, type ChatbotReference, type InsertChatbotReference,
   type PatientNote, type InsertPatientNote, type ConsultationNote, type InsertConsultationNote,
-  type ConsultationRecording, type InsertConsultationRecording
+  type ConsultationRecording, type InsertConsultationRecording,
+  type LayoutSetting, type InsertLayoutSetting
 } from "@shared/schema";
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
@@ -1679,6 +1680,45 @@ export class DatabaseStorage implements IStorage {
       .where(eq(errorLogs.id, id))
       .returning();
     return errorLog || undefined;
+  }
+
+  // Layout Settings methods
+  async getLayoutSettings(): Promise<LayoutSetting[]> {
+    return await db.select().from(layoutSettings).orderBy(layoutSettings.category, layoutSettings.settingKey);
+  }
+
+  async getLayoutSettingByKey(key: string): Promise<LayoutSetting | undefined> {
+    const [setting] = await db.select().from(layoutSettings)
+      .where(eq(layoutSettings.settingKey, key))
+      .limit(1);
+    return setting || undefined;
+  }
+
+  async createOrUpdateLayoutSetting(data: InsertLayoutSetting): Promise<LayoutSetting> {
+    const existing = await this.getLayoutSettingByKey(data.settingKey);
+    
+    if (existing) {
+      const [updated] = await db.update(layoutSettings)
+        .set({
+          ...data,
+          updatedAt: sql`now()`
+        })
+        .where(eq(layoutSettings.settingKey, data.settingKey))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(layoutSettings)
+        .values(data)
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteLayoutSetting(key: string): Promise<boolean> {
+    const result = await db.delete(layoutSettings)
+      .where(eq(layoutSettings.settingKey, key))
+      .returning();
+    return result.length > 0;
   }
 }
 

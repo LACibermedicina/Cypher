@@ -9,7 +9,7 @@ import LanguageSelector from "@/components/ui/language-selector";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield } from "lucide-react";
+import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield, Ambulance } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import NotificationCenter from "@/components/notifications/notification-center";
 import telemedLogo from "@/assets/logo-fundo.png";
@@ -428,16 +428,22 @@ export default function Header() {
             {user ? (
               <>
                 <NotificationCenter />
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
-                  data-testid="button-emergency"
-                  onClick={handleEmergencyContact}
-                >
-                  <i className="fas fa-ambulance mr-2"></i>
-                  Emergência Médica
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white"
+                      data-testid="button-emergency"
+                      onClick={handleEmergencyContact}
+                    >
+                      <Ambulance className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Emergência Médica</p>
+                  </TooltipContent>
+                </Tooltip>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button

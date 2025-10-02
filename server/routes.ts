@@ -7372,6 +7372,120 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
   });
 
   // ======================
+  // LAYOUT SETTINGS API ROUTES
+  // ======================
+
+  // Get all layout settings (public endpoint for applying theme)
+  app.get('/api/layout-settings/public', async (req, res) => {
+    try {
+      const settings = await storage.getLayoutSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error('Layout settings fetch error:', error);
+      res.status(500).json({ message: 'Erro ao buscar configurações de layout' });
+    }
+  });
+
+  // Get all layout settings (admin only)
+  app.get('/api/admin/layout-settings', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const settings = await storage.getLayoutSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error('Admin layout settings fetch error:', error);
+      res.status(500).json({ message: 'Erro ao buscar configurações de layout' });
+    }
+  });
+
+  // Create or update layout setting (admin only)
+  app.post('/api/admin/layout-settings', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { settingKey, settingValue, settingType, category, description } = req.body;
+
+      const setting = await storage.createOrUpdateLayoutSetting({
+        settingKey,
+        settingValue,
+        settingType: settingType || 'text',
+        category: category || 'general',
+        description,
+        updatedBy: user.id
+      });
+
+      res.json({ message: 'Configuração salva com sucesso', setting });
+    } catch (error) {
+      console.error('Layout settings update error:', error);
+      res.status(500).json({ message: 'Erro ao salvar configuração' });
+    }
+  });
+
+  // Upload background image (admin only)
+  app.post('/api/admin/layout-settings/upload-background', requireAuth, upload.single('background'), async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: 'Nenhum arquivo foi enviado' });
+      }
+
+      const fileUrl = `/uploads/${req.file.filename}`;
+      
+      // Save background image URL to layout settings
+      const setting = await storage.createOrUpdateLayoutSetting({
+        settingKey: 'background_image',
+        settingValue: fileUrl,
+        settingType: 'image',
+        category: 'background',
+        description: 'Imagem de fundo do sistema',
+        updatedBy: user.id
+      });
+
+      res.json({ 
+        message: 'Imagem de fundo enviada com sucesso', 
+        fileUrl,
+        setting
+      });
+    } catch (error) {
+      console.error('Background upload error:', error);
+      res.status(500).json({ message: 'Erro ao enviar imagem de fundo' });
+    }
+  });
+
+  // Delete layout setting (admin only)
+  app.delete('/api/admin/layout-settings/:key', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { key } = req.params;
+      const deleted = await storage.deleteLayoutSetting(key);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: 'Configuração não encontrada' });
+      }
+
+      res.json({ message: 'Configuração removida com sucesso' });
+    } catch (error) {
+      console.error('Layout setting delete error:', error);
+      res.status(500).json({ message: 'Erro ao remover configuração' });
+    }
+  });
+
+  // ======================
   // TMC CREDIT SYSTEM API ROUTES
   // ======================
 

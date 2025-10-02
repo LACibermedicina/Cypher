@@ -571,6 +571,19 @@ export const drugInteractions = pgTable("drug_interactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Layout and theme settings (admin-configurable)
+export const layoutSettings = pgTable("layout_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: text("setting_key").notNull().unique(), // background_image, primary_color, theme_mode, etc.
+  settingValue: text("setting_value"), // JSON string or simple value
+  settingType: text("setting_type").notNull().default("text"), // text, color, image, json
+  category: text("category").notNull().default("general"), // general, theme, background, typography
+  description: text("description"),
+  updatedBy: uuid("updated_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Error logging for admin monitoring
 export const errorLogs = pgTable("error_logs", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1089,6 +1102,12 @@ export const insertErrorLogSchema = createInsertSchema(errorLogs).omit({
   createdAt: true,
 });
 
+export const insertLayoutSettingSchema = createInsertSchema(layoutSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1189,6 +1208,9 @@ export type InsertPatientNote = z.infer<typeof insertPatientNoteSchema>;
 
 export type ErrorLog = typeof errorLogs.$inferSelect;
 export type InsertErrorLog = z.infer<typeof insertErrorLogSchema>;
+
+export type LayoutSetting = typeof layoutSettings.$inferSelect;
+export type InsertLayoutSetting = z.infer<typeof insertLayoutSettingSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {
