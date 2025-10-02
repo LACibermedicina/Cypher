@@ -8588,14 +8588,14 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
     }
   });
 
-  // Upload PDF Reference - admin check wrapper to prevent unauthorized uploads
+  // Upload PDF Reference - admin and doctor access
   app.post('/api/chatbot-references/upload-pdf', requireAuth, async (req: any, res: any) => {
-    // Check admin role BEFORE invoking Multer
-    if (!req.user || !['admin'].includes(req.user.role)) {
-      return res.status(403).json({ message: 'Admin access required' });
+    // Check admin or doctor role BEFORE invoking Multer
+    if (!req.user || !['admin', 'doctor'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Admin or Doctor access required' });
     }
 
-    // Only invoke Multer if user is admin
+    // Only invoke Multer if user is admin or doctor
     uploadPDF.single('pdfFile')(req, res, async (multerError: any) => {
       try {
         if (multerError) {
@@ -8611,14 +8611,25 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         const fileUrl = `/uploads/references/${filename}`;
         const fileSize = req.file.size;
         
-        // TODO: Extract text from PDF using a PDF parsing library
-        // For now, we'll store the file path and let the admin input the content manually
+        // Extract text from PDF
+        let pdfText = '';
+        try {
+          const pdfParse = (await import('pdf-parse')).default;
+          const filePath = path.join(pdfsDir, filename);
+          const dataBuffer = await fs.promises.readFile(filePath);
+          const pdfData = await pdfParse(dataBuffer);
+          pdfText = pdfData.text;
+        } catch (pdfError) {
+          console.error('PDF text extraction error:', pdfError);
+          // Continue without text extraction - file is still uploaded
+        }
         
         res.json({
           message: 'PDF uploaded successfully',
           fileUrl,
           filename,
-          fileSize
+          fileSize,
+          extractedText: pdfText
         });
       } catch (error) {
         console.error('PDF upload error:', error);
@@ -9124,7 +9135,8 @@ IMPORTANTE:
       const aiResponse = await geminiService.chatWithContext(
         message,
         systemPrompt + contextText,
-        conversation.messages as Message[]
+        conversation.messages as Message[],
+        req.user.role
       );
 
       // Add assistant response

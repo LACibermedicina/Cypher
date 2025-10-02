@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db } from "../db";
+import { chatbotReferences } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 
 // Lazy initialization to prevent crashes when API key is missing
 let genAI: GoogleGenerativeAI | null = null;
@@ -408,7 +411,8 @@ Formato: texto corrido, máximo 300 palavras.
   async chatWithContext(
     userMessage: string,
     systemContext: string,
-    conversationHistory: Array<{ role: string; content: string }>
+    conversationHistory: Array<{ role: string; content: string }>,
+    userRole: string = 'patient'
   ): Promise<string> {
     try {
       const client = getGeminiClient();
@@ -416,8 +420,49 @@ Formato: texto corrido, máximo 300 palavras.
         model: "gemini-2.0-flash-exp"
       });
 
+      // Search for relevant PDF references from database
+      let pdfReferences = '';
+      let referencesUsed: string[] = [];
+      try {
+        const references = await db.select()
+          .from(chatbotReferences)
+          .where(and(
+            eq(chatbotReferences.isActive, true),
+            sql`${userRole} = ANY(${chatbotReferences.allowedRoles})`
+          ))
+          .orderBy(sql`${chatbotReferences.priority} DESC`)
+          .limit(5); // Get top 5 most relevant references
+
+        if (references.length > 0) {
+          pdfReferences = '\n\n=== REFERÊNCIAS MÉDICAS PRIORITÁRIAS ===\n\n';
+          pdfReferences += 'IMPORTANTE: Use as seguintes referências médicas como fonte prioritária de informação antes de buscar outras fontes:\n\n';
+          
+          references.forEach((ref, index) => {
+            if (ref.pdfExtractedText || ref.content) {
+              pdfReferences += `--- Referência ${index + 1}: ${ref.title} ---\n`;
+              pdfReferences += `Categoria: ${ref.category}\n`;
+              if (ref.source) {
+                pdfReferences += `Fonte: ${ref.source}\n`;
+              }
+              pdfReferences += `Conteúdo:\n${ref.pdfExtractedText || ref.content}\n\n`;
+              referencesUsed.push(ref.id);
+            }
+          });
+          
+          pdfReferences += '=== FIM DAS REFERÊNCIAS ===\n\n';
+        }
+      } catch (dbError) {
+        console.error('Error fetching PDF references:', dbError);
+        // Continue without references if there's an error
+      }
+
       // Build conversation history for context
       let fullPrompt = systemContext + '\n\n';
+      
+      // Add PDF references FIRST (highest priority)
+      if (pdfReferences) {
+        fullPrompt += pdfReferences;
+      }
       
       // Add last 5 messages for context (to keep token count reasonable)
       const recentHistory = conversationHistory.slice(-5);
