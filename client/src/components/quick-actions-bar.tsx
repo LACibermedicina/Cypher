@@ -14,7 +14,8 @@ import {
   Search,
   Zap,
   Sparkles,
-  Grid3x3
+  Grid3x3,
+  LayoutGrid
 } from "lucide-react";
 
 interface QuickActionsBarProps {
@@ -181,7 +182,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             data-testid="button-toggle-quick-actions"
             title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
-            <Grid3x3 className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-45' : ''}`} />
+            <LayoutGrid className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-0' : ''}`} />
           </Button>
         </div>
 
