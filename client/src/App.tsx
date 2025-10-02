@@ -28,6 +28,7 @@ import DoctorRegister from "@/pages/register/doctor";
 import AdminRegister from "@/pages/register/admin";
 import PatientAgenda from "@/pages/patient-agenda";
 import MedicalAssistant from "@/pages/medical-assistant";
+import MedicalReferences from "@/pages/medical-references";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
 import CommandPalette from "@/components/command-palette";
@@ -180,6 +181,13 @@ function Router() {
           <ProtectedRoute requiredRoles={['doctor', 'patient', 'admin']}>
             <Header />
             <MedicalAssistant />
+          </ProtectedRoute>
+        </Route>
+        
+        <Route path="/medical-references">
+          <ProtectedRoute requiredRoles={['doctor', 'admin']}>
+            <Header />
+            <MedicalReferences />
           </ProtectedRoute>
         </Route>
         
