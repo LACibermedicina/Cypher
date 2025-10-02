@@ -113,6 +113,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Configure Multer for PDF reference uploads
+  const pdfsDir = path.join(process.cwd(), 'client', 'public', 'uploads', 'references');
+  if (!fs.existsSync(pdfsDir)) {
+    fs.mkdirSync(pdfsDir, { recursive: true });
+  }
+  
+  const pdfStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, pdfsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(file.originalname);
+      cb(null, `reference-${uniqueSuffix}${ext}`);
+    }
+  });
+  
+  const uploadPDF = multer({
+    storage: pdfStorage,
+    limits: {
+      fileSize: 20 * 1024 * 1024, // 20MB limit for PDFs
+    },
+    fileFilter: (req, file, cb) => {
+      const allowedTypes = /pdf/;
+      const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = file.mimetype === 'application/pdf';
+      
+      if (extname && mimetype) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only PDF files are allowed'));
+      }
+    }
+  });
+  
   // Global middleware to populate req.user from JWT cookie (if present)
   app.use(async (req: any, res: any, next: any) => {
     try {
@@ -8549,6 +8584,56 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
       console.error('Delete system setting error:', error);
       res.status(500).json({ message: 'Failed to delete system setting' });
     }
+  });
+
+  // Upload PDF Reference - admin check wrapper to prevent unauthorized uploads
+  app.post('/api/chatbot-references/upload-pdf', requireAuth, async (req: any, res: any) => {
+    // Check admin role BEFORE invoking Multer
+    if (!req.user || !['admin'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    // Only invoke Multer if user is admin
+    uploadPDF.single('pdfFile')(req, res, async (multerError: any) => {
+      try {
+        if (multerError) {
+          console.error('Multer error:', multerError);
+          return res.status(400).json({ message: multerError.message || 'File upload failed' });
+        }
+
+        if (!req.file) {
+          return res.status(400).json({ message: 'No PDF file uploaded' });
+        }
+        
+        const filename = req.file.filename;
+        const fileUrl = `/uploads/references/${filename}`;
+        const fileSize = req.file.size;
+        
+        // TODO: Extract text from PDF using a PDF parsing library
+        // For now, we'll store the file path and let the admin input the content manually
+        
+        res.json({
+          message: 'PDF uploaded successfully',
+          fileUrl,
+          filename,
+          fileSize
+        });
+      } catch (error) {
+        console.error('PDF upload error:', error);
+        
+        // Cleanup uploaded file if something went wrong
+        if (req.file) {
+          const filePath = path.join(pdfsDir, req.file.filename);
+          try {
+            await fs.promises.unlink(filePath);
+          } catch (unlinkError) {
+            console.error('Failed to cleanup file:', unlinkError);
+          }
+        }
+        
+        res.status(500).json({ message: 'Failed to upload PDF' });
+      }
+    });
   });
 
   // Chatbot References API (Knowledge Sources)

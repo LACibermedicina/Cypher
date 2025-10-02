@@ -321,6 +321,7 @@ export default function AdminPage() {
           <TabsTrigger value="api-keys" data-testid="tab-api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="monitoring" data-testid="tab-monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
+          <TabsTrigger value="ai-references" data-testid="tab-ai-references">AI References</TabsTrigger>
         </TabsList>
 
         {/* Users Tab */}
@@ -938,8 +939,276 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* AI References Tab */}
+        <TabsContent value="ai-references" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>AI Reference Documents</CardTitle>
+              <CardDescription>
+                Upload and manage PDF reference documents for AI diagnostic assistance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Upload PDF Section */}
+              <div className="border-2 border-dashed rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Upload New PDF Reference</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="pdf-upload">PDF File (max 20MB)</Label>
+                    <Input 
+                      id="pdf-upload" 
+                      type="file" 
+                      accept=".pdf"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const formData = new FormData();
+                        formData.append('pdfFile', file);
+                        
+                        try {
+                          const response = await fetch('/api/chatbot-references/upload-pdf', {
+                            method: 'POST',
+                            body: formData,
+                            credentials: 'include'
+                          });
+                          
+                          if (!response.ok) throw new Error('Upload failed');
+                          
+                          const data = await response.json();
+                          toast({
+                            title: "PDF Uploaded",
+                            description: `File ${data.filename} uploaded successfully`,
+                          });
+                          
+                          // Store uploaded file info for form
+                          (window as any).__uploadedPdf = data;
+                        } catch (error) {
+                          toast({
+                            title: "Upload Failed",
+                            description: "Failed to upload PDF file",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      data-testid="input-pdf-upload"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="ref-title">Reference Title</Label>
+                    <Input 
+                      id="ref-title" 
+                      placeholder="e.g., Diabetes Clinical Guidelines 2024" 
+                      data-testid="input-ref-title"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="ref-content">Content/Summary</Label>
+                    <textarea 
+                      id="ref-content" 
+                      className="w-full min-h-[100px] p-2 border rounded-md"
+                      placeholder="Provide a summary or key points from the PDF..."
+                      data-testid="input-ref-content"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="ref-category">Category</Label>
+                    <Select>
+                      <SelectTrigger id="ref-category" data-testid="select-ref-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="medical">Medical</SelectItem>
+                        <SelectItem value="procedural">Procedural</SelectItem>
+                        <SelectItem value="emergency">Emergency</SelectItem>
+                        <SelectItem value="diagnostic">Diagnostic</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <Button 
+                    onClick={async () => {
+                      const uploadedPdf = (window as any).__uploadedPdf;
+                      if (!uploadedPdf) {
+                        toast({
+                          title: "No PDF",
+                          description: "Please upload a PDF first",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      const title = (document.getElementById('ref-title') as HTMLInputElement)?.value;
+                      const content = (document.getElementById('ref-content') as HTMLTextAreaElement)?.value;
+                      const category = (document.getElementById('ref-category') as any)?.value;
+                      
+                      if (!title || !content) {
+                        toast({
+                          title: "Missing Fields",
+                          description: "Please fill in title and content",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+                      
+                      try {
+                        const response = await fetch('/api/chatbot-references', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({
+                            title,
+                            content,
+                            category: category || 'general',
+                            sourceType: 'pdf',
+                            fileUrl: uploadedPdf.fileUrl,
+                            fileName: uploadedPdf.filename,
+                            fileSize: uploadedPdf.fileSize,
+                            language: 'pt-BR',
+                            allowedRoles: ['admin', 'doctor'],
+                            useForDiagnostics: true,
+                            priority: 1,
+                            isActive: true
+                          })
+                        });
+                        
+                        if (!response.ok) throw new Error('Failed to create reference');
+                        
+                        toast({
+                          title: "Reference Created",
+                          description: "AI reference document created successfully"
+                        });
+                        
+                        // Clear form
+                        (document.getElementById('ref-title') as HTMLInputElement).value = '';
+                        (document.getElementById('ref-content') as HTMLTextAreaElement).value = '';
+                        (document.getElementById('pdf-upload') as HTMLInputElement).value = '';
+                        delete (window as any).__uploadedPdf;
+                        
+                        queryClient.invalidateQueries({ queryKey: ['/api/chatbot-references'] });
+                      } catch (error) {
+                        toast({
+                          title: "Creation Failed",
+                          description: "Failed to create AI reference",
+                          variant: "destructive"
+                        });
+                      }
+                    }}
+                    data-testid="button-create-reference"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Reference
+                  </Button>
+                </div>
+              </div>
+
+              {/* References List */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Existing References</h3>
+                <AIReferencesTable />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// AI References Table Component
+function AIReferencesTable() {
+  const { toast } = useToast();
+  const { data: references = [], isLoading } = useQuery({
+    queryKey: ['/api/chatbot-references'],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/chatbot-references/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to delete reference');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reference Deleted",
+        description: "AI reference document deleted successfully"
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/chatbot-references'] });
+    },
+    onError: () => {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete AI reference",
+        variant: "destructive"
+      });
+    }
+  });
+
+  if (isLoading) {
+    return <div>Loading references...</div>;
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Title</TableHead>
+          <TableHead>Category</TableHead>
+          <TableHead>Source Type</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {(references as any[]).map((ref) => (
+          <TableRow key={ref.id} data-testid={`ref-row-${ref.id}`}>
+            <TableCell className="font-medium">{ref.title}</TableCell>
+            <TableCell>
+              <Badge>{ref.category}</Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant="outline">{ref.sourceType}</Badge>
+            </TableCell>
+            <TableCell>
+              <Badge variant={ref.isActive ? "default" : "secondary"}>
+                {ref.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-2">
+                {ref.fileUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(ref.fileUrl, '_blank')}
+                    data-testid={`button-view-${ref.id}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deleteMutation.mutate(ref.id)}
+                  disabled={deleteMutation.isPending}
+                  data-testid={`button-delete-${ref.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
