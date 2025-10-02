@@ -9071,34 +9071,6 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
         }).returning();
       }
 
-      // Get relevant references from database
-      const references = await db.select()
-        .from(chatbotReferences)
-        .where(and(
-          eq(chatbotReferences.isActive, true),
-          sql`${chatbotReferences.allowedRoles} @> ARRAY[${req.user.role}]::text[]`
-        ))
-        .orderBy(desc(chatbotReferences.priority))
-        .limit(5);
-
-      // Build context from references
-      let contextText = '';
-      const referencesIds: string[] = [];
-      
-      if (references.length > 0) {
-        contextText = '\n\nReferências médicas disponíveis:\n';
-        references.forEach((ref) => {
-          referencesIds.push(ref.id);
-          contextText += `\n## ${ref.title}\n`;
-          if (ref.pdfExtractedText) {
-            // Use first 1000 chars of extracted PDF text
-            contextText += ref.pdfExtractedText.substring(0, 1000) + '...\n';
-          } else {
-            contextText += ref.content.substring(0, 500) + '...\n';
-          }
-        });
-      }
-
       // Build system prompt based on user role
       let systemPrompt = '';
       if (req.user.role === 'doctor') {
@@ -9109,7 +9081,9 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
 - Sugestões de exames complementares
 - Informações sobre tratamentos e medicações
 
-Baseie suas respostas nas referências médicas fornecidas. Seja preciso, técnico e sempre cite as fontes quando disponíveis.`;
+IMPORTANTE: Se houver referências médicas disponíveis (PDFs carregados pelos administradores), use-as como fonte prioritária. Caso contrário, use seu conhecimento geral baseado no Gemini API.
+
+Sempre cite as fontes quando disponíveis e seja preciso e técnico nas respostas.`;
       } else {
         systemPrompt = `Você é um assistente de saúde AI que ajuda pacientes com:
 - Orientações gerais sobre sintomas e condições de saúde
@@ -9121,7 +9095,7 @@ IMPORTANTE:
 - Você NÃO faz diagnósticos
 - Sempre recomende consulta médica para avaliação adequada
 - Em casos de emergência, oriente a procurar atendimento imediato
-- Baseie suas respostas nas referências médicas fornecidas`;
+- Se houver referências médicas disponíveis, baseie suas respostas nelas. Caso contrário, use seu conhecimento geral.`;
       }
 
       // Add user message to conversation
@@ -9131,10 +9105,10 @@ IMPORTANTE:
         timestamp: new Date().toISOString(),
       };
 
-      // Call Gemini API with context
-      const aiResponse = await geminiService.chatWithContext(
+      // Call Gemini API with context - geminiService.chatWithContext already handles reference fetching
+      const aiResult = await geminiService.chatWithContext(
         message,
-        systemPrompt + contextText,
+        systemPrompt,
         conversation.messages as Message[],
         req.user.role
       );
@@ -9142,9 +9116,9 @@ IMPORTANTE:
       // Add assistant response
       const assistantMessage = {
         role: 'assistant',
-        content: aiResponse,
+        content: aiResult.response,
         timestamp: new Date().toISOString(),
-        referencesUsed: referencesIds,
+        referencesUsed: aiResult.referencesUsed,
       };
 
       // Update conversation
@@ -9153,15 +9127,15 @@ IMPORTANTE:
       await db.update(chatbotConversations)
         .set({
           messages: updatedMessages,
-          referencesUsed: Array.from(new Set([...(conversation.referencesUsed || []), ...referencesIds])),
+          referencesUsed: Array.from(new Set([...(conversation.referencesUsed || []), ...aiResult.referencesUsed])),
           lastMessageAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(chatbotConversations.id, conversation.id));
 
       // Update usage count for references
-      if (referencesIds.length > 0) {
-        for (const refId of referencesIds) {
+      if (aiResult.referencesUsed.length > 0) {
+        for (const refId of aiResult.referencesUsed) {
           await db.update(chatbotReferences)
             .set({
               usageCount: sql`${chatbotReferences.usageCount} + 1`,

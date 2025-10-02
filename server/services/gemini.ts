@@ -413,7 +413,7 @@ Formato: texto corrido, máximo 300 palavras.
     systemContext: string,
     conversationHistory: Array<{ role: string; content: string }>,
     userRole: string = 'patient'
-  ): Promise<string> {
+  ): Promise<{ response: string; referencesUsed: string[] }> {
     try {
       const client = getGeminiClient();
       const model = client.getGenerativeModel({ 
@@ -478,7 +478,10 @@ Formato: texto corrido, máximo 300 palavras.
       fullPrompt += `Nova pergunta do usuário:\n${userMessage}\n\nResposta:`;
 
       const result = await model.generateContent(fullPrompt);
-      return result.response.text();
+      return {
+        response: result.response.text(),
+        referencesUsed
+      };
     } catch (error) {
       console.error('Gemini chat error:', {
         name: error instanceof Error ? error.name : 'Unknown',
@@ -486,10 +489,16 @@ Formato: texto corrido, máximo 300 palavras.
       });
       
       if (error instanceof Error && error.message.includes('GEMINI_API_KEY')) {
-        return 'Funcionalidade de IA temporariamente indisponível. Configure a GEMINI_API_KEY para usar este assistente.';
+        return {
+          response: 'Funcionalidade de IA temporariamente indisponível. Configure a GEMINI_API_KEY para usar este assistente.',
+          referencesUsed: []
+        };
       }
       
-      return 'Desculpe, houve um erro ao processar sua pergunta. Por favor, tente novamente.';
+      return {
+        response: 'Desculpe, houve um erro ao processar sua pergunta. Por favor, tente novamente.',
+        referencesUsed: []
+      };
     }
   }
 }

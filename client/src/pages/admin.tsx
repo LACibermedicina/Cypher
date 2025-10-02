@@ -82,6 +82,12 @@ export default function AdminPage() {
   const [selectedCollaborator, setSelectedCollaborator] = useState<string>('');
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [realtimeActivities, setRealtimeActivities] = useState<any[]>([]);
+  
+  // PDF Reference upload states
+  const [uploadedPdfData, setUploadedPdfData] = useState<any>(null);
+  const [refTitle, setRefTitle] = useState('');
+  const [refContent, setRefContent] = useState('');
+  const [refCategory, setRefCategory] = useState('');
 
   // WebSocket for real-time activity monitoring
   const { isConnected, messages } = useWebSocket();
@@ -981,20 +987,27 @@ export default function AdminPage() {
                             credentials: 'include'
                           });
                           
-                          if (!response.ok) throw new Error('Upload failed');
+                          if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(`${response.status}: ${JSON.stringify(errorData)}`);
+                          }
                           
                           const data = await response.json();
+                          setUploadedPdfData(data);
+                          // Auto-fill content with extracted text preview (first 500 chars)
+                          if (data.extractedText) {
+                            const preview = data.extractedText.substring(0, 500);
+                            setRefContent(preview + (data.extractedText.length > 500 ? '...' : ''));
+                          }
                           toast({
-                            title: "PDF Uploaded",
-                            description: `File ${data.filename} uploaded successfully`,
+                            title: "PDF Carregado",
+                            description: `Arquivo ${data.filename} carregado com sucesso. Texto extraído automaticamente.`,
                           });
-                          
-                          // Store uploaded file info for form
-                          (window as any).__uploadedPdf = data;
                         } catch (error) {
+                          const errorInfo = formatErrorForToast(error);
                           toast({
-                            title: "Upload Failed",
-                            description: "Failed to upload PDF file",
+                            title: errorInfo.title,
+                            description: errorInfo.description,
                             variant: "destructive"
                           });
                         }
@@ -1007,7 +1020,9 @@ export default function AdminPage() {
                     <Label htmlFor="ref-title">Reference Title</Label>
                     <Input 
                       id="ref-title" 
-                      placeholder="e.g., Diabetes Clinical Guidelines 2024" 
+                      placeholder="e.g., Diabetes Clinical Guidelines 2024"
+                      value={refTitle}
+                      onChange={(e) => setRefTitle(e.target.value)}
                       data-testid="input-ref-title"
                     />
                   </div>
@@ -1018,13 +1033,15 @@ export default function AdminPage() {
                       id="ref-content" 
                       className="w-full min-h-[100px] p-2 border rounded-md"
                       placeholder="Provide a summary or key points from the PDF..."
+                      value={refContent}
+                      onChange={(e) => setRefContent(e.target.value)}
                       data-testid="input-ref-content"
                     />
                   </div>
                   
                   <div>
                     <Label htmlFor="ref-category">Category</Label>
-                    <Select>
+                    <Select value={refCategory} onValueChange={setRefCategory}>
                       <SelectTrigger id="ref-category" data-testid="select-ref-category">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -1040,24 +1057,19 @@ export default function AdminPage() {
                   
                   <Button 
                     onClick={async () => {
-                      const uploadedPdf = (window as any).__uploadedPdf;
-                      if (!uploadedPdf) {
+                      if (!uploadedPdfData) {
                         toast({
-                          title: "No PDF",
-                          description: "Please upload a PDF first",
+                          title: "Nenhum PDF",
+                          description: "Por favor, faça upload de um PDF primeiro",
                           variant: "destructive"
                         });
                         return;
                       }
                       
-                      const title = (document.getElementById('ref-title') as HTMLInputElement)?.value;
-                      const content = (document.getElementById('ref-content') as HTMLTextAreaElement)?.value;
-                      const category = (document.getElementById('ref-category') as any)?.value;
-                      
-                      if (!title || !content) {
+                      if (!refTitle || !refContent) {
                         toast({
-                          title: "Missing Fields",
-                          description: "Please fill in title and content",
+                          title: "Campos obrigatórios",
+                          description: "Por favor, preencha título e conteúdo",
                           variant: "destructive"
                         });
                         return;
@@ -1069,39 +1081,45 @@ export default function AdminPage() {
                           headers: { 'Content-Type': 'application/json' },
                           credentials: 'include',
                           body: JSON.stringify({
-                            title,
-                            content,
-                            category: category || 'general',
+                            title: refTitle,
+                            content: refContent,
+                            category: refCategory || 'general',
                             sourceType: 'pdf',
-                            fileUrl: uploadedPdf.fileUrl,
-                            fileName: uploadedPdf.filename,
-                            fileSize: uploadedPdf.fileSize,
+                            fileUrl: uploadedPdfData.fileUrl,
+                            fileName: uploadedPdfData.filename,
+                            fileSize: uploadedPdfData.fileSize,
+                            pdfExtractedText: uploadedPdfData.extractedText,
                             language: 'pt-BR',
-                            allowedRoles: ['admin', 'doctor'],
+                            allowedRoles: ['admin', 'doctor', 'patient'],
                             useForDiagnostics: true,
                             priority: 1,
                             isActive: true
                           })
                         });
                         
-                        if (!response.ok) throw new Error('Failed to create reference');
+                        if (!response.ok) {
+                          const errorData = await response.json();
+                          throw new Error(`${response.status}: ${JSON.stringify(errorData)}`);
+                        }
                         
                         toast({
-                          title: "Reference Created",
-                          description: "AI reference document created successfully"
+                          title: "Referência Criada",
+                          description: "Documento de referência AI criado com sucesso"
                         });
                         
                         // Clear form
-                        (document.getElementById('ref-title') as HTMLInputElement).value = '';
-                        (document.getElementById('ref-content') as HTMLTextAreaElement).value = '';
+                        setRefTitle('');
+                        setRefContent('');
+                        setRefCategory('');
+                        setUploadedPdfData(null);
                         (document.getElementById('pdf-upload') as HTMLInputElement).value = '';
-                        delete (window as any).__uploadedPdf;
                         
                         queryClient.invalidateQueries({ queryKey: ['/api/chatbot-references'] });
                       } catch (error) {
+                        const errorInfo = formatErrorForToast(error);
                         toast({
-                          title: "Creation Failed",
-                          description: "Failed to create AI reference",
+                          title: errorInfo.title,
+                          description: errorInfo.description,
                           variant: "destructive"
                         });
                       }
