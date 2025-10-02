@@ -6,6 +6,22 @@ Telemed is an AI-powered telemedicine platform designed for modern healthcare de
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (October 2025)
+
+### Design Update - Autumn Theme
+- **Visual Theme**: Migrated from vibrant blue/green medical palette to warm autumn pastel colors (soft orange hsl(30,70%,70%), earthy browns, muted greens)
+- **Background Images**: Replaced medical stock photos with abstract autumn-themed health imagery across login, visitor dashboard, and hero sections
+- **Logo Treatment**: Applied CSS filters (`brightness(0) invert(1)`) to convert logo-fundo.png to white by default, with automatic dark mode adaptation
+
+### Real Data Implementation
+- **Public Statistics Endpoint**: New `/api/stats/public` endpoint (no authentication required) provides real-time platform statistics:
+  - Completed appointments count
+  - Active doctors count
+  - Average appointment rating (from patient ratings)
+  - 24/7 support availability indicator
+- **Visitor Dashboard**: Updated to fetch and display real statistics from database instead of hardcoded values
+- **Loading & Error States**: Proper skeleton UI during data fetch and user-friendly error messages on failure
+
 ## System Architecture
 
 ### Frontend Architecture

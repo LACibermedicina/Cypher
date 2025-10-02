@@ -4868,10 +4868,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isNotNull(appointments.rating)
         ));
       
+      // Parse average rating safely
+      const avgRatingValue = avgRating?.avg ? parseFloat(String(avgRating.avg)) : 0;
+      
       res.json({
         completedAppointments: completedAppointments?.count || 0,
         activeDoctors: activeDoctors?.count || 0,
-        averageRating: avgRating?.avg ? Number(avgRating.avg.toFixed(1)) : 0,
+        averageRating: avgRatingValue > 0 ? Number(avgRatingValue.toFixed(1)) : 0,
         support24_7: true, // Platform offers 24/7 support
       });
     } catch (error) {
