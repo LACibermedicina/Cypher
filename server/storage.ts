@@ -3,7 +3,7 @@ import {
   examResults, collaborators, doctorSchedule, digitalSignatures, videoConsultations,
   prescriptionShares, labOrders, hospitalReferrals, collaboratorIntegrations, collaboratorApiKeys,
   tmcTransactions, tmcConfig, supportConfig, systemSettings, chatbotReferences, patientNotes,
-  consultationNotes, consultationRecordings,
+  consultationNotes, consultationRecordings, errorLogs,
   type User, type InsertUser, type Patient, type InsertPatient,
   type Appointment, type InsertAppointment, type MedicalRecord, type InsertMedicalRecord,
   type WhatsappMessage, type InsertWhatsappMessage, type ExamResult, type InsertExamResult,
@@ -16,6 +16,9 @@ import {
   type PatientNote, type InsertPatientNote, type ConsultationNote, type InsertConsultationNote,
   type ConsultationRecording, type InsertConsultationRecording
 } from "@shared/schema";
+
+export type ErrorLog = typeof errorLogs.$inferSelect;
+export type InsertErrorLog = typeof errorLogs.$inferInsert;
 
 // Import TMC types from schema
 import { createInsertSchema } from "drizzle-zod";
@@ -191,6 +194,18 @@ export interface IStorage {
   createConsultationNote(note: InsertConsultationNote): Promise<ConsultationNote>;
   getConsultationRecordings(consultationId: string): Promise<ConsultationRecording[]>;
   createConsultationRecording(recording: InsertConsultationRecording): Promise<ConsultationRecording>;
+  
+  // Error Logs
+  getErrorLogs(filters?: {
+    errorType?: string;
+    userId?: string;
+    resolved?: boolean;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<ErrorLog[]>;
+  getErrorLog(id: string): Promise<ErrorLog | undefined>;
+  markErrorAsResolved(id: string, resolvedById: string, adminNotes?: string): Promise<ErrorLog | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1603,6 +1618,67 @@ export class DatabaseStorage implements IStorage {
   async createConsultationRecording(insertRecording: InsertConsultationRecording): Promise<ConsultationRecording> {
     const [recording] = await db.insert(consultationRecordings).values(insertRecording).returning();
     return recording;
+  }
+  
+  // Error Logs Implementation
+  async getErrorLogs(filters?: {
+    errorType?: string;
+    userId?: string;
+    resolved?: boolean;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<ErrorLog[]> {
+    const conditions = [];
+    
+    if (filters?.errorType) {
+      conditions.push(eq(errorLogs.errorType, filters.errorType));
+    }
+    if (filters?.userId) {
+      conditions.push(eq(errorLogs.userId, filters.userId));
+    }
+    if (filters?.resolved !== undefined) {
+      conditions.push(eq(errorLogs.resolved, filters.resolved));
+    }
+    if (filters?.startDate) {
+      conditions.push(gte(errorLogs.createdAt, filters.startDate));
+    }
+    if (filters?.endDate) {
+      conditions.push(lte(errorLogs.createdAt, filters.endDate));
+    }
+    
+    const query = db.select().from(errorLogs)
+      .orderBy(desc(errorLogs.createdAt));
+    
+    if (conditions.length > 0) {
+      query.where(and(...conditions));
+    }
+    
+    if (filters?.limit) {
+      query.limit(filters.limit);
+    }
+    
+    return await query;
+  }
+  
+  async getErrorLog(id: string): Promise<ErrorLog | undefined> {
+    const [errorLog] = await db.select().from(errorLogs)
+      .where(eq(errorLogs.id, id))
+      .limit(1);
+    return errorLog || undefined;
+  }
+  
+  async markErrorAsResolved(id: string, resolvedById: string, adminNotes?: string): Promise<ErrorLog | undefined> {
+    const [errorLog] = await db.update(errorLogs)
+      .set({
+        resolved: true,
+        resolvedBy: resolvedById,
+        resolvedAt: sql`now()`,
+        adminNotes: adminNotes || null
+      })
+      .where(eq(errorLogs.id, id))
+      .returning();
+    return errorLog || undefined;
   }
 }
 

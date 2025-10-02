@@ -7239,6 +7239,139 @@ Pressão arterial: 120/80 mmHg, frequência cardíaca: 78 bpm.
   });
 
   // ======================
+  // ERROR LOG MANAGEMENT API ROUTES
+  // ======================
+
+  // Get all error logs with filters (admin only)
+  app.get('/api/admin/error-logs', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { errorType, userId, resolved, startDate, endDate, limit } = req.query;
+      
+      const filters = {
+        errorType: errorType as string | undefined,
+        userId: userId as string | undefined,
+        resolved: resolved === 'true' ? true : resolved === 'false' ? false : undefined,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 100,
+      };
+
+      const errorLogs = await storage.getErrorLogs(filters);
+      res.json(errorLogs);
+    } catch (error) {
+      const { errorLoggerService } = await import('./services/error-logger');
+      const friendlyError = await errorLoggerService.logError(
+        error as Error,
+        {
+          endpoint: '/api/admin/error-logs',
+          method: 'GET',
+          userId: (req.user as User)?.id
+        },
+        req
+      );
+      
+      res.status(500).json({ 
+        message: friendlyError.userMessage,
+        errorCode: friendlyError.errorCode
+      });
+    }
+  });
+
+  // Get specific error log by ID (admin only)
+  app.get('/api/admin/error-logs/:id', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { id } = req.params;
+      const errorLog = await storage.getErrorLog(id);
+
+      if (!errorLog) {
+        return res.status(404).json({ message: 'Log de erro não encontrado' });
+      }
+
+      res.json(errorLog);
+    } catch (error) {
+      const { errorLoggerService } = await import('./services/error-logger');
+      const friendlyError = await errorLoggerService.logError(
+        error as Error,
+        {
+          endpoint: `/api/admin/error-logs/${req.params.id}`,
+          method: 'GET',
+          userId: (req.user as User)?.id
+        },
+        req
+      );
+      
+      res.status(500).json({ 
+        message: friendlyError.userMessage,
+        errorCode: friendlyError.errorCode
+      });
+    }
+  });
+
+  // Mark error log as resolved (admin only)
+  app.patch('/api/admin/error-logs/:id/resolve', requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Acesso negado: privilégios de administrador necessários' });
+      }
+
+      const { id } = req.params;
+      const { adminNotes } = req.body;
+
+      const resolvedLog = await storage.markErrorAsResolved(id, user.id, adminNotes);
+
+      if (!resolvedLog) {
+        return res.status(404).json({ message: 'Log de erro não encontrado' });
+      }
+
+      // Broadcast to all admins
+      await broadcastAdminActivity({
+        type: 'error_log_management',
+        action: 'error_resolved',
+        entityId: id,
+        userId: user.id,
+        details: {
+          errorCode: resolvedLog.errorCode,
+          resolvedBy: user.username,
+          resolvedByName: user.name,
+          adminNotes: adminNotes || 'Sem observações'
+        }
+      });
+
+      res.json({ 
+        message: 'Erro marcado como resolvido com sucesso', 
+        errorLog: resolvedLog 
+      });
+    } catch (error) {
+      const { errorLoggerService } = await import('./services/error-logger');
+      const friendlyError = await errorLoggerService.logError(
+        error as Error,
+        {
+          endpoint: `/api/admin/error-logs/${req.params.id}/resolve`,
+          method: 'PATCH',
+          userId: (req.user as User)?.id
+        },
+        req
+      );
+      
+      res.status(500).json({ 
+        message: friendlyError.userMessage,
+        errorCode: friendlyError.errorCode
+      });
+    }
+  });
+
+  // ======================
   // TMC CREDIT SYSTEM API ROUTES
   // ======================
 
