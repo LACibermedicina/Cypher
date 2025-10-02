@@ -35,7 +35,7 @@ export default function MedicalAssistant() {
   const { toast } = useToast();
   const [inputMessage, setInputMessage] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get or create active conversation
   const { data: conversation, isLoading } = useQuery<Conversation>({
@@ -61,9 +61,7 @@ export default function MedicalAssistant() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversation?.messages]);
 
   const sendMessageMutation = useMutation({
@@ -145,7 +143,7 @@ export default function MedicalAssistant() {
 
         <CardContent className="flex-1 flex flex-col p-0">
           {/* Messages Area */}
-          <ScrollArea className="flex-1 p-6" ref={scrollRef}>
+          <ScrollArea className="flex-1 p-6">
             <div className="space-y-4">
               {!conversation?.messages || conversation.messages.length === 0 ? (
                 <div className="text-center py-12">
@@ -221,6 +219,9 @@ export default function MedicalAssistant() {
                   </div>
                 </div>
               )}
+              
+              {/* Scroll anchor */}
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
