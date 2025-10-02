@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useIsMobile } from "@/hooks/use-mobile";
-import telemedLogo from "@/assets/logo-icon.jpg";
+import telemedLogo from "@/assets/logo-fundo.png";
 
 interface SidebarProps {
   className?: string;

@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LogOut, User, Settings } from "lucide-react";
 import NotificationCenter from "@/components/notifications/notification-center";
-import telemedLogo from "@/assets/logo-icon.jpg";
+import telemedLogo from "@/assets/logo-fundo.png";
 import userIcon from "@/assets/user-icon.png";
 
 export default function Header() {

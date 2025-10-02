@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 import { User, UserCheck, Stethoscope } from "lucide-react";
-import telemedLogo from "@/assets/logo-icon.jpg";
+import telemedLogo from "@/assets/logo-fundo.png";
 import { formatErrorForToast } from "@/lib/error-handler";
 
 // Create schemas using translation function
