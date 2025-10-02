@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Users, Stethoscope, ArrowRight, CheckCircle, Shield, Heart } from "lucide-react";
+import { Users, Stethoscope, ArrowRight, CheckCircle, Shield, Heart, Settings } from "lucide-react";
 
 export default function RegisterSelect() {
   return (
@@ -22,7 +22,7 @@ export default function RegisterSelect() {
         </div>
 
         {/* Registration Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           
           {/* Patient Card */}
           <Card className="shadow-xl border-medical-primary/20 hover:shadow-2xl transition-all duration-300 hover:scale-105">
@@ -110,6 +110,54 @@ export default function RegisterSelect() {
                   data-testid="button-register-doctor-select"
                 >
                   Registrar como Médico
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* Admin Card */}
+          <Card className="shadow-xl border-slate-300 hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <CardHeader className="text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Shield className="w-8 h-8 text-slate-700" />
+              </div>
+              <CardTitle className="text-xl text-slate-700">Sou Administrador</CardTitle>
+              <p className="text-muted-foreground">
+                Gerencie toda a plataforma com acesso completo
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="space-y-3">
+                <li className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Controle total do sistema</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Gestão de usuários</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Análises e relatórios</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Configuração de TMC</span>
+                </li>
+                <li className="flex items-center space-x-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-sm">Segurança avançada</span>
+                </li>
+              </ul>
+              
+              <Link href="/register/admin">
+                <Button 
+                  variant="outline" 
+                  className="w-full border-slate-300 text-slate-700 hover:bg-slate-100"
+                  data-testid="button-register-admin-select"
+                >
+                  Registrar como Administrador
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>

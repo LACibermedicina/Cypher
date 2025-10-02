@@ -25,6 +25,7 @@ import Features from "@/pages/features";
 import RegisterSelect from "@/pages/register/index";
 import PatientRegister from "@/pages/register/patient";
 import DoctorRegister from "@/pages/register/doctor";
+import AdminRegister from "@/pages/register/admin";
 import PatientAgenda from "@/pages/patient-agenda";
 import Header from "@/components/layout/header";
 import FloatingChatbot from "@/components/ui/floating-chatbot";
@@ -75,6 +76,9 @@ function Router() {
         </Route>
         <Route path="/register/doctor">
           <DoctorRegister />
+        </Route>
+        <Route path="/register/admin">
+          <AdminRegister />
         </Route>
         
         {/* Features page - public */}
