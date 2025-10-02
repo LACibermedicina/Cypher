@@ -22,6 +22,27 @@ Preferred communication style: Simple, everyday language.
 - **Visitor Dashboard**: Updated to fetch and display real statistics from database instead of hardcoded values
 - **Loading & Error States**: Proper skeleton UI during data fetch and user-friendly error messages on failure
 
+### Comprehensive Error Logging and Admin Management System
+- **Error Logging Infrastructure**: Implemented complete error logging system with database persistence:
+  - Unique error ID generation (format: ERR-YYYYMMDD-XXXX) for easy tracking and admin reference
+  - Database schema (`error_logs` table) storing technical details, user-friendly messages, stack traces, and request context
+  - Separation of technical error messages (logged in database) from user-facing messages (displayed to users)
+  - Automatic metadata capture: IP address, user agent, HTTP method, endpoint, timestamp
+- **ErrorLoggerService**: Centralized service (`server/services/error-logger.ts`) for consistent error handling across the platform:
+  - Portuguese user-friendly messages without technical jargon
+  - Contextual error types (authentication, validation, database, external_api, permission, not_found, internal)
+  - Integration with all authentication endpoints (register, login)
+- **Admin Error Management API**: RESTful endpoints for admin error oversight:
+  - `GET /api/admin/error-logs`: List all error logs with filtering by type, status, and date range
+  - `GET /api/admin/error-logs/:id`: View detailed error information including stack trace and context
+  - `PATCH /api/admin/error-logs/:id/resolve`: Mark errors as resolved with optional admin notes
+- **Admin Panel Error Logs Tab**: Complete UI for error monitoring and management:
+  - Real-time error log table with filtering by error type (authentication, validation, database, etc.) and resolution status
+  - Statistics display showing total errors and unresolved count
+  - Detailed error view dialog with technical and user messages, stack traces, context, and request metadata
+  - Resolution workflow with admin notes for tracking fixes
+  - Date formatting in Portuguese with `date-fns` integration
+
 ## System Architecture
 
 ### Frontend Architecture
