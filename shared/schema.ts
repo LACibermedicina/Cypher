@@ -90,14 +90,21 @@ export const medicalRecords = pgTable("medical_records", {
 export const whatsappMessages = pgTable("whatsapp_messages", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   patientId: uuid("patient_id").references(() => patients.id),
+  doctorId: uuid("doctor_id").references(() => users.id), // The doctor in the conversation
   fromNumber: text("from_number").notNull(),
   toNumber: text("to_number").notNull(),
   message: text("message").notNull(),
   messageType: text("message_type").notNull().default("text"), // text, image, audio
+  direction: text("direction").notNull().default("inbound"), // inbound (patient->system), outbound (system->patient), doctor_to_patient, patient_to_doctor
+  senderRole: text("sender_role"), // patient, doctor, system, ai
   isFromAI: boolean("is_from_ai").default(false),
   appointmentScheduled: boolean("appointment_scheduled").default(false),
   appointmentId: uuid("appointment_id").references(() => appointments.id),
   processed: boolean("processed").default(false),
+  isRead: boolean("is_read").default(false), // Whether recipient has read the message
+  readAt: timestamp("read_at"), // When message was read
+  deliveredToWhatsApp: boolean("delivered_to_whatsapp").default(false), // If message was sent via WhatsApp API
+  whatsappMessageId: text("whatsapp_message_id"), // WhatsApp API message ID
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
