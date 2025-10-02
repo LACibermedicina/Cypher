@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,10 @@ import LanguageSelector from "@/components/ui/language-selector";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield, Ambulance, Menu } from "lucide-react";
+import { LogOut, User, Settings, LayoutDashboard, Users, CalendarClock, MessageCircle, FileText, ClipboardList, BrainCircuit, BookOpenCheck, BarChart3, Shield, Ambulance, Menu, Command } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import NotificationCenter from "@/components/notifications/notification-center";
+import CommandPalette from "@/components/command-palette";
 import telemedLogo from "@/assets/logo-fundo.png";
 import userIcon from "@/assets/user-icon.png";
 
@@ -19,8 +20,29 @@ export default function Header() {
   const [location, navigate] = useLocation();
   const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
+
+  // Get only first and second name
+  const getShortName = (fullName: string) => {
+    const names = fullName.trim().split(' ');
+    if (names.length <= 2) return fullName;
+    return `${names[0]} ${names[1]}`;
+  };
+
+  // Listen for ⌘K / Ctrl+K to open command palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -366,13 +388,31 @@ export default function Header() {
             </Link>
 
             {user && (
-              <div className="hidden md:block">
-                <p className="text-sm font-semibold text-foreground" data-testid="text-greeting">
-                  {t("greeting.hello")}, {user.name}!
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {getRoleDisplay(user.role)}
-                </p>
+              <div className="hidden md:flex items-center space-x-2">
+                <div>
+                  <p className="text-sm font-semibold text-foreground" data-testid="text-greeting">
+                    {t("greeting.hello")}, {getShortName(user.name)}!
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {getRoleDisplay(user.role)}
+                  </p>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-8 h-8 hover:bg-primary/10"
+                      onClick={() => setIsCommandPaletteOpen(true)}
+                      data-testid="button-command-palette"
+                    >
+                      <Command className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Comandos (⌘K)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             )}
 
@@ -523,6 +563,13 @@ export default function Header() {
           </div>
         </div>
       </div>
+      
+      {/* Command Palette */}
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen} 
+        onClose={() => setIsCommandPaletteOpen(false)}
+        userRole={user?.role}
+      />
     </header>
   );
 }
