@@ -237,14 +237,14 @@ export default function FloatingChatbot() {
   if (!isOpen) {
     return (
       <div className="fixed bottom-6 right-28 z-50">
-        <div className="bg-white/10 dark:bg-black/10 backdrop-blur-sm rounded-full shadow-lg border border-white/20 dark:border-black/20 p-2">
+        <div className="bg-white/10 dark:bg-black/10 rounded-lg shadow-lg border border-white/20 dark:border-black/20 p-2">
           <Button
             onClick={() => setIsOpen(true)}
             size="lg"
-            className="rounded-full w-12 h-12 hover:scale-105 transition-transform bg-gradient-to-br from-primary to-medical-primary border-0 shadow-none"
+            className="rounded-full w-10 h-10 hover:scale-105 transition-transform bg-gradient-to-br from-primary to-medical-primary border-0 shadow-none"
             data-testid="button-open-chatbot"
           >
-            <MessageCircle className="w-6 h-6" />
+            <MessageCircle className="w-5 h-5" />
           </Button>
         </div>
       </div>

@@ -169,7 +169,7 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
 
   return (
     <div className="fixed bottom-6 right-6 z-50" data-testid="quick-actions-bar">
-      <div className={`bg-white/10 dark:bg-black/10 backdrop-blur-sm rounded-lg shadow-lg border border-white/20 dark:border-black/20 transition-all duration-300 ${
+      <div className={`bg-white/10 dark:bg-black/10 rounded-lg shadow-lg border border-white/20 dark:border-black/20 transition-all duration-300 ${
         isExpanded ? 'p-3' : 'p-2'
       }`}>
         {/* Expand/Collapse Button */}
@@ -178,11 +178,11 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             variant="ghost"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
-            className={`h-10 w-10 rounded-full hover:bg-primary/20 transition-all ${isExpanded ? 'mb-2' : ''}`}
+            className={`h-10 w-10 rounded-full bg-gradient-to-br from-primary to-medical-primary hover:scale-105 transition-all ${isExpanded ? 'mb-2' : ''}`}
             data-testid="button-toggle-quick-actions"
             title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
           >
-            <LayoutGrid className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-0' : ''}`} />
+            <LayoutGrid className={`w-5 h-5 text-white transition-transform ${isExpanded ? 'rotate-0' : ''}`} />
           </Button>
         </div>
 
