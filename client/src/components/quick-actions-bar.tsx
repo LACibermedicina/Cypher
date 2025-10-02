@@ -169,24 +169,9 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
 
   return (
     <div className="fixed bottom-6 right-11 z-50" data-testid="quick-actions-bar">
-      <div className={`transition-all duration-300 ${
-        isExpanded ? 'p-3' : 'p-0'
-      }`}>
-        {/* Expand/Collapse Button */}
-        <div className="flex justify-center">
-          <Button
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className={`h-10 w-10 p-0 rounded-full bg-gradient-to-br from-primary/90 to-medical-primary/90 hover:from-primary hover:to-medical-primary hover:scale-105 transition-all border-2 border-gray-800 dark:border-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.4)] ${isExpanded ? 'mb-2' : ''}`}
-            data-testid="button-toggle-quick-actions"
-            title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
-          >
-            <LayoutGrid className={`w-5 h-5 text-white transition-transform ${isExpanded ? 'rotate-0' : ''}`} />
-          </Button>
-        </div>
-
-        {/* Quick Actions */}
-        <div className={`transition-all duration-300 ${
+      <div className="flex flex-col-reverse items-center">
+        {/* Quick Actions - aparece acima do botão */}
+        <div className={`transition-all duration-300 mb-2 ${
           isExpanded ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 overflow-hidden'
         }`}>
           <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border border-gray-200 dark:border-gray-700">
@@ -238,6 +223,17 @@ export default function QuickActionsBar({ userRole }: QuickActionsBarProps) {
             </div>
           </div>
         </div>
+
+        {/* Expand/Collapse Button - sempre visível */}
+        <Button
+          size="sm"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="h-10 w-10 p-0 rounded-full bg-gradient-to-br from-primary/90 to-medical-primary/90 hover:from-primary hover:to-medical-primary hover:scale-105 transition-all border-2 border-gray-800 dark:border-gray-700 shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
+          data-testid="button-toggle-quick-actions"
+          title={isExpanded ? "Fechar ações rápidas" : "Abrir ações rápidas"}
+        >
+          <LayoutGrid className="w-5 h-5 text-white transition-transform" />
+        </Button>
       </div>
     </div>
   );

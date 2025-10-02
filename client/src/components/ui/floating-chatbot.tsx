@@ -250,8 +250,8 @@ export default function FloatingChatbot() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <Card className={`w-96 shadow-xl border-2 border-white/20 dark:border-black/20 backdrop-blur-sm ${isMinimized ? 'h-16' : 'h-[500px]'} transition-all duration-300`}>
+    <div className="fixed bottom-20 right-6 z-50">
+      <Card className={`w-96 shadow-xl border-2 border-white/20 dark:border-gray-700 backdrop-blur-sm ${isMinimized ? 'h-16' : 'h-[500px]'} transition-all duration-300`}>
         <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary to-medical-primary text-white rounded-t-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
