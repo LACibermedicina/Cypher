@@ -31,6 +31,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useAuth } from "@/contexts/AuthContext"
 import { useQuery } from "@tanstack/react-query"
 import { useLocation } from "wouter"
+import TodaySchedule from "@/components/dashboard/today-schedule"
 
 interface Appointment {
   id: string;
@@ -574,6 +575,9 @@ export function DesktopPatientDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Today's Appointments with Rating Feature */}
+        <TodaySchedule />
 
         {/* Emergency Button */}
         <Card className="shadow-lg bg-gradient-to-r from-red-50 to-pink-50 border-red-200">
