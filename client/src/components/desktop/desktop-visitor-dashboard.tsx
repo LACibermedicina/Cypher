@@ -46,7 +46,7 @@ export function DesktopVisitorDashboard() {
   });
 
   // Fetch real statistics from API
-  const { data: stats } = useQuery({
+  const { data: stats, isLoading: isLoadingStats, isError: isErrorStats } = useQuery({
     queryKey: ['/api/stats/public'],
     refetchInterval: 60000, // Refetch every minute
   });
@@ -212,24 +212,40 @@ export function DesktopVisitorDashboard() {
               <div className="text-center">
                 <div className="bg-white/10 rounded-2xl p-8">
                   <h3 className="text-2xl font-bold mb-4">Estatísticas da Plataforma</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <div className="text-3xl font-bold">{stats?.completedAppointments || 0}+</div>
-                      <div className="text-amber-200">Consultas Realizadas</div>
+                  {isLoadingStats ? (
+                    <div className="grid grid-cols-2 gap-6">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="h-8 bg-white/20 rounded mb-2"></div>
+                          <div className="h-4 bg-white/10 rounded"></div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <div className="text-3xl font-bold">{stats?.activeDoctors || 0}</div>
-                      <div className="text-amber-200">Médicos Ativos</div>
+                  ) : isErrorStats ? (
+                    <div className="text-amber-200">
+                      <p>Não foi possível carregar as estatísticas no momento.</p>
+                      <p className="text-sm mt-2">Por favor, tente novamente mais tarde.</p>
                     </div>
-                    <div>
-                      <div className="text-3xl font-bold">{stats?.averageRating > 0 ? `${stats.averageRating}⭐` : 'N/A'}</div>
-                      <div className="text-amber-200">Avaliação Média</div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-6">
+                      <div>
+                        <div className="text-3xl font-bold">{stats?.completedAppointments || 0}+</div>
+                        <div className="text-amber-200">Consultas Realizadas</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold">{stats?.activeDoctors || 0}</div>
+                        <div className="text-amber-200">Médicos Ativos</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold">{stats?.averageRating > 0 ? `${stats.averageRating}⭐` : 'N/A'}</div>
+                        <div className="text-amber-200">Avaliação Média</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold">24/7</div>
+                        <div className="text-amber-200">Suporte Ativo</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-3xl font-bold">24/7</div>
-                      <div className="text-amber-200">Suporte Ativo</div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
