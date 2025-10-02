@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -459,6 +459,35 @@ export default function Login() {
             </TabsContent>
           </Tabs>
         </Card>
+
+        {/* Registration Links */}
+        <div className="mt-6 space-y-3">
+          <p className="text-center text-sm text-muted-foreground">
+            Não tem uma conta? Cadastre-se como:
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <Link href="/register/patient">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                data-testid="link-register-patient"
+              >
+                <User className="w-4 h-4 mr-2" />
+                Paciente
+              </Button>
+            </Link>
+            <Link href="/register/doctor">
+              <Button 
+                variant="outline" 
+                className="w-full"
+                data-testid="link-register-doctor"
+              >
+                <Stethoscope className="w-4 h-4 mr-2" />
+                Médico
+              </Button>
+            </Link>
+          </div>
+        </div>
 
         <div className="text-center mt-6 text-sm text-muted-foreground">
           <p>
