@@ -1,182 +1,68 @@
 # Telemed - Sistema de Telemedicina
 
 ## Overview
-
-Telemed is an AI-powered telemedicine platform designed for modern healthcare delivery. The application combines traditional medical practice management with cutting-edge telemedicine capabilities, including multilingual support, video consultations, WhatsApp integration for patient communication, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. Built as a responsive full-stack web application, it provides real-time communication through WebSockets, comprehensive patient data management, and optimized mobile experience for both patients and doctors.
+Telemed is an AI-powered telemedicine platform designed for modern healthcare delivery. It integrates traditional medical practice management with advanced telemedicine features, including multilingual support, video consultations, WhatsApp integration, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. This responsive full-stack web application provides real-time communication, comprehensive patient data management, and an optimized mobile experience for both patients and doctors. The platform aims to modernize healthcare delivery and improve patient-doctor interactions.
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
-
-## Recent Changes (October 2025)
-
-### Brand Update (October 1, 2025)
-- **Logo**: Updated application logomarca to custom design (`attached_assets/logo icon_1759355903911.jpg`)
-- **Applied to**: Header (desktop & mobile menu), Sidebar, Login page
-- **Implementation**: Direct image reference replacing previous icon-based logos
-
-### TMC Credits System & PayPal Integration (October 1, 2025)
-- **Promotional Credits**: New users receive 10 credits automatically (configurable via systemSettings)
-- **Automatic Charging**: 1 credit/minute for video consultations, 1 credit per AI diagnostic query
-- **Doctor Commissions**: Automatic 30% commission transfer to doctors from consultation charges
-- **Cashbox System**: Admin-managed revenue tracking with balance, totalRevenue, totalExpenses, serverCosts
-- **PayPal Integration**: Secure credit purchases with server-side validation
-  - Pricing tiers: $1=10, $5=60 (+20%), $10=150 (+50%), $20=350 (+75% bonus)
-  - Double-spending prevention via order tracking
-  - Complete transaction audit trail
-- **Security**: Server validates PayPal order status, calculates credits backend-only, prevents replay attacks
-- **Endpoints**: `POST /api/credits/purchase`, `GET /api/credits/balance`, PayPal blueprint routes
-
-### Authorization Foundation (October 1, 2025)
-- **Schema updates**: Added `userId` (unique, FK to users) and `primaryDoctorId` (FK to users) to patients table
-- **User-Patient linking**: `/api/patients/me` endpoint now uses userId for direct lookup with email/phone fallback for legacy data
-- **Auto-linking**: When fallback match is found, automatically updates patient record with userId
-- **Frontend updates**: Patient dashboard now references `primaryDoctorId` instead of deprecated `assignedDoctorId`
-- **Next steps**: Implement centralized `authorizePatientAccess` helper for RBAC across all patient data endpoints
-
-### Patient Agenda Feature
-- **New table**: `patient_notes` with fields: id, patientId, userId, date, title, content, isPrivate, createdAt, updatedAt
-- **RBAC**: Only patients and admins can create/view/edit notes; doctors explicitly denied
-- **Security**: Field whitelisting on POST/PATCH, server-side ID enforcement, ownership verification
-- **Frontend**: Calendar-based interface at `/patient-agenda` for patients to create/view/edit personal health notes
-- **Known limitation**: Admin UI lacks patient selector - functional for patients only
-
-### Enhanced Patient Dashboard
-- Added quick navigation buttons: "Agendar Consulta" (scheduling), "Minha Agenda" (personal notes), "Minhas Prescrições" (prescriptions), "Chat Médico" (WhatsApp redirect)
-- Health status now displayed dynamically based on physician assessment
-- Dashboard now displays actual logged-in patient name and data (fixed hardcoded "Olá, Maria!" greeting)
-
-### Prescriptions Page Access
-- Route now allows patient access at `/prescriptions`
-- UI adapts by role: patients see view-only interface, doctors/admins can create prescriptions
-- "Nova Prescrição" button hidden for patients via conditional rendering
-
-### Profile Picture Upload System (October 1, 2025)
-- **File Storage**: Images saved to `client/public/uploads/profiles/` with unique filenames (`profile-{timestamp}-{random}.ext`)
-- **Validation**: Server-side MIME type checking (jpeg, jpg, png, gif, webp), 5MB size limit
-- **Security**: Authenticated endpoints only, automatic cleanup of old images on replacement
-- **API Endpoints**: 
-  - `POST /api/users/upload-profile-picture` - Upload new profile picture with Multer middleware
-  - `DELETE /api/users/delete-profile-picture` - Remove current profile picture
-- **Frontend**: Integrated into `/profile` page with preview, upload/cancel/delete buttons, loading states, toast notifications
-- **Database**: Uses existing `profilePicture` field (text nullable) in users table, stores relative path
-
-### Dashboard Real-Data Integration (October 1, 2025)
-- **Removed hardcoded data**: Eliminated DEFAULT_DOCTOR_ID constant and all mock data references
-- **Role-based statistics**: 
-  - **Doctors**: See personal metrics (their own appointments, signatures, patients)
-  - **Admins**: See aggregated system-wide stats (all appointments of the day, total patients)
-  - **Patients**: See their own appointment count and records
-- **Frontend improvements**: Query gating with `enabled: !!user?.id` prevents premature API calls
-- **Backend authorization**: Endpoint requires authentication, validates user ownership (user can only access their own stats unless admin)
-- **API Endpoint**: `GET /api/dashboard/stats/:userId` with role-specific response logic
-- **Security**: Proper authentication, ownership validation, 403 Forbidden for unauthorized access
-
-### Appointment Rescheduling System (October 1, 2025)
-- **Endpoint**: `POST /api/appointments/:id/reschedule` with authentication required
-- **Authorization**: Only doctor, admin, or the patient themselves can reschedule
-- **Validations**: Cannot reschedule completed/cancelled appointments, no past dates allowed
-- **Business Logic**: Creates new appointment with same details but new date, updates original to "rescheduled" status, links both via `rescheduledFromId`/`rescheduledToId`
-- **Frontend**: Modal dialog in dashboard with datetime picker, formatted success messages, automatic list refresh
-- **WebSocket**: Broadcasts reschedule event to doctor for real-time updates
-- **Security**: Role-based access control, proper authorization checks, validated input
-
-### Post-Consultation Rating System (October 2, 2025)
-- **Endpoint**: `POST /api/appointments/:id/rate` with authentication required
-- **Authorization**: Only the patient (or admin) can rate their own completed appointments
-- **Validations**: Rating must be 1-5 stars, only completed appointments can be rated, prevents duplicate ratings
-- **Data Fields**: `rating` (integer 1-5 required), `feedback` (text optional)
-- **Frontend**: TodaySchedule component shows "Avaliar" button for unrated completed appointments
-- **Rating UI**: Interactive star selection dialog with optional feedback textarea, visual star display for rated appointments
-- **WebSocket**: Broadcasts rating notification to the attending doctor for real-time updates
-- **Security**: Ownership validation ensures patients can only rate their own appointments, prevents rating manipulation
-- **Doctor Rating Stats**: GET endpoint `/api/doctors/:doctorId/rating-stats` returns average rating and distribution
-- **Profile Display**: Doctors see average rating and total count in profile page (data-testid="text-average-rating")
-- **Bug Fix (Oct 2)**: Added TodaySchedule to DesktopPatientDashboard so patients can access rating feature on desktop devices
-- **E2E Tested**: Rating flow validated from patient submission through database persistence to doctor statistics display
-
-### Video Consultation Feature (October 1, 2025)
-- **Agora.io Integration**: Real-time video/audio using Agora RTC SDK with server-side token generation
-- **Fullscreen Interface**: 70% minimum video display, picture-in-picture for local video, floating control bar
-- **Multi-tab Panel**: Chat messages, AI Diagnostic queries, and Doctor notes with real-time synchronization
-- **Interactive Controls**: Camera toggle, microphone toggle, recording start/stop, fullscreen mode, end call
-- **Data Persistence**: All chat messages, AI queries, and notes saved to `consultation_notes` table
-- **Recording Segments**: Support for video segment URLs stored in `consultation_recordings` table
-- **API Endpoints**: Token generation (`POST /api/video-consultations/agora-token`), consultation creation/retrieval (`POST /api/video-consultations/start-with-patient/:patientId`), notes management, recordings
-- **Route**: `/consultation/video/:patientId` - Accessible to authenticated doctors only
-- **Security**: Endpoint requires authentication and doctor/admin role; idempotent (returns existing active/waiting consultation for patient-doctor pair)
-- **Database Schema**: Added `agora_channel_name` and `agora_app_id` columns to `video_consultations` table
-- **Known Limitation**: AI response pipeline not yet implemented (queries saved but no automated response generation)
 
 ## System Architecture
 
 ### Frontend Architecture
-The client-side is built using React with TypeScript, featuring a modern component-based architecture:
-- **UI Framework**: React 18 with TypeScript, utilizing Wouter for routing
-- **Component Library**: Shadcn/ui components built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom medical-themed color variables and responsive design
-- **State Management**: TanStack React Query for server state management and caching
-- **Form Handling**: React Hook Form with Zod validation schemas
-- **Real-time Updates**: Custom WebSocket hook for live data synchronization
+The client-side is built using React with TypeScript, utilizing Wouter for routing. It features Shadcn/ui components based on Radix UI, styled with Tailwind CSS for a responsive, medical-themed design. State management is handled by TanStack React Query, form handling by React Hook Form with Zod validation, and real-time updates via a custom WebSocket hook.
 
 ### Backend Architecture
-The server follows a RESTful API design with Express.js:
-- **Runtime**: Node.js with TypeScript in ESModule format
-- **Web Framework**: Express.js with middleware for JSON parsing, CORS, and request logging
-- **Real-time Communication**: WebSocket server integrated with HTTP server for live updates
-- **API Design**: RESTful endpoints organized by domain (patients, appointments, WhatsApp, etc.)
-- **Error Handling**: Centralized error middleware with structured error responses
+The server is a RESTful API built with Node.js and Express.js, using TypeScript in ESModule format. It includes middleware for JSON parsing, CORS, and request logging. A WebSocket server is integrated for live updates. API endpoints are organized by domain, and centralized error handling provides structured error responses.
 
 ### Data Storage Solutions
-The application uses a PostgreSQL database with Drizzle ORM:
-- **Database**: PostgreSQL with Neon serverless driver for cloud deployment
-- **ORM**: Drizzle ORM with type-safe schema definitions and migrations
-- **Schema Design**: Comprehensive medical entities including users, patients, appointments, medical records, WhatsApp messages, exam results, and digital signatures
-- **Data Validation**: Drizzle-Zod integration for runtime type checking and API validation
+The application uses PostgreSQL with Drizzle ORM and Neon serverless driver for cloud deployment. The schema includes comprehensive medical entities such as users, patients, appointments, medical records, WhatsApp messages, exam results, and digital signatures. Drizzle-Zod integration ensures runtime type checking and API validation.
 
 ### Authentication and Authorization
-Security implementation focuses on healthcare compliance:
-- **Authentication**: User-based authentication with role-based access control (doctor, admin, patient)
-- **Compliance**: FIPS 140-2 Level 3 compliance indicators throughout the UI
-- **Digital Signatures**: Integrated digital certificate management for medical document signing
-- **Session Management**: PostgreSQL-based session storage with connect-pg-simple
+Security is implemented with user-based authentication and role-based access control (doctor, admin, patient), aiming for healthcare compliance. It includes FIPS 140-2 Level 3 compliance indicators, integrated digital certificate management for document signing, and PostgreSQL-based session management.
 
-### Key Features and Integrations
-- **AI Clinical Assistant**: OpenAI integration for diagnostic hypothesis generation and symptom analysis
-- **WhatsApp Integration**: Automated patient communication with webhook support for message processing
-- **Real-time Dashboard**: Live updates for appointments, messages, and system status
-- **Medical Records Management**: Comprehensive patient data handling with exam result analysis
-- **Appointment Scheduling**: AI-powered scheduling with support for different appointment types
-- **Digital Document Signing**: FIPS-compliant digital signature workflow for prescriptions and medical documents
-- **Patient Health Status**: Physicians can determine patient health status after consultations (excellent/good/regular/critical/to_be_determined)
-- **Patient Personal Agenda**: Private note-taking system for patients to track health information by date
-- **Enhanced Patient Dashboard**: Quick navigation buttons to scheduling, agenda, prescriptions, and WhatsApp team chat
-- **Prescription Management**: Role-based access - patients view/download, doctors create/manage
+### Key Features
+- **AI Clinical Assistant**: OpenAI integration for diagnostic support.
+- **WhatsApp Integration**: Automated patient communication.
+- **Real-time Dashboard**: Live updates for various system metrics.
+- **Medical Records Management**: Comprehensive patient data and exam analysis.
+- **Appointment Scheduling**: AI-powered scheduling with different appointment types.
+- **Digital Document Signing**: FIPS-compliant workflow for medical documents.
+- **Patient Health Status**: Physician-determined health status after consultations.
+- **Patient Personal Agenda**: Private note-taking for patients.
+- **Enhanced Patient Dashboard**: Quick navigation to key functionalities.
+- **Prescription Management**: Role-based access for viewing, creating, and managing prescriptions.
+- **Video Consultation Feature**: Real-time video/audio using Agora.io with multi-tab panels for chat, AI diagnostics, and doctor notes, with data persistence.
+- **Post-Consultation Rating System**: Patients can rate completed appointments with feedback, and doctors receive real-time updates and average rating statistics.
+- **Appointment Rescheduling System**: Allows doctors, admins, or patients to reschedule appointments with validation and real-time notifications.
+- **Profile Picture Upload System**: Secure profile picture management with server-side validation and storage.
+- **TMC Credits System**: Promotional credits for new users, automatic charging for video consultations and AI queries, doctor commissions, and PayPal integration for secure credit purchases.
+- **Enhanced Registration System**: Role-based registration (Patient, Doctor, Admin) with mandatory fields and transactional database writes.
 
 ## External Dependencies
 
 ### Third-party Services
-- **Neon Database**: Serverless PostgreSQL hosting for production deployment
-- **OpenAI API**: GPT-5 model integration for clinical decision support and natural language processing
-- **WhatsApp Business API**: Official Meta WhatsApp integration for patient messaging
-- **Agora.io**: Real-time video/audio communication SDK for telemedicine consultations
-- **Font Awesome**: Icon library for medical and UI icons throughout the application
+- **Neon Database**: Serverless PostgreSQL hosting.
+- **OpenAI API**: GPT-5 model for AI features.
+- **WhatsApp Business API**: Meta's official integration for messaging.
+- **Agora.io**: Real-time video/audio communication SDK.
+- **PayPal**: Payment gateway for credit purchases.
+- **Font Awesome**: Icon library.
 
 ### Development and Build Tools
-- **Vite**: Frontend build tool with React plugin and development server
-- **ESBuild**: Backend bundling for production deployment
-- **Drizzle Kit**: Database migration and schema management tool
-- **PostCSS**: CSS processing with Tailwind CSS and Autoprefixer
+- **Vite**: Frontend build tool.
+- **ESBuild**: Backend bundling.
+- **Drizzle Kit**: Database migration and schema management.
+- **PostCSS**: CSS processing.
 
 ### UI and Component Libraries
-- **Radix UI**: Comprehensive set of accessible, unstyled React components
-- **Tailwind CSS**: Utility-first CSS framework with custom medical theme
-- **Lucide React**: Icon library for modern UI elements
-- **React Hook Form**: Form state management with validation
-- **TanStack React Query**: Server state management and caching solution
+- **Radix UI**: Accessible React components.
+- **Tailwind CSS**: Utility-first CSS framework.
+- **Lucide React**: Icon library.
+- **React Hook Form**: Form state management.
+- **TanStack React Query**: Server state management.
 
 ### Security and Compliance
-- **WebSocket (ws)**: Real-time communication protocol implementation
-- **Zod**: TypeScript-first schema declaration and validation library
-- **Class Variance Authority**: Type-safe variant API for component styling
-- **Date-fns**: Date manipulation library with internationalization support
+- **WebSocket (ws)**: Real-time communication.
+- **Zod**: TypeScript-first schema validation.
+- **Class Variance Authority**: Type-safe component styling.
+- **Date-fns**: Date manipulation library.

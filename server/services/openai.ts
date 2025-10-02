@@ -1,7 +1,20 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazy initialization to prevent crashes when API key is missing
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is not configured. Please add it to your deployment configuration.');
+  }
+  
+  if (!openai) {
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  
+  return openai;
+}
 
 export interface DiagnosticHypothesis {
   condition: string;
@@ -37,6 +50,7 @@ export class OpenAIService {
     suggestedAction?: string;
   }> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Você é uma IA assistente médica integrada ao WhatsApp. Analise a mensagem do paciente e determine:
         
@@ -50,7 +64,7 @@ export class OpenAIService {
         Responda em JSON com os campos: isSchedulingRequest, isClinicalQuestion, response, suggestedAction
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -61,18 +75,21 @@ export class OpenAIService {
       console.error('OpenAI analysis error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to analyze WhatsApp message'
+        message: error instanceof Error ? error.message : 'Failed to analyze WhatsApp message'
       });
       return {
         isSchedulingRequest: false,
         isClinicalQuestion: false,
-        response: 'Desculpe, houve um erro ao processar sua mensagem. Por favor, tente novamente.',
+        response: error instanceof Error && error.message.includes('OPENAI_API_KEY')
+          ? 'Funcionalidade de IA temporariamente indisponível. Por favor, entre em contato diretamente com nosso suporte.'
+          : 'Desculpe, houve um erro ao processar sua mensagem. Por favor, tente novamente.',
       };
     }
   }
 
   async processSchedulingRequest(message: string, availableSlots: string[]): Promise<SchedulingResponse> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Você é um assistente de agendamento médico. Analise a solicitação de agendamento do paciente e sugira o melhor horário disponível.
         
@@ -86,7 +103,7 @@ export class OpenAIService {
         - requiresHumanIntervention: boolean
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -97,7 +114,7 @@ export class OpenAIService {
       console.error('OpenAI scheduling error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to process scheduling request'
+        message: error instanceof Error ? error.message : 'Failed to process scheduling request'
       });
       return {
         isSchedulingRequest: false,
@@ -109,6 +126,7 @@ export class OpenAIService {
 
   async generateDiagnosticHypotheses(symptoms: string, patientHistory: string): Promise<DiagnosticHypothesis[]> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Como um assistente médico especializado, analise os sintomas e histórico do paciente para gerar hipóteses diagnósticas baseadas nas diretrizes do Ministério da Saúde brasileiro.
         
@@ -125,7 +143,7 @@ export class OpenAIService {
         Responda com um objeto JSON contendo o campo "hypotheses".
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -137,7 +155,7 @@ export class OpenAIService {
       console.error('OpenAI diagnostic error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to generate diagnostic hypotheses'
+        message: error instanceof Error ? error.message : 'Failed to generate diagnostic hypotheses'
       });
       throw error;
     }
@@ -151,6 +169,7 @@ export class OpenAIService {
     followUp?: string;
   }> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Analise esta transcrição de consulta médica e forneça um resumo estruturado:
         
@@ -164,7 +183,7 @@ export class OpenAIService {
         - followUp: orientações de acompanhamento (se houver)
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -175,7 +194,7 @@ export class OpenAIService {
       console.error('OpenAI transcription error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to process consultation transcription'
+        message: error instanceof Error ? error.message : 'Failed to process consultation transcription'
       });
       throw error;
     }
@@ -183,6 +202,7 @@ export class OpenAIService {
 
   async answerClinicalQuestion(question: string, context?: string): Promise<string> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Você é um assistente médico especializado que responde dúvidas clínicas baseado exclusivamente nas diretrizes do Ministério da Saúde brasileiro e protocolos clínicos oficiais.
         
@@ -192,7 +212,7 @@ export class OpenAIService {
         Forneça uma resposta clara, precisa e baseada em evidências científicas. Sempre cite as fontes quando possível e lembre o paciente de que esta resposta não substitui uma consulta médica presencial.
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           {
@@ -208,7 +228,7 @@ export class OpenAIService {
       console.error('OpenAI clinical question error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to process clinical question'
+        message: error instanceof Error ? error.message : 'Failed to process clinical question'
       });
       return `Desculpe, não foi possível processar sua pergunta médica no momento. Por favor, consulte diretamente com nossos profissionais de saúde.`;
     }
@@ -220,6 +240,7 @@ export class OpenAIService {
     summary: string;
   }> {
     try {
+      const client = getOpenAIClient();
       const prompt = `
         Extraia e estruture os dados deste exame médico:
         
@@ -232,7 +253,7 @@ export class OpenAIService {
         - summary: resumo dos principais achados
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -243,7 +264,7 @@ export class OpenAIService {
       console.error('OpenAI exam extraction error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to extract exam results'
+        message: error instanceof Error ? error.message : 'Failed to extract exam results'
       });
       return {
         structuredResults: {},
@@ -255,7 +276,8 @@ export class OpenAIService {
 
   async generateClinicalAnalysis(prompt: string): Promise<string> {
     try {
-      const response = await openai.chat.completions.create({
+      const client = getOpenAIClient();
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           { 
@@ -273,7 +295,7 @@ export class OpenAIService {
       console.error('OpenAI clinical analysis error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to generate clinical analysis'
+        message: error instanceof Error ? error.message : 'Failed to generate clinical analysis'
       });
       return 'Erro ao gerar análise clínica. Tente novamente.';
     }
@@ -306,6 +328,7 @@ export class OpenAIService {
 
   async generatePatientSummary(patientHistory: any[], consultationNotes: any[]): Promise<string> {
     try {
+      const client = getOpenAIClient();
       const historyText = patientHistory.map(h => 
         `${h.date}: ${h.condition || h.diagnosis || h.description}`
       ).join('\n');
@@ -332,7 +355,7 @@ Gere um resumo estruturado em português brasileiro incluindo:
 Formato: texto corrido, máximo 300 palavras.
 `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [
           { 
@@ -350,7 +373,7 @@ Formato: texto corrido, máximo 300 palavras.
       console.error('OpenAI patient summary error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to generate patient summary'
+        message: error instanceof Error ? error.message : 'Failed to generate patient summary'
       });
       return 'Erro ao gerar resumo do paciente.';
     }
@@ -367,6 +390,7 @@ Formato: texto corrido, máximo 300 palavras.
     followUpRequired: boolean;
   }> {
     try {
+      const client = getOpenAIClient();
       const resultsText = typeof results === 'object' ? JSON.stringify(results, null, 2) : results.toString();
       
       const prompt = `
@@ -385,7 +409,7 @@ Formato: texto corrido, máximo 300 palavras.
         Base sua análise nas diretrizes do Ministério da Saúde brasileiro e valores de referência padrão.
       `;
 
-      const response = await openai.chat.completions.create({
+      const response = await client.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
@@ -397,7 +421,7 @@ Formato: texto corrido, máximo 300 palavras.
       console.error('OpenAI exam analysis error:', {
         name: error instanceof Error ? error.name : 'Unknown',
         status: (error as any)?.status || 'Unknown',
-        message: 'Failed to analyze exam results'
+        message: error instanceof Error ? error.message : 'Failed to analyze exam results'
       });
       return {
         analysis: 'Não foi possível analisar os resultados do exame automaticamente.',
