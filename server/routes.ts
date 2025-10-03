@@ -5108,6 +5108,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Researcher Statistics API - Anonymized data compliant with LGPD
+  // Researchers can only access aggregated statistical data, no personal information
+  app.get('/api/research/medical-records-stats', requireAuth, async (req: any, res) => {
+    try {
+      // Only researchers and admins can access this endpoint
+      if (req.user.role !== 'researcher' && req.user.role !== 'admin') {
+        return res.status(403).json({ 
+          message: 'Acesso negado: Apenas pesquisadores e administradores podem acessar dados estatísticos' 
+        });
+      }
+
+      // Get anonymized aggregated statistics
+      // Total medical records by diagnosis (top 10 most common)
+      const topDiagnoses = await db
+        .select({
+          diagnosis: medicalRecords.diagnosis,
+          count: sql<number>`count(*)::int`
+        })
+        .from(medicalRecords)
+        .where(isNotNull(medicalRecords.diagnosis))
+        .groupBy(medicalRecords.diagnosis)
+        .orderBy(sql`count(*) DESC`)
+        .limit(10);
+
+      // Total medical records by month (last 12 months)
+      const recordsByMonth = await db
+        .select({
+          month: sql<string>`TO_CHAR(${medicalRecords.createdAt}, 'YYYY-MM')`,
+          count: sql<number>`count(*)::int`
+        })
+        .from(medicalRecords)
+        .where(sql`${medicalRecords.createdAt} >= NOW() - INTERVAL '12 months'`)
+        .groupBy(sql`TO_CHAR(${medicalRecords.createdAt}, 'YYYY-MM')`)
+        .orderBy(sql`TO_CHAR(${medicalRecords.createdAt}, 'YYYY-MM') ASC`);
+
+      // Age distribution (anonymized - only age ranges, no birth dates)
+      const ageDistribution = await db
+        .select({
+          ageRange: sql<string>`
+            CASE 
+              WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 18 THEN '0-17'
+              WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 30 THEN '18-29'
+              WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 45 THEN '30-44'
+              WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 60 THEN '45-59'
+              ELSE '60+'
+            END
+          `,
+          count: sql<number>`count(*)::int`
+        })
+        .from(patients)
+        .where(isNotNull(patients.dateOfBirth))
+        .groupBy(sql`
+          CASE 
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 18 THEN '0-17'
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 30 THEN '18-29'
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 45 THEN '30-44'
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 60 THEN '45-59'
+            ELSE '60+'
+          END
+        `)
+        .orderBy(sql`
+          CASE 
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 18 THEN 1
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 30 THEN 2
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 45 THEN 3
+            WHEN EXTRACT(YEAR FROM AGE(${patients.dateOfBirth})) < 60 THEN 4
+            ELSE 5
+          END
+        `);
+
+      // Gender distribution (anonymized)
+      const genderDistribution = await db
+        .select({
+          gender: patients.gender,
+          count: sql<number>`count(*)::int`
+        })
+        .from(patients)
+        .where(isNotNull(patients.gender))
+        .groupBy(patients.gender);
+
+      // Appointment types distribution
+      const appointmentTypes = await db
+        .select({
+          type: appointments.type,
+          count: sql<number>`count(*)::int`
+        })
+        .from(appointments)
+        .groupBy(appointments.type)
+        .orderBy(sql`count(*) DESC`);
+
+      // Health status distribution (anonymized)
+      const healthStatusDistribution = await db
+        .select({
+          status: patients.healthStatus,
+          count: sql<number>`count(*)::int`
+        })
+        .from(patients)
+        .groupBy(patients.healthStatus)
+        .orderBy(sql`count(*) DESC`);
+
+      // Total counts
+      const [totalRecords] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(medicalRecords);
+
+      const [totalPatients] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(patients);
+
+      const [totalAppointments] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(appointments);
+
+      res.json({
+        summary: {
+          totalMedicalRecords: totalRecords?.count || 0,
+          totalPatients: totalPatients?.count || 0,
+          totalAppointments: totalAppointments?.count || 0,
+        },
+        demographics: {
+          ageDistribution,
+          genderDistribution,
+        },
+        clinicalData: {
+          topDiagnoses,
+          healthStatusDistribution,
+          appointmentTypes,
+        },
+        trends: {
+          recordsByMonth,
+        },
+        disclaimer: 'Todos os dados são anonimizados e agregados em conformidade com a LGPD. Nenhuma informação pessoal identificável é incluída nesta resposta.'
+      });
+    } catch (error) {
+      console.error('Researcher stats error:', error);
+      res.status(500).json({ message: 'Falha ao obter estatísticas de pesquisa' });
+    }
+  });
+
   // Reschedule appointment
   app.post('/api/appointments/:id/reschedule', requireAuth, async (req: any, res) => {
     try {
