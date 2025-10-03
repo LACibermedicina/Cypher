@@ -312,7 +312,7 @@ export default function Header() {
                           }`}
                           style={{
                             background: isActive
-                              ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
+                              ? "linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 50%, 68%) 100%)"
                               : "transparent"
                           }}
                         >
@@ -334,7 +334,7 @@ export default function Header() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <Avatar className="w-12 h-12">
-                          <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold">
+                          <AvatarFallback className="text-white font-semibold" style={{ background: "linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 50%, 68%) 100%)" }}>
                             {getUserInitials(user.name)}
                           </AvatarFallback>
                         </Avatar>
@@ -377,13 +377,18 @@ export default function Header() {
             </Sheet>
 
             <Link href="/" data-testid="link-logo">
-              <div className="w-10 h-10 flex items-center justify-center cursor-pointer">
-                <img 
-                  src={telemedLogo} 
-                  alt="Telemed Logo" 
-                  className="w-full h-full object-contain"
-                  style={{ filter: 'brightness(0) invert(1)' }}
-                />
+              <div className="flex items-center space-x-3 cursor-pointer group">
+                <div className="w-10 h-10 flex items-center justify-center">
+                  <img 
+                    src={telemedLogo} 
+                    alt="Telemed Logo" 
+                    className="w-full h-full object-contain transition-transform group-hover:scale-110"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                  />
+                </div>
+                <span className="hidden lg:block text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+                  Telemed
+                </span>
               </div>
             </Link>
 
@@ -416,16 +421,22 @@ export default function Header() {
               </div>
             )}
 
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="w-10 h-10 hover:bg-accent/10 transition-colors"
-              data-testid="button-support"
-              onClick={handleSupportContact}
-              title={t("support.contact")}
-            >
-              <i className="fas fa-headset text-lg text-accent"></i>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="w-10 h-10 hover:bg-primary/10 text-primary transition-colors"
+                  data-testid="button-support"
+                  onClick={handleSupportContact}
+                >
+                  <i className="fas fa-headset text-lg"></i>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{t("support.contact")}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Desktop Navigation */}
@@ -452,7 +463,7 @@ export default function Header() {
                           }`}
                           style={{
                             background: isActive
-                              ? "linear-gradient(135deg, hsl(239, 84%, 67%) 0%, hsl(213, 93%, 68%) 100%)"
+                              ? "linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 50%, 68%) 100%)"
                               : "transparent"
                           }}
                         >
@@ -478,9 +489,9 @@ export default function Header() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
-                      variant="destructive" 
+                      variant="ghost" 
                       size="icon"
-                      className="w-10 h-10 bg-red-600 hover:bg-red-700 text-white"
+                      className="w-10 h-10 text-destructive hover:bg-destructive/10 transition-colors"
                       data-testid="button-emergency"
                       onClick={handleEmergencyContact}
                     >
@@ -499,7 +510,7 @@ export default function Header() {
                       data-testid="button-user-menu"
                     >
                       <Avatar className="w-9 h-9">
-                        <AvatarFallback className="bg-gradient-to-br from-secondary to-accent text-white font-semibold text-sm">
+                        <AvatarFallback className="text-white font-semibold text-sm" style={{ background: "linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 50%, 68%) 100%)" }}>
                           {getUserInitials(user.name)}
                         </AvatarFallback>
                       </Avatar>
@@ -544,21 +555,44 @@ export default function Header() {
                 </DropdownMenu>
               </>
             ) : (
-              <Button
-                variant="ghost"
-                className="flex items-center space-x-2 px-3 py-2 rounded-xl hover:bg-primary/10 transition-colors"
-                data-testid="button-login"
-                onClick={() => navigate('/login')}
-                title={t("auth.login")}
-              >
-                <img 
-                  src={userIcon} 
-                  alt="User Icon" 
-                  className="w-5 h-5"
-                  style={{ filter: 'brightness(0) invert(1)' }}
-                />
-                <i className="fas fa-sign-in-alt text-lg text-primary"></i>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="flex items-center space-x-2 px-3 py-2 rounded-xl hover:bg-primary/10 transition-colors"
+                    data-testid="button-login-menu"
+                    title={t("auth.login")}
+                  >
+                    <img 
+                      src={userIcon} 
+                      alt="User Icon" 
+                      className="w-5 h-5"
+                      style={{ filter: 'brightness(0) invert(1)' }}
+                    />
+                    <span className="hidden sm:inline text-sm font-medium text-foreground">
+                      {t("auth.login")}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/login')} 
+                    data-testid="button-login"
+                    className="cursor-pointer"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    {t("auth.login")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/register')} 
+                    data-testid="button-register"
+                    className="cursor-pointer"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Cadastrar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>

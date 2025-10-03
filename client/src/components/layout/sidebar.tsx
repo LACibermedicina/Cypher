@@ -120,16 +120,16 @@ function SidebarContent() {
         <Button 
           variant="outline" 
           size="sm" 
-          className="w-full text-xs font-semibold hover:bg-accent/10 transition-colors"
+          className="w-full text-xs font-semibold text-primary hover:bg-primary/10 border-primary/30 transition-colors"
           data-testid="sidebar-support"
         >
-          <Headphones className="mr-2 h-4 w-4 text-accent" />
+          <Headphones className="mr-2 h-4 w-4" />
           {t("support.contact")}
         </Button>
         <Button 
-          variant="destructive" 
+          variant="outline" 
           size="sm" 
-          className="w-full text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
+          className="w-full text-xs font-semibold text-destructive hover:bg-destructive/10 border-destructive/30 transition-colors"
           data-testid="sidebar-emergency"
         >
           <Ambulance className="mr-2 h-4 w-4" />
@@ -224,7 +224,7 @@ function SidebarContent() {
       {/* Modern User Info */}
       <div className="border-t border-border p-6">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-secondary to-accent rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, hsl(30, 65%, 65%) 0%, hsl(20, 50%, 68%) 100%)" }}>
             <User className="text-white h-5 w-5" />
           </div>
           <div className="flex-1">
