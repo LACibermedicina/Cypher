@@ -252,11 +252,19 @@ export const digitalSignatures = pgTable("digital_signatures", {
   documentId: uuid("document_id").notNull(),
   patientId: uuid("patient_id").references(() => patients.id).notNull(),
   doctorId: uuid("doctor_id").references(() => users.id).notNull(),
-  signature: text("signature").notNull(),
+  digitalKeyId: uuid("digital_key_id").references(() => digitalKeys.id), // Which key was used
+  documentHash: text("document_hash").notNull(), // SHA-256 hash of document
+  signature: text("signature").notNull(), // Encrypted signature
   certificateInfo: jsonb("certificate_info"),
-  status: text("status").notNull().default("pending"), // pending, signed, rejected
+  qrCodeData: text("qr_code_data"), // QR code content for verification
+  qrCodeUrl: text("qr_code_url"), // URL to QR code image
+  verificationUrl: text("verification_url"), // Public URL to verify signature
+  status: text("status").notNull().default("pending"), // pending, signed, rejected, verified
   signedAt: timestamp("signed_at"),
+  verificationCount: integer("verification_count").default(0), // How many times verified
+  lastVerifiedAt: timestamp("last_verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const videoConsultations = pgTable("video_consultations", {
@@ -623,6 +631,75 @@ export const patientNotes = pgTable("patient_notes", {
   isPrivate: boolean("is_private").default(true), // Only patient and admin can see
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// TMC Credit Packages for purchase via PayPal
+export const tmcCreditPackages = pgTable("tmc_credit_packages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Pacote Básico", "Pacote Premium"
+  credits: integer("credits").notNull(), // Number of credits in package
+  priceUsd: text("price_usd").notNull(), // Price in USD (stored as string for precision)
+  priceBrl: text("price_brl"), // Price in BRL (optional)
+  bonusCredits: integer("bonus_credits").default(0), // Extra promotional credits
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  isPromotional: boolean("is_promotional").default(false),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// PayPal Orders for credit purchases
+export const paypalOrders = pgTable("paypal_orders", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  packageId: uuid("package_id").references(() => tmcCreditPackages.id),
+  paypalOrderId: text("paypal_order_id").notNull().unique(), // PayPal's order ID
+  amount: text("amount").notNull(), // Amount charged
+  currency: text("currency").notNull().default("USD"),
+  creditsAmount: integer("credits_amount").notNull(), // Credits to be added
+  status: text("status").notNull().default("created"), // created, approved, captured, failed, cancelled
+  payerEmail: text("payer_email"),
+  payerId: text("payer_id"),
+  captureId: text("capture_id"), // PayPal capture ID after payment
+  errorMessage: text("error_message"),
+  transactionId: uuid("transaction_id").references(() => tmcTransactions.id), // Link to credit transaction
+  metadata: jsonb("metadata"), // Additional PayPal response data
+  capturedAt: timestamp("captured_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Digital Keys for doctors (FIPS-compliant signature system)
+export const digitalKeys = pgTable("digital_keys", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  doctorId: uuid("doctor_id").references(() => users.id).notNull().unique(), // One key per doctor
+  publicKey: text("public_key").notNull(), // PEM format public key
+  privateKeyEncrypted: text("private_key_encrypted").notNull(), // Encrypted private key (never store plain)
+  keyAlgorithm: text("key_algorithm").notNull().default("RSA"), // RSA or ECC
+  keySize: integer("key_size").default(2048), // Key size in bits
+  certificateInfo: jsonb("certificate_info"), // Certificate metadata
+  isActive: boolean("is_active").default(true),
+  isExportedToUsb: boolean("is_exported_to_usb").default(false),
+  usbExportedAt: timestamp("usb_exported_at"),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"), // Key expiration date
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Signature Verifications for public QR code validation
+export const signatureVerifications = pgTable("signature_verifications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  signatureId: uuid("signature_id").references(() => digitalSignatures.id).notNull(),
+  verifiedBy: text("verified_by"), // IP address or user identifier
+  verificationMethod: text("verification_method").notNull().default("qr_code"), // qr_code, direct_link, api
+  isValid: boolean("is_valid").notNull(),
+  validationDetails: jsonb("validation_details"), // Detailed verification results
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  geolocation: jsonb("geolocation"), // Optional location data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -1115,6 +1192,29 @@ export const insertLayoutSettingSchema = createInsertSchema(layoutSettings).omit
   updatedAt: true,
 });
 
+export const insertTmcCreditPackageSchema = createInsertSchema(tmcCreditPackages).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPaypalOrderSchema = createInsertSchema(paypalOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDigitalKeySchema = createInsertSchema(digitalKeys).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSignatureVerificationSchema = createInsertSchema(signatureVerifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -1218,6 +1318,18 @@ export type InsertErrorLog = z.infer<typeof insertErrorLogSchema>;
 
 export type LayoutSetting = typeof layoutSettings.$inferSelect;
 export type InsertLayoutSetting = z.infer<typeof insertLayoutSettingSchema>;
+
+export type TmcCreditPackage = typeof tmcCreditPackages.$inferSelect;
+export type InsertTmcCreditPackage = z.infer<typeof insertTmcCreditPackageSchema>;
+
+export type PaypalOrder = typeof paypalOrders.$inferSelect;
+export type InsertPaypalOrder = z.infer<typeof insertPaypalOrderSchema>;
+
+export type DigitalKey = typeof digitalKeys.$inferSelect;
+export type InsertDigitalKey = z.infer<typeof insertDigitalKeySchema>;
+
+export type SignatureVerification = typeof signatureVerifications.$inferSelect;
+export type InsertSignatureVerification = z.infer<typeof insertSignatureVerificationSchema>;
 
 // Dashboard stats type
 export interface DashboardStats {

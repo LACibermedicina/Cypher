@@ -1,147 +1,48 @@
 # Telemed - Sistema de Telemedicina
 
 ## Overview
-Telemed is an AI-powered telemedicine platform designed for modern healthcare delivery. It integrates traditional medical practice management with advanced telemedicine features, including multilingual support, video consultations, WhatsApp integration, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. This responsive full-stack web application provides real-time communication, comprehensive patient data management, and an optimized mobile experience for both patients and doctors. The platform aims to modernize healthcare delivery and improve patient-doctor interactions.
+Telemed is an AI-powered telemedicine platform designed to modernize healthcare delivery and improve patient-doctor interactions. It integrates traditional medical practice management with advanced telemedicine features such as multilingual support, video consultations, WhatsApp integration, automated scheduling, clinical decision support, and FIPS-compliant digital signatures. This responsive full-stack web application offers real-time communication, comprehensive patient data management, and an optimized mobile experience for both patients and doctors.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (October 2025)
-
-### Design Update - Autumn Theme
-- **Visual Theme**: Migrated from vibrant blue/green medical palette to warm autumn pastel colors (soft orange hsl(30,70%,70%), earthy browns, muted greens)
-- **Background Images**: Replaced medical stock photos with abstract autumn-themed health imagery across login, visitor dashboard, and hero sections
-- **Logo Treatment**: Applied CSS filters (`brightness(0) invert(1)`) to convert logo-fundo.png to white by default, with automatic dark mode adaptation
-
-### Real Data Implementation
-- **Public Statistics Endpoint**: New `/api/stats/public` endpoint (no authentication required) provides real-time platform statistics:
-  - Completed appointments count
-  - Active doctors count
-  - Average appointment rating (from patient ratings)
-  - 24/7 support availability indicator
-- **Visitor Dashboard**: Updated to fetch and display real statistics from database instead of hardcoded values
-- **Loading & Error States**: Proper skeleton UI during data fetch and user-friendly error messages on failure
-
-### Comprehensive Error Logging and Admin Management System
-- **Error Logging Infrastructure**: Implemented complete error logging system with database persistence:
-  - Unique error ID generation (format: ERR-YYYYMMDD-XXXX) for easy tracking and admin reference
-  - Database schema (`error_logs` table) storing technical details, user-friendly messages, stack traces, and request context
-  - Separation of technical error messages (logged in database) from user-facing messages (displayed to users)
-  - Automatic metadata capture: IP address, user agent, HTTP method, endpoint, timestamp
-- **ErrorLoggerService**: Centralized service (`server/services/error-logger.ts`) for consistent error handling across the platform:
-  - Portuguese user-friendly messages without technical jargon
-  - Contextual error types (authentication, validation, database, external_api, permission, not_found, internal)
-  - Integration with all authentication endpoints (register, login)
-- **Admin Error Management API**: RESTful endpoints for admin error oversight:
-  - `GET /api/admin/error-logs`: List all error logs with filtering by type, status, and date range
-  - `GET /api/admin/error-logs/:id`: View detailed error information including stack trace and context
-  - `PATCH /api/admin/error-logs/:id/resolve`: Mark errors as resolved with optional admin notes
-- **Admin Panel Error Logs Tab**: Complete UI for error monitoring and management:
-  - Real-time error log table with filtering by error type (authentication, validation, database, etc.) and resolution status
-  - Statistics display showing total errors and unresolved count
-  - Detailed error view dialog with technical and user messages, stack traces, context, and request metadata
-  - Resolution workflow with admin notes for tracking fixes
-  - Date formatting in Portuguese with `date-fns` integration
-
-### Database Cleanup and Avatar Upload System
-- **Database Cleanup Endpoint**: Admin-only endpoint `/api/admin/clear-database` for removing test data:
-  - Requires admin authentication and explicit confirmation (`{ "confirmation": "CLEAR_ALL_DATA" }`)
-  - Deletes all data in FK-safe order: conversations, messages, records, prescriptions, exams, appointments, patients, transactions, non-admin users
-  - Removes all profile pictures from uploads directory
-  - Preserves admin users to maintain system access
-- **Admin Cleanup Interface**: New "Limpeza de Dados" tab in admin panel:
-  - Visual warnings about destructive operation
-  - Double confirmation: typed text ("LIMPAR TUDO") + browser alert
-  - Clear listing of all data types that will be removed
-  - Success feedback confirming system is ready for real users
-- **Avatar Upload in Registration**: Profile picture upload integrated into registration flow:
-  - `/api/auth/register` endpoint accepts multipart form data with avatar file
-  - Server-side validation: 5MB max size, image formats only (JPG, PNG, GIF, WEBP)
-  - Unique filename generation and storage in `/uploads/profiles/`
-  - Frontend preview before submission
-  - Avatar URL saved to user's profilePicture field in database
-
-### Visitor Chatbot with PDF References
-- **Public Chatbot Endpoint**: New `/api/chatbot/visitor-message` endpoint allows unauthenticated visitors to use AI chatbot:
-  - No authentication required
-  - Uses `userRole='visitor'` to filter PDF references marked for public access
-  - Stateless (no conversation history persistence)
-  - Visitor-specific system prompt (no diagnosis, no scheduling capabilities)
-  - Automatic reference usage tracking
-- **Smart Endpoint Selection**: FloatingChatbot component detects authentication state:
-  - Authenticated users: uses `/api/chatbot/message` with full features (scheduling, diagnostics, conversation history)
-  - Visitors: uses `/api/chatbot/visitor-message` with limited, safe functionality
-- **Reference-Based Responses**: Visitors receive answers grounded in medical PDF references when references are marked with 'visitor' in allowedRoles array
-- **Security**: Visitors cannot access privileged features (appointment scheduling, medical records, patient diagnostics)
-
-### Enhanced Chatbot AI Configuration (Gemini)
-- **Objective Response Format**: System prompts updated to enforce concise, objective responses (~30 words) for both authenticated and visitor endpoints
-- **Reference Prioritization**: Medical PDF references are now explicitly prioritized as the primary source of information before using general AI knowledge
-- **Anti-Repetition Rules**: Chatbot instructed to avoid repeating information already stated in conversation history, always bringing new or complementary information
-- **Consistent Behavior**: Both `/api/chatbot/message` (authenticated) and `/api/chatbot/visitor-message` (public) endpoints follow the same response guidelines for consistency
-- **Source Citation**: When medical references are available, the AI is instructed to cite sources and base answers on uploaded PDFs first
-- **Test Results**: Functional testing confirmed responses are concise (19 words in test case), reference-aware, and include appropriate medical consultation recommendations
-
 ## System Architecture
 
 ### Frontend Architecture
-The client-side is built using React with TypeScript, utilizing Wouter for routing. It features Shadcn/ui components based on Radix UI, styled with Tailwind CSS for a responsive, medical-themed design. State management is handled by TanStack React Query, form handling by React Hook Form with Zod validation, and real-time updates via a custom WebSocket hook.
+The client-side is built with React and TypeScript, using Wouter for routing. It leverages Shadcn/ui components (based on Radix UI) styled with Tailwind CSS for a responsive, medical-themed design. State management is handled by TanStack React Query, form handling by React Hook Form with Zod validation, and real-time updates via a custom WebSocket hook. The UI features a warm autumn pastel color scheme.
 
 ### Backend Architecture
-The server is a RESTful API built with Node.js and Express.js, using TypeScript in ESModule format. It includes middleware for JSON parsing, CORS, and request logging. A WebSocket server is integrated for live updates. API endpoints are organized by domain, and centralized error handling provides structured error responses.
+The server is a RESTful API built with Node.js and Express.js, using TypeScript in ESModule format. It includes middleware for JSON parsing, CORS, and request logging. A WebSocket server provides live updates. API endpoints are domain-organized, and centralized error handling ensures structured error responses.
 
 ### Data Storage Solutions
-The application uses PostgreSQL with Drizzle ORM and Neon serverless driver for cloud deployment. The schema includes comprehensive medical entities such as users, patients, appointments, medical records, WhatsApp messages, exam results, and digital signatures. Drizzle-Zod integration ensures runtime type checking and API validation.
+The application uses PostgreSQL with Drizzle ORM and Neon serverless driver. The schema includes entities for users, patients, appointments, medical records, WhatsApp messages, exam results, and digital signatures. Drizzle-Zod integration provides runtime type checking and API validation.
 
 ### Authentication and Authorization
-Security is implemented with user-based authentication and role-based access control (doctor, admin, patient), aiming for healthcare compliance. It includes FIPS 140-2 Level 3 compliance indicators, integrated digital certificate management for document signing, and PostgreSQL-based session management.
+Security is implemented with user-based authentication and role-based access control (doctor, admin, patient), aiming for healthcare compliance. It incorporates FIPS 140-2 Level 3 compliance indicators, integrated digital certificate management for document signing, and PostgreSQL-based session management.
 
 ### Key Features
-- **AI Clinical Assistant**: Gemini API integration (migrated from OpenAI) for diagnostic support, medication interaction analysis, and clinical Q&A.
+- **AI Clinical Assistant**: Integration with the Gemini API for diagnostic support, medication interaction analysis, and clinical Q&A, prioritizing medical PDF references for responses.
 - **WhatsApp Integration**: Automated patient communication.
-- **Real-time Dashboard**: Simplified dashboards showing only production-backed statistics via /api/dashboard/stats endpoint.
-- **Medical Records Management**: Strict role-based access control - patients denied access, doctors see only assigned patients, admins see all records.
-- **Appointment Scheduling**: AI-powered scheduling with different appointment types.
-- **Digital Document Signing**: FIPS-compliant workflow for medical documents.
-- **Patient Health Status**: Physician-determined health status after consultations.
-- **Patient Personal Agenda**: Private note-taking for patients.
-- **Enhanced Patient Dashboard**: Quick navigation to key functionalities.
-- **Prescription Management**: Role-based access for viewing, creating, and managing prescriptions.
-- **Video Consultation Feature**: Real-time video/audio using Agora.io with multi-tab panels for chat, AI diagnostics, and doctor notes. Fullscreen mode, consultation notes persistence, and recording infrastructure (requires Agora Cloud Recording for complete capture).
-- **Post-Consultation Rating System**: Patients can rate completed appointments with feedback, and doctors receive real-time updates and average rating statistics.
-- **Appointment Rescheduling System**: Allows doctors, admins, or patients to reschedule appointments with validation and real-time notifications.
-- **Profile Picture Upload System**: Secure profile picture management with server-side validation and storage.
-- **TMC Credits System**: Promotional credits for new users, automatic charging for video consultations and AI queries, doctor commissions, and PayPal integration for secure credit purchases.
-- **Enhanced Registration System**: Role-based registration (Patient, Doctor, Admin) with mandatory fields and transactional database writes. Registration links available on login page.
+- **Real-time Dashboards**: Simplified dashboards displaying production-backed statistics.
+- **Medical Records Management**: Strict role-based access control.
+- **Appointment Scheduling**: AI-powered scheduling with various appointment types.
+- **Digital Document Signing**: A system for FIPS-compliant digital signatures for medical documents with QR code verification (note: current private key storage is not production-ready for FIPS compliance).
+- **Video Consultation Feature**: Real-time video/audio using Agora.io with multi-tab panels for chat, AI diagnostics, and doctor notes.
+- **TMC Credits System**: Manages credit purchases, debits, transfers, and commissions, with PayPal integration for secure purchases.
+- **Enhanced Registration & Profile Management**: Role-based registration with mandatory fields and secure profile picture uploads.
 - **AI Reference Management**: Admin-only PDF upload system for AI knowledge base with secure file validation and role-based access control.
-- **Friendly Error Handling System**: User-friendly error messages with practical suggestions for common HTTP errors (400, 401, 403, 404, 409, 422, 429, 500+), implemented across all forms using formatErrorForToast helper.
-
-## Error Handling
-
-### User-Friendly Error Messages
-The platform implements a comprehensive error handling system that provides clear, actionable feedback to users:
-- **Helper Location**: `client/src/lib/error-handler.ts`
-- **Coverage**: All forms including registration, login, patient management, appointments, prescriptions, and admin functions
-- **Error Types Handled**:
-  - 409 Conflict: Specific suggestions for duplicate username, email, phone, or CRM
-  - 400 Bad Request: Validation error details with formatting guidance
-  - 401 Unauthorized: Credential verification suggestions
-  - 403 Forbidden: Permission requirement explanations
-  - 404 Not Found: Resource location guidance
-  - 422 Unprocessable: Data completeness suggestions
-  - 429 Too Many Requests: Rate limit advice
-  - 500+ Server Errors: Server issue acknowledgment with retry suggestions
-- **Implementation Pattern**: All form error handlers use `formatErrorForToast(error)` to parse HTTP errors and return structured, user-friendly messages with practical suggestions
+- **Comprehensive Error Handling**: User-friendly error messages with practical suggestions for common HTTP errors, and an admin error logging system for detailed error tracking and resolution.
+- **Database Cleanup Endpoint**: Admin-only endpoint for removing test data with strict confirmation.
+- **Visitor Chatbot**: Publicly accessible AI chatbot with limited, safe functionality, referencing public medical PDFs.
 
 ## External Dependencies
 
 ### Third-party Services
 - **Neon Database**: Serverless PostgreSQL hosting.
-- **Google Gemini API**: Gemini 1.5 Flash model for AI features (WhatsApp triage, scheduling, diagnostics, clinical Q&A, exam analysis, drug interactions).
+- **Google Gemini API**: Gemini 1.5 Flash model for AI features.
 - **WhatsApp Business API**: Meta's official integration for messaging.
 - **Agora.io**: Real-time video/audio communication SDK.
 - **PayPal**: Payment gateway for credit purchases.
-- **Font Awesome**: Icon library.
 
 ### Development and Build Tools
 - **Vite**: Frontend build tool.
@@ -157,7 +58,5 @@ The platform implements a comprehensive error handling system that provides clea
 - **TanStack React Query**: Server state management.
 
 ### Security and Compliance
-- **WebSocket (ws)**: Real-time communication.
 - **Zod**: TypeScript-first schema validation.
-- **Class Variance Authority**: Type-safe component styling.
 - **Date-fns**: Date manipulation library.

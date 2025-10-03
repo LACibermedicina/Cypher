@@ -11,6 +11,8 @@ import { clinicalInterviewService } from "./services/clinical-interview";
 import { pdfGeneratorService, PrescriptionData } from "./services/pdf-generator";
 import * as tmcCreditsService from "./services/tmc-credits";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault } from "./paypal";
+import creditsRouter from "./routes/credits";
+import signaturesRouter from "./routes/signatures";
 import { insertPatientSchema, insertAppointmentSchema, insertWhatsappMessageSchema, insertMedicalRecordSchema, insertVideoConsultationSchema, insertConsultationNoteSchema, insertConsultationRecordingSchema, insertPrescriptionShareSchema, insertCollaboratorSchema, insertLabOrderSchema, insertCollaboratorApiKeySchema, insertMedicationSchema, insertPrescriptionSchema, insertPrescriptionItemSchema, insertPrescriptionTemplateSchema, User, DEFAULT_DOCTOR_ID, examResults, patients, medications, prescriptions, prescriptionItems, prescriptionTemplates, drugInteractions, users, appointments, tmcTransactions, whatsappMessages, medicalRecords, systemSettings, chatbotReferences, chatbotConversations } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -10000,6 +10002,10 @@ REGRAS IMPORTANTES:
       });
     }
   });
+
+  // Register credit and signature routers
+  app.use('/api/credits', creditsRouter);
+  app.use('/api/signatures', signaturesRouter);
 
   return httpServer;
 }
