@@ -74,6 +74,14 @@ Preferred communication style: Simple, everyday language.
 - **Reference-Based Responses**: Visitors receive answers grounded in medical PDF references when references are marked with 'visitor' in allowedRoles array
 - **Security**: Visitors cannot access privileged features (appointment scheduling, medical records, patient diagnostics)
 
+### Enhanced Chatbot AI Configuration (Gemini)
+- **Objective Response Format**: System prompts updated to enforce concise, objective responses (~30 words) for both authenticated and visitor endpoints
+- **Reference Prioritization**: Medical PDF references are now explicitly prioritized as the primary source of information before using general AI knowledge
+- **Anti-Repetition Rules**: Chatbot instructed to avoid repeating information already stated in conversation history, always bringing new or complementary information
+- **Consistent Behavior**: Both `/api/chatbot/message` (authenticated) and `/api/chatbot/visitor-message` (public) endpoints follow the same response guidelines for consistency
+- **Source Citation**: When medical references are available, the AI is instructed to cite sources and base answers on uploaded PDFs first
+- **Test Results**: Functional testing confirmed responses are concise (19 words in test case), reference-aware, and include appropriate medical consultation recommendations
+
 ## System Architecture
 
 ### Frontend Architecture
