@@ -85,28 +85,30 @@ export default function FloatingChatbot() {
       // Use different endpoints based on authentication status
       const endpoint = user ? '/api/chatbot/message' : '/api/chatbot/visitor-message';
       
-      const response = await apiRequest('POST', endpoint, {
+      const res = await apiRequest('POST', endpoint, {
         message
-      }) as any;
+      });
+      
+      const data = await res.json();
       
       // For authenticated users, parse full metadata
       if (user) {
         return {
-          response: response.message?.content || response.response || 'Como posso ajudá-lo hoje?',
-          isSchedulingRequest: response.type === 'appointment',
-          isClinicalQuestion: response.type === 'clinical',
-          suggestedAction: response.metadata?.suggestedAppointment ? 'schedule' : undefined,
-          diagnosticHypotheses: response.metadata?.diagnosticHypotheses,
-          interviewId: response.metadata?.interviewId,
-          interviewStage: response.metadata?.interviewStage,
-          urgencyLevel: response.metadata?.urgencyLevel,
-          isComplete: response.metadata?.isComplete,
-          urgentFlag: response.metadata?.urgentFlag
+          response: data.message?.content || data.response || 'Como posso ajudá-lo hoje?',
+          isSchedulingRequest: data.type === 'appointment',
+          isClinicalQuestion: data.type === 'clinical',
+          suggestedAction: data.metadata?.suggestedAppointment ? 'schedule' : undefined,
+          diagnosticHypotheses: data.metadata?.diagnosticHypotheses,
+          interviewId: data.metadata?.interviewId,
+          interviewStage: data.metadata?.interviewStage,
+          urgencyLevel: data.metadata?.urgencyLevel,
+          isComplete: data.metadata?.isComplete,
+          urgentFlag: data.metadata?.urgentFlag
         };
       } else {
         // For visitors, simpler response structure (no advanced features)
         return {
-          response: response.response || 'Como posso ajudá-lo hoje?',
+          response: data.response || 'Como posso ajudá-lo hoje?',
         };
       }
     },
