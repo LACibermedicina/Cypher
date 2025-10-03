@@ -1399,39 +1399,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = req.user;
 
-      // Only admins and doctors have access to medical records
-      if (user.role !== 'admin' && user.role !== 'doctor') {
-        return res.status(403).json({ message: 'Access denied: Insufficient permissions' });
+      // Get patient first to validate existence
+      const patient = await storage.getPatient(patientId);
+      if (!patient) {
+        return res.status(404).json({ message: 'Patient not found' });
       }
 
-      // Doctors can only access records of their patients
-      if (user.role === 'doctor') {
-        const patient = await storage.getPatient(patientId);
-        if (!patient) {
-          return res.status(404).json({ message: 'Patient not found' });
-        }
+      // Role-based access control
+      if (user.role === 'admin') {
+        // Admins have full access to all medical records
+        const records = await storage.getMedicalRecordsByPatient(patientId);
+        return res.json(records);
+      }
 
+      if (user.role === 'patient') {
+        // Patients can only access their own medical records
+        if (patient.userId !== user.id) {
+          return res.status(403).json({ 
+            message: 'Acesso negado: Você só pode visualizar seus próprios prontuários médicos' 
+          });
+        }
+        const records = await storage.getMedicalRecordsByPatient(patientId);
+        return res.json(records);
+      }
+
+      if (user.role === 'doctor') {
         // Check if doctor is the primary doctor for this patient
         const isPrimaryDoctor = patient.primaryDoctorId === user.id;
         
-        // Check if doctor has any appointments with this patient (efficient query)
+        // Check if doctor has any appointments with this patient
         const doctorAppointments = await storage.getAppointmentsByDoctor(user.id);
         const hasAppointment = doctorAppointments.some(
           apt => apt.patientId === patientId
         );
 
-        if (!isPrimaryDoctor && !hasAppointment) {
-          return res.status(403).json({ 
-            message: 'Access denied: You can only view records of your assigned patients' 
-          });
+        // Check if doctor is in same team hierarchy (superior or through superior's patients)
+        let isInTeamHierarchy = false;
+        if (user.superiorDoctorId) {
+          // Check if patient belongs to superior doctor
+          const superiorAppointments = await storage.getAppointmentsByDoctor(user.superiorDoctorId);
+          isInTeamHierarchy = patient.primaryDoctorId === user.superiorDoctorId || 
+            superiorAppointments.some(apt => apt.patientId === patientId);
         }
+
+        // Allow access if doctor is primary, has appointment, or is in team hierarchy
+        if (isPrimaryDoctor || hasAppointment || isInTeamHierarchy) {
+          const records = await storage.getMedicalRecordsByPatient(patientId);
+          return res.json(records);
+        }
+
+        return res.status(403).json({ 
+          message: 'Acesso negado: Você só pode visualizar prontuários de pacientes atribuídos a você ou sua equipe' 
+        });
       }
 
-      // Admins have full access - no additional checks needed
+      if (user.role === 'researcher') {
+        // Researchers cannot access individual patient medical records (LGPD compliance)
+        return res.status(403).json({ 
+          message: 'Acesso negado: Pesquisadores não têm acesso a prontuários individuais. Use os endpoints de dados estatísticos' 
+        });
+      }
 
-      const records = await storage.getMedicalRecordsByPatient(patientId);
-      res.json(records);
+      // Any other role is denied
+      return res.status(403).json({ message: 'Acesso negado: Permissões insuficientes' });
     } catch (error) {
+      console.error('Get medical records error:', error);
       res.status(500).json({ message: 'Failed to get medical records' });
     }
   });
